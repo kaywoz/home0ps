@@ -2,7 +2,7 @@
 
 **Yo, greetings!**
 
-The purpose of this repos is to store my persoanl iac and other templates or quick-to-use-scripts.
+The purpose of this repos is to store my personal iac and other templates or quick-to-use-scripts.
 
 
 This Repository is my personal template collection. Here you'll find templates, and configurations for various tools, and technologies.
