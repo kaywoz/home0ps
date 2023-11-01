@@ -1,4 +1,4 @@
-# templates and other stuff to re-use
+# templates and other stuff to re-use in my home0ps-projects
 
 **Yo, greetings!**
 
