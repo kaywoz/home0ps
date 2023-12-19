@@ -1,0 +1,16 @@
+services:
+  archiveTeamWarrior:
+    image: atdr.meo.ws/archiveteam/warrior-dockerfile
+    container_name: archivewarrior
+    hostname: archivewarrior
+    ports:
+      - 8001:8001
+    restart: always
+    environment:
+      - HTTP_PASSWORD=placeholder
+      - HTTP_USERNAME=ka
+      - SELECTED_PROJECT=urlteam2
+      - CONCURRENT_ITEMS=4
+      - DOWNLOADER=morna666
+networks: {}
+version: "3.8"
