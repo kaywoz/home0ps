@@ -1,0 +1,140 @@
+baremetal-defaults: &defaults-baremetal
+  group: 🏭 baremetal
+  interval: 30s
+  client:
+    timeout: 10s
+  conditions:
+    - "[CONNECTED] == true"
+
+network-defaults: &defaults-network
+  group: 🕸️ network
+  interval: 30s
+  client:
+    timeout: 10s
+  conditions:
+    - "[CONNECTED] == true"
+
+storage-defaults: &defaults-storage
+  group: 💾 storage
+  interval: 30s
+  client:
+    timeout: 10s
+  conditions:
+    - "[STATUS] == 200"
+    - "[CERTIFICATE_EXPIRATION] > 48h"
+
+docker-defaults: &defaults-docker
+  group: 🐳 docker
+  interval: 30s
+  client:
+    timeout: 10s
+  conditions:
+    - "[STATUS] == 200"
+
+iot-defaults: &defaults-iot
+  group: 🤖 iot
+  interval: 30s
+  client:
+    timeout: 10s
+  conditions:
+    - "[CONNECTED] == true"
+
+hosted-defaults: &defaults-hosted
+  group: 👻 hosted
+  interval: 30s
+  client:
+    timeout: 10s
+  conditions:
+    - "[STATUS] == 200"
+    - "[CERTIFICATE_EXPIRATION] > 48h"
+
+endpoints:
+  - name: Blog - kaywozplayz - HTTP
+    <<: *defaults-hosted
+    url: "https://kaywozplayz.krypi.net"
+
+  - name: Blog - kaywozplayz.krypi.net - DNS
+    group: dns
+    url: "1.1.1.1"
+    interval: 5m
+    dns:
+      query-name: "kaywozplayz.krypi.net"
+      query-type: "A"
+    conditions:
+      - "[DNS_RCODE] == NOERROR"
+
+  - name: firewall - 🐨 wally-wombat - ping
+    <<: *defaults-baremetal
+    url: "icmp://192.168.1.1"
+
+  - name: hypervisor - 🐅 sexy-serval - ping
+    <<: *defaults-baremetal
+    url: "icmp://sexy-serval"
+
+  - name: hypervisor - 🐘 edgy-elephant - ping
+    <<: *defaults-baremetal
+    url: "icmp://edgy-elephant"
+
+  - name: storage - 🐠 nappy-nightfish - ping
+    <<: *defaults-baremetal
+    url: "icmp://nappy-nightfish"
+
+  - name: docker - 🐧 plenty-penguin - ping
+    <<: *defaults-baremetal
+    url: "icmp://localhost"
+
+  - name: gpuworker - 🐵 grunty-gibbon - ping
+    <<: *defaults-baremetal
+    url: "icmp://grunty-gibbon"
+
+  - name: openmediavault - nappy-nightfish - HTTP
+    <<: *defaults-hosted
+    url: "https://nappy-nightfish"
+
+  - name: switch - 🌲 flexy - ping
+    <<: *defaults-network
+    url: "icmp://192.168.1.14"
+
+  - name: ap - 🌲 u6litey - ping
+    <<: *defaults-network
+    url: "icmp://192.168.1.13"
+
+  - name: ap - 🌲 u6proey - ping
+    <<: *defaults-network
+    url: "icmp://192.168.1.12"
+
+  - name: switch - 🌲 uswy - ping
+    <<: *defaults-network
+    url: "icmp://192.168.1.11"
+
+  - name: tv - framey - ping
+    <<: *defaults-iot
+    url: "icmp://192.168.13.52"
+
+  - name: googlehome - homy - ping
+    <<: *defaults-iot
+    url: "icmp://192.168.13.59"
+
+  - name: cabletv - hubby - ping
+    <<: *defaults-iot
+    url: "icmp://192.168.13.57"
+
+  - name: hue-bridge - huey - ping
+    <<: *defaults-iot
+    url: "icmp://192.168.13.56"
+
+  - name: smart socket - tappy - ping
+    <<: *defaults-iot
+    url: "icmp://192.168.13.50"
+
+  - name: container - 🐜 archivewarrior11 - http
+    <<: *defaults-docker
+    url: "http://192.168.1.21:8001"
+
+  - name: container - 🐜 archivewarrior12 - http
+    <<: *defaults-docker
+    url: "http://192.168.1.21:8002"
+
+  - name: container - 🐜 archivewarrior13 - http
+    <<: *defaults-docker
+    url: "http://192.168.1.21:8003"
