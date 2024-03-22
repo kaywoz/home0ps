@@ -37,9 +37,9 @@ iot-defaults: &defaults-iot
   client:
     timeout: 10s
   conditions:
-    - "[CONNECTED] == true"
+    - "[CONNECTED] == true"S
 
-hosted-defaults: &defaults-hosted
+hosted-defaults: &defaults-hostedS
   group: 👻 hosted
   interval: 30s
   client:

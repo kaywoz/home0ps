@@ -1,0 +1,26 @@
+# docker network create -d macvlan \
+#  --subnet=192.168.13.0/24 \
+#  --gateway=192.168.13.1 \
+#  --ip-range 192.168.13.2/29 \
+#  -o parent=enp1s0.13 \
+#  macvlan13
+
+  
+version: "3.8"
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx_macvlan
+    networks:
+      macvlan_network:
+        ipv4_address: 192.168.13.3
+networks:
+  macvlan_network:
+    driver: macvlan
+    driver_opts:
+      parent: enp1s0.13
+    ipam:
+      config:
+        - subnet: 192.168.13.0/24
+          gateway: 192.168.13.1
+          ip_range: 192.168.13.0/29
