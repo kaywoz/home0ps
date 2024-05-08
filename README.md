@@ -11,7 +11,7 @@ This repository is my personal template collection. Here you'll find templates, 
 <!-- eraser-additional-content -->
 ## Diagrams
 <!-- eraser-additional-files -->
-<a href="/README-krypi.net h0me0ps-1.eraserdiagram" data-element-id="P3xiglesT1v3IJCKGm6H1"><img src="/.eraser/w7KGBbqem433wRv7Y7wP___X0sJn9MOhPegOp7fnl0MHqOu1LT2___---diagram----bf49a5f6b3f04ab5acd9a05908fcffce-krypi-net-h0me0ps.png" alt="" data-element-id="P3xiglesT1v3IJCKGm6H1" /></a>
+<a href="/README-krypi.net h0me0ps-1.eraserdiagram" data-element-id="P3xiglesT1v3IJCKGm6H1"><img src="/.eraser/w7KGBbqem433wRv7Y7wP___X0sJn9MOhPegOp7fnl0MHqOu1LT2___---diagram----a5074554040a836d48a70dbc34f8dec0-krypi-net-h0me0ps.png" alt="" data-element-id="P3xiglesT1v3IJCKGm6H1" /></a>
 <!-- end-eraser-additional-files -->
 <!-- end-eraser-additional-content -->
 <!--- Eraser file: https://app.eraser.io/workspace/w7KGBbqem433wRv7Y7wP --->

@@ -3,7 +3,7 @@ cloud-architecture-diagram
 title krypi.net h0me0ps
 
 // Physical layer contains actual hardware and their operating systems
-hardware [color: blue] {
+hardware [color: blue, colorMode: bold] {
   Sexy-serval [icon: server] // xcp-ng
   Edgy-elephant [icon:server] // xcp-ng
   Nasty-nightfish [icon: storage] // casaos, acts as NAS
@@ -12,7 +12,7 @@ hardware [color: blue] {
 }
 
 // Logical layer represents the separation of networks based on VLANs
-network [color: green] {
+network [color: green, colorMode: bold] {
   VLAN1-Trust-Untagged [icon: network-wired]
   VLAN2-Trust-Hypervisor [icon: network-wired]
   VLAN3-Trust-Storage [icon: network-wired]
@@ -27,7 +27,7 @@ network [color: green] {
 }
 
 // Virtual layer includes VMs and containers running on the physical servers
-machines [color: lightcoral] {
+machines [color: lightcoral, colorMode: bold] {
   VMs-on-XCP-NG [icon: virtual-machine]
   Containers-on-Docker [icon: docker]
 }
@@ -39,13 +39,13 @@ services [color: grey] {
 }
 
 // Overlay layer connects all nodes with specific service filters
-tailscale [color: orange] {
+tailscale [color: orange, colorMode: bold] {
   Snow-Koi.ts.net [icon: tailscale] // Tailscale tailnet
 }
 
 // cloudflare tunnels proxying connections
-cloudflare [color: yellow] {
-  cloudflare [icon: cloudflare] // cloudflare
+cloudflare [color: yellow, colorMode: bold] {
+  cloudflare [icon: network] // cloudflare
 }
 
 // Connections within Physical layer
