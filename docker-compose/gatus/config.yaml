@@ -1,5 +1,14 @@
+alerting:
+  slack:
+    webhook-url: "https://hooks.slack.com/services/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"
+    default-alert:
+      description: "health check failed"
+      send-on-resolved: true
+      failure-threshold: 1
+      success-threshold: 5    
+
 baremetal-defaults: &defaults-baremetal
-  group: 🏭 baremetal
+  group: baremetal
   interval: 30s
   client:
     timeout: 10s
@@ -7,7 +16,7 @@ baremetal-defaults: &defaults-baremetal
     - "[CONNECTED] == true"
 
 network-defaults: &defaults-network
-  group: 🕸️ network
+  group:  network
   interval: 30s
   client:
     timeout: 10s
@@ -15,7 +24,7 @@ network-defaults: &defaults-network
     - "[CONNECTED] == true"
 
 storage-defaults: &defaults-storage
-  group: 💾 storage
+  group: storage
   interval: 30s
   client:
     timeout: 10s
@@ -24,7 +33,7 @@ storage-defaults: &defaults-storage
     - "[CERTIFICATE_EXPIRATION] > 48h"
 
 docker-defaults: &defaults-docker
-  group: 🐳 docker
+  group: docker
   interval: 30s
   client:
     timeout: 10s
@@ -32,15 +41,15 @@ docker-defaults: &defaults-docker
     - "[STATUS] == 200"
 
 iot-defaults: &defaults-iot
-  group: 🤖 iot
+  group: iot
   interval: 30s
   client:
     timeout: 10s
   conditions:
-    - "[CONNECTED] == true"S
+    - "[CONNECTED] == true"
 
-hosted-defaults: &defaults-hostedS
-  group: 👻 hosted
+hosted-defaults: &defaults-hosted
+  group: hosted
   interval: 30s
   client:
     timeout: 10s
@@ -48,12 +57,20 @@ hosted-defaults: &defaults-hostedS
     - "[STATUS] == 200"
     - "[CERTIFICATE_EXPIRATION] > 48h"
 
+cloud-defaults: &defaults-cloud
+  group: cloud
+  interval: 30s
+  client:
+    timeout: 10s
+  conditions:
+    - "[CONNECTED] == true"    
+
 endpoints:
-  - name: Blog - kaywozplayz - HTTP
+  - name: blog - kaywozplayz - HTTP
     <<: *defaults-hosted
     url: "https://kaywozplayz.krypi.net"
 
-  - name: Blog - kaywozplayz.krypi.net - DNS
+  - name: blog - kaywozplayz.krypi.net - DNS
     group: dns
     url: "1.1.1.1"
     interval: 5m
@@ -61,80 +78,36 @@ endpoints:
       query-name: "kaywozplayz.krypi.net"
       query-type: "A"
     conditions:
-      - "[DNS_RCODE] == NOERROR"
+      - "[DNS_RCODE] == NOERROR"   
 
-  - name: firewall - 🐨 wally-wombat - ping
+  - name: firewall - wally-wombat - ping
     <<: *defaults-baremetal
     url: "icmp://192.168.1.1"
 
-  - name: hypervisor - 🐅 sexy-serval - ping
+  - name: hypervisor - sexy-serval - ping
     <<: *defaults-baremetal
     url: "icmp://sexy-serval"
 
-  - name: hypervisor - 🐘 edgy-elephant - ping
+  - name: hypervisor - edgy-elephant - ping
     <<: *defaults-baremetal
     url: "icmp://edgy-elephant"
 
-  - name: storage - 🐠 nappy-nightfish - ping
+  - name: storage - nappy-nightfish - ping
     <<: *defaults-baremetal
     url: "icmp://nappy-nightfish"
 
-  - name: docker - 🐧 plenty-penguin - ping
+  - name: docker - plenty-penguin - ping
     <<: *defaults-baremetal
-    url: "icmp://localhost"
+    url: "icmp://plenty-penguin"
 
-  - name: gpuworker - 🐵 grunty-gibbon - ping
-    <<: *defaults-baremetal
+  - name: gpuworker - clpc12 - ping
+    <<: *defaults-cloud
     url: "icmp://grunty-gibbon"
 
-  - name: openmediavault - nappy-nightfish - HTTP
-    <<: *defaults-hosted
-    url: "https://nappy-nightfish"
+  - name: cloudworker - clpc11 - ping
+    <<: *defaults-cloud
+    url: "icmp://clpc11"    
 
-  - name: switch - 🌲 flexy - ping
-    <<: *defaults-network
-    url: "icmp://192.168.1.14"
-
-  - name: ap - 🌲 u6litey - ping
-    <<: *defaults-network
-    url: "icmp://192.168.1.13"
-
-  - name: ap - 🌲 u6proey - ping
-    <<: *defaults-network
-    url: "icmp://192.168.1.12"
-
-  - name: switch - 🌲 uswy - ping
-    <<: *defaults-network
-    url: "icmp://192.168.1.11"
-
-  - name: tv - framey - ping
-    <<: *defaults-iot
-    url: "icmp://192.168.13.52"
-
-  - name: googlehome - homy - ping
-    <<: *defaults-iot
-    url: "icmp://192.168.13.59"
-
-  - name: cabletv - hubby - ping
-    <<: *defaults-iot
-    url: "icmp://192.168.13.57"
-
-  - name: hue-bridge - huey - ping
-    <<: *defaults-iot
-    url: "icmp://192.168.13.56"
-
-  - name: smart socket - tappy - ping
-    <<: *defaults-iot
-    url: "icmp://192.168.13.50"
-
-  - name: container - 🐜 archivewarrior11 - http
-    <<: *defaults-docker
-    url: "http://192.168.1.21:8001"
-
-  - name: container - 🐜 archivewarrior12 - http
-    <<: *defaults-docker
-    url: "http://192.168.1.21:8002"
-
-  - name: container - 🐜 archivewarrior13 - http
-    <<: *defaults-docker
-    url: "http://192.168.1.21:8003"
+  - name: cloudworker - na - ping
+    <<: *defaults-cloud
+    url: "icmp://na"   
