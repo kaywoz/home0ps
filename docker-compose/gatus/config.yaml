@@ -1,6 +1,6 @@
 alerting:
   slack:
-    webhook-url: "PLACEHOLDER"
+    webhook-url: PLACEHOLDER
     default-alert:
       description: "health check failed"
       send-on-resolved: true
