@@ -1,0 +1,68 @@
+flowchart-diagram
+
+internet-wan1clean[icon: cloud, color: black]
+internet-wan2dirty[icon: cloud, color: black]
+firewall[icon: firewall, color: red]
+tailscale[icon: cloudflare, color: FFA500]
+cloudflare[icon: cloudflare, color: FFA500]
+
+cloud [icon: cloud, color: pink] {
+    cloud workloads [icon: warehouse]{
+      cloud servers  {
+        clp-monitor11 [colormode: pastel, icon: virtual-machine, color: 40E0D0]
+        clp-worker11 [colormode: pastel, icon: virtual-machine, color: 40E0D0]
+  }
+    }
+}
+
+
+  physical [icon: warehouse]{
+    hypervisors [color: grey]{
+
+      edgy-elephant [icon: server, color: yellow]
+      sexy-serval [icon: server, color: yellow]
+      wally-wombat [icon: server, color: yellow]
+      plenty-penguin [icon: server, color: yellow]
+    }
+    network {
+
+     uswy [icon: switch, color: pink]
+     flexy [icon: switch, color: pink]
+     proey [icon: wifi, color: pink]
+     litey [icon: wifi, color: pink]
+    }
+ workloads [icon: warehouse]{
+
+servers  {
+  alp-xos11 [colormode: pastel, icon: virtual-machine, color: 40E0D0]
+  abp-opnsense11 [colormode: pastel, icon: virtual-machine, color: 40E0D0]
+  }
+services {
+  
+  cloudflared11 [colormode: pastel, icon: docker, color: 40E0D0]
+     }
+    }
+  }
+
+
+
+
+// connections et.al
+  
+internet-wan1clean <> firewall : h0me0ps 
+internet-wan2dirty <> firewall : lab
+
+firewall <> abp-opnsense11 : uplink
+abp-opnsense11  <> uswy,flexy :trunk
+flexy - proey - litey
+
+sexy-serval, edgy-elephant, wally-wombat, plenty-penguin > uswy : trunk
+
+workloads,hypervisors,cloud-workloads --> tailscale : tailscale acl
+cloudflared11 --> cloudflare : cloudflare access
+cloudflare -->internet-wan1clean : cloudflare access
+
+
+
+
+
