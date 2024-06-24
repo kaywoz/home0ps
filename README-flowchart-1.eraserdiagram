@@ -3,20 +3,20 @@ flowchart-diagram
 internet-wan1clean[icon: cloud, color: black]
 internet-wan2dirty[icon: cloud, color: black]
 firewall[icon: firewall, color: red]
-tailscale[icon: cloudflare, color: FFA500]
-cloudflare[icon: cloudflare, color: FFA500]
+tailscale[icon: cloudflare, color: orange]
+cloudflare[icon: cloudflare, color: orange]
 
 cloud [icon: cloud, color: pink] {
     cloud workloads [icon: warehouse]{
-      cloud servers  {
-        clp-monitor11 [colormode: pastel, icon: virtual-machine, color: 40E0D0]
-        clp-worker11 [colormode: pastel, icon: virtual-machine, color: 40E0D0]
+      cloud servers [color: white ]  {
+        clp-monitor11 [colormode: solid, icon: virtual-machine, color: blue]
+        clp-worker11 [colormode: solid, icon: virtual-machine, color: blue]
   }
     }
 }
 
 
-  physical [icon: warehouse]{
+  physical [icon: warehouse, color: pink]{
     hypervisors [color: grey]{
 
       edgy-elephant [icon: server, color: yellow]
@@ -24,7 +24,13 @@ cloud [icon: cloud, color: pink] {
       wally-wombat [icon: server, color: yellow]
       plenty-penguin [icon: server, color: yellow]
     }
-    network {
+    iot [color: grey ]{
+      framey [icon: tv, color: green]
+      tappy [icon: electron, color: green]
+      funny [icon: controller, color: green]
+      huey [icon: activity, color: green]
+    }
+    network[color: grey ] {
 
      uswy [icon: switch, color: pink]
      flexy [icon: switch, color: pink]
@@ -33,13 +39,13 @@ cloud [icon: cloud, color: pink] {
     }
  workloads [icon: warehouse]{
 
-servers  {
-  alp-xos11 [colormode: pastel, icon: virtual-machine, color: 40E0D0]
-  abp-opnsense11 [colormode: pastel, icon: virtual-machine, color: 40E0D0]
+servers [color: white ] {
+  alp-xos11 [colormode: solid, icon: virtual-machine, color: blue]
+  abp-opnsense11 [colormode: solid, icon: virtual-machine, color: blue]
   }
-services {
+services [color: white ] {
   
-  cloudflared11 [colormode: pastel, icon: docker, color: 40E0D0]
+  cloudflared11 [colormode: solid, icon: docker, color: blue]
      }
     }
   }
@@ -53,8 +59,9 @@ internet-wan1clean <> firewall : h0me0ps
 internet-wan2dirty <> firewall : lab
 
 firewall <> abp-opnsense11 : uplink
-abp-opnsense11  <> uswy,flexy :trunk
-flexy - proey - litey
+abp-opnsense11  <> uswy : trunk
+uswy - flexy - proey - litey
+iot <> flexy, proey, litey : vlan13iot
 
 sexy-serval, edgy-elephant, wally-wombat, plenty-penguin > uswy : trunk
 
