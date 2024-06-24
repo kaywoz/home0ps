@@ -59,11 +59,11 @@ internet-wan1clean <> firewall : h0me0ps
 internet-wan2dirty <> firewall : lab
 
 firewall <> abp-opnsense11 : uplink
-abp-opnsense11  <> uswy : trunk
+abp-opnsense11  - uswy : trunk
 uswy - flexy - proey - litey
 iot <> flexy, proey, litey : vlan13iot
 
-sexy-serval, edgy-elephant, wally-wombat, plenty-penguin > uswy : trunk
+sexy-serval, edgy-elephant, wally-wombat, plenty-penguin - uswy : trunk
 
 workloads,hypervisors,cloud-workloads --> tailscale : tailscale acl
 cloudflared11 --> cloudflare : cloudflare access
