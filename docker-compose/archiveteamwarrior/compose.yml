@@ -1,16 +1,49 @@
 services:
-  archiveTeamWarrior:
+  archiveTeamWarrior11:
     image: atdr.meo.ws/archiveteam/warrior-dockerfile
-    container_name: archivewarrior
-    hostname: archivewarrior
-    ports:
-      - 8001:8001
+    container_name: archivewarrior11
+    hostname: archivewarrior11
+    expose:
+      - 8001
     restart: always
     environment:
-      - HTTP_PASSWORD=placeholder ## login pw
-      - HTTP_USERNAME=kaplaceholder ## login username
-      - SELECTED_PROJECT=urlteam2
-      - CONCURRENT_ITEMS=4
-      - DOWNLOADER=placeholder ##high score name
-networks: {}
-version: "3.8"
+      - HTTP_PASSWORD=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_PASSWORD }}
+      - HTTP_USERNAME=ARCHIVETEAMWARRIOR_HTTP_USERNAME
+      - SELECTED_PROJECT=pastebin
+      - CONCURRENT_ITEMS=2
+      - DOWNLOADER=morna
+    networks:
+      - cloudflare
+  archiveTeamWarrior12:
+    image: atdr.meo.ws/archiveteam/warrior-dockerfile
+    container_name: archivewarrior12
+    hostname: archivewarrior12
+    expose:
+      - 8002
+    restart: always
+    environment:
+      - HTTP_PASSWORD=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_PASSWORD }}
+      - HTTP_USERNAME=ARCHIVETEAMWARRIOR_HTTP_USERNAME
+      - SELECTED_PROJECT=imgur
+      - CONCURRENT_ITEMS=2
+      - DOWNLOADER=morna
+    networks:
+      - cloudflare
+  archiveTeamWarrior13:
+    image: atdr.meo.ws/archiveteam/warrior-dockerfile
+    container_name: archivewarrior13
+    hostname: archivewarrior13
+    expose:
+      - 8003
+    restart: always
+    environment:
+      - HTTP_PASSWORD=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_PASSWORD }}
+      - HTTP_USERNAME=ARCHIVETEAMWARRIOR_HTTP_USERNAME
+      - SELECTED_PROJECT=auto
+      - CONCURRENT_ITEMS=2
+      - DOWNLOADER=morna
+    networks:
+      - archiveteamwarrior-cloudflare
+networks:
+  archiveteamwarrior-cloudflare:
+    external: true
