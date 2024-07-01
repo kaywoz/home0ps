@@ -12,8 +12,7 @@ services:
       - SELECTED_PROJECT=pastebin
       - CONCURRENT_ITEMS=2
       - DOWNLOADER=morna
-    networks:
-      - cloudflare
+    networks: {}
   archiveTeamWarrior12:
     image: atdr.meo.ws/archiveteam/warrior-dockerfile
     container_name: archivewarrior12
@@ -27,8 +26,7 @@ services:
       - SELECTED_PROJECT=imgur
       - CONCURRENT_ITEMS=2
       - DOWNLOADER=morna
-    networks:
-      - cloudflare
+    networks: {}
   archiveTeamWarrior13:
     image: atdr.meo.ws/archiveteam/warrior-dockerfile
     container_name: archivewarrior13
@@ -42,8 +40,4 @@ services:
       - SELECTED_PROJECT=auto
       - CONCURRENT_ITEMS=2
       - DOWNLOADER=morna
-    networks:
-      - archiveteamwarrior-cloudflare
-networks:
-  archiveteamwarrior-cloudflare:
-    external: true
+    networks: {}
