@@ -8,7 +8,7 @@ services:
     restart: always
     environment:
       - HTTP_PASSWORD=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_PASSWORD }}
-      - HTTP_USERNAME=ARCHIVETEAMWARRIOR_HTTP_USERNAME
+      - HTTP_USERNAME=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_USERNAME }}
       - SELECTED_PROJECT=pastebin
       - CONCURRENT_ITEMS=2
       - DOWNLOADER=morna
@@ -23,7 +23,7 @@ services:
     restart: always
     environment:
       - HTTP_PASSWORD=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_PASSWORD }}
-      - HTTP_USERNAME=ARCHIVETEAMWARRIOR_HTTP_USERNAME
+      - HTTP_USERNAME=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_USERNAME }}
       - SELECTED_PROJECT=imgur
       - CONCURRENT_ITEMS=2
       - DOWNLOADER=morna
@@ -38,7 +38,7 @@ services:
     restart: always
     environment:
       - HTTP_PASSWORD=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_PASSWORD }}
-      - HTTP_USERNAME=ARCHIVETEAMWARRIOR_HTTP_USERNAME
+      - HTTP_USERNAME=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_USERNAME }}
       - SELECTED_PROJECT=auto
       - CONCURRENT_ITEMS=2
       - DOWNLOADER=morna
