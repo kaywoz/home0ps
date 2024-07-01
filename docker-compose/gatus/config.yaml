@@ -1,15 +1,20 @@
 alerting:
   slack:
-    webhook-url: PLACEHOLDER
+    webhook-url: ${{ secrets.GATUS_WEBHOOK_URL }}
     default-alert:
       description: "health check failed"
       send-on-resolved: true
       failure-threshold: 1
       success-threshold: 5    
 
+security:
+  basic:
+    username: ${{ secrets.GATUS_BASIC_USERNAME }}
+    password-bcrypt-base64: ${{ secrets.GATUS_BASIC_AUTH }}
+
 baremetal-defaults: &defaults-baremetal
   group: baremetal
-  interval: 30s
+  interval: 60s
   client:
     timeout: 10s
   conditions:
@@ -17,7 +22,7 @@ baremetal-defaults: &defaults-baremetal
 
 network-defaults: &defaults-network
   group:  network
-  interval: 30s
+  interval: 60s
   client:
     timeout: 10s
   conditions:
@@ -25,7 +30,7 @@ network-defaults: &defaults-network
 
 storage-defaults: &defaults-storage
   group: storage
-  interval: 30s
+  interval: 60s
   client:
     timeout: 10s
   conditions:
@@ -34,7 +39,7 @@ storage-defaults: &defaults-storage
 
 docker-defaults: &defaults-docker
   group: docker
-  interval: 30s
+  interval: 60s
   client:
     timeout: 10s
   conditions:
@@ -42,7 +47,7 @@ docker-defaults: &defaults-docker
 
 iot-defaults: &defaults-iot
   group: iot
-  interval: 30s
+  interval: 60s
   client:
     timeout: 10s
   conditions:
@@ -50,7 +55,7 @@ iot-defaults: &defaults-iot
 
 hosted-defaults: &defaults-hosted
   group: hosted
-  interval: 30s
+  interval: 60s
   client:
     timeout: 10s
   conditions:
@@ -59,7 +64,7 @@ hosted-defaults: &defaults-hosted
 
 cloud-defaults: &defaults-cloud
   group: cloud
-  interval: 30s
+  interval: 60s
   client:
     timeout: 10s
   conditions:
@@ -80,9 +85,9 @@ endpoints:
     conditions:
       - "[DNS_RCODE] == NOERROR"   
 
-  - name: firewall - wally-wombat - ping
+  - name: firewall - abp-opnsense11 - ping
     <<: *defaults-baremetal
-    url: "icmp://192.168.1.1"
+    url: "icmp://abp-opnsense11"
 
   - name: hypervisor - sexy-serval - ping
     <<: *defaults-baremetal
@@ -92,6 +97,10 @@ endpoints:
     <<: *defaults-baremetal
     url: "icmp://edgy-elephant"
 
+  - name: hypervisor - wally-wombat - ping
+    <<: *defaults-baremetal
+    url: "icmp://wally-wombat"
+
   - name: storage - nappy-nightfish - ping
     <<: *defaults-baremetal
     url: "icmp://nappy-nightfish"
@@ -100,14 +109,22 @@ endpoints:
     <<: *defaults-baremetal
     url: "icmp://plenty-penguin"
 
-  - name: gpuworker - clpc12 - ping
-    <<: *defaults-cloud
-    url: "icmp://grunty-gibbon"
+  - name: sbc - banging-blueberry - ping
+    <<: *defaults-baremetal
+    url: "icmp://banging-blueberry"
 
-  - name: cloudworker - clpc11 - ping
+  - name: gpu-vps - clp-worker11 - ping
     <<: *defaults-cloud
-    url: "icmp://clpc11"    
+    url: "icmp://clp-worker11"
+
+  - name: vps - clp-monitor11 - ping
+    <<: *defaults-cloud
+    url: "icmp://clp-monitor11"
 
   - name: cloudworker - na - ping
     <<: *defaults-cloud
-    url: "icmp://na"   
+    url: "icmp://na"
+
+  - name: test - test - ping
+    <<: *defaults-cloud
+    url: "icmp://1.1.1.1"

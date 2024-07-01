@@ -1,0 +1,27 @@
+version: "3.8"
+services:
+  folding-at-home-gpu:
+    image: yurinnick/folding-at-home:latest-nvidia
+    container_name: fahgpu11
+    environment:
+      - USER=Morna
+      - TEAM=37451
+      - PASSKEY=b8028855f0642f79b8028855f0642f79 #feel free to fold in my name, lawl.
+      - ENABLE_GPU=true
+      - ENABLE_SMP=false
+      - PUID=1000
+      - PGUI=1000
+      # - ALLOWED_HOSTS=0/0
+    volumes:
+      - /srv/fah/work:/opt/fahclient/work
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities:
+                - gpu
+    expose:
+      - 7396:7396
+      - 36330:36330
+    restart: unless-stopped
+    networks: {}

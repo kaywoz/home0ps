@@ -1,0 +1,19 @@
+version: "3.3"
+services:
+  docker-socket-proxy:
+    container_name: docker-socket-proxy11
+    restart: always
+    privileged: true
+    environment:
+      - CONTAINERS=1
+      - SERVICES=1
+      - TASKS=1
+      - POST=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - 127.0.0.1:2375:2375
+    image: tecnativa/docker-socket-proxy
+    networks:
+      - docker-socket-proxy_default
+networks: {}

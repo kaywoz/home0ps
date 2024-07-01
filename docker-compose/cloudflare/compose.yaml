@@ -1,0 +1,12 @@
+version: "3.3"
+services:
+  cloudflared:
+    restart: always
+    container_name: cloudflareds11
+    image: cloudflare/cloudflared:latest
+    command: >
+    ##(placeholder)
+    ##networks: {}
+networks:
+  macvlan99:
+    external: true

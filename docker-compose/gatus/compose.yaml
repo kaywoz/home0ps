@@ -1,0 +1,12 @@
+version: "3.9"
+services:
+  gatus:
+    restart: always
+    image: twinproduction/gatus:latest
+    container_name: gatus11
+    ports:
+      - 8090:8080
+    volumes:
+      - ./config:/config
+      - ./data:/data/
+    networks: {}
