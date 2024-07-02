@@ -1,0 +1,12 @@
+services:
+  golink:
+    image: ghcr.io/tailscale/golink:main
+    container_name: golink11
+    restart: unless-stopped
+    user: root
+    ports:
+      - 8081:8080
+    environment:
+      - TS_AUTHKEY= #placeholder
+      - ./golink/tmp/golink:/home/nonroot
+networks: {}

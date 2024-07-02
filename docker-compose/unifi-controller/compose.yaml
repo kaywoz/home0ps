@@ -3,28 +3,26 @@ services:
   mongo:
     image: mongo:3.6
     container_name: unifi_controller_mongo11
-    networks:
-      - unifi
+    networks: {}
     restart: always
     volumes:
-      - db:/data/db
-      - dbcfg:/data/configdb
+      - ./db:/data/db
+      - ./dbcfg:/data/configdb
   controller:
     image: jacobalberty/unifi:${TAG:-latest}
     container_name: unifi_controller11
     depends_on:
       - mongo
     init: true
-    networks:
-      - unifi
+    networks: {}
     restart: always
     volumes:
-      - dir:/unifi
-      - data:/unifi/data
-      - log:/unifi/log
-      - cert:/unifi/cert
-      - init:/unifi/init.d
-      - run:/var/run/unifi
+      - ./dir:/unifi
+      - ./data:/unifi/data
+      - ./log:/unifi/log
+      - ./cert:/unifi/cert
+      - ./init:/unifi/init.d
+      - ./run:/var/run/unifi
       - ./backup:/unifi/data/backup
     user: unifi
     sysctls:
@@ -34,13 +32,13 @@ services:
       STATDB_URI: mongodb://mongo/unifi_stat
       DB_NAME: unifi
     ports:
-      - 3478:3478/udp # STUN
-      - 6789:6789/tcp # Speed test
-      - 8080:8080/tcp # Device/ controller comm.
-      - 8443:8443/tcp # Controller GUI/API as seen in a web browser
-      - 8880:8880/tcp # HTTP portal redirection
-      - 8843:8843/tcp # HTTPS portal redirection
-      - 10001:10001/udp # AP discovery
+      - 3478:3478/udp
+      - 6789:6789/tcp
+      - 8080:8080/tcp
+      - 8443:8443/tcp
+      - 8880:8880/tcp
+      - 8843:8843/tcp
+      - 10001:10001/udp
   logs:
     image: bash
     container_name: unifi_controller_logs11
@@ -49,15 +47,5 @@ services:
     command: bash -c 'tail -F /unifi/log/*.log'
     restart: always
     volumes:
-      - log:/unifi/log
-volumes:
-  db: null
-  dbcfg: null
-  data: null
-  log: null
-  cert: null
-  init: null
-  dir: null
-  run: null
-networks:
-  unifi: null
+      - ./log:/unifi/log
+    networks: {}

@@ -1,33 +1,30 @@
 services:
   healthchecks:
-    image: healthchecks/healthchecks:latest
-    container_name: healthchecks
+    image: lscr.io/linuxserver/healthchecks:latest
+    container_name: healthchecks11
     environment:
-      - ALLOWED_HOSTS=cloudflare.domain.com,vanity-subdomain.domain.com
-      - DB=sqlite
-      - DB_NAME=/tmp/hc.sqlite
-      - SITE_ROOT=https://cloudflare.domain.com
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Stockholm
+      - SITE_ROOT= #placeholder
+      - SITE_NAME=healthchecks
+      - SUPERUSER_EMAIL= #placeholder
+      - SUPERUSER_PASSWORD= #placeholder
       - DEBUG=False
-      - SECRET_KEY=xxxxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx
-      - ADMINS=email-address
-      - DEFAULT_FROM_EMAIL=email-address
-      - EMAIL_HOST=email-relay.domain.com
-      - EMAIL_HOST_USER=apikey
-      - EMAIL_HOST_PASSWORD=the_api_key
+      - PING_EMAIL_DOMAIN= #placeholder
+      - INTEGRATIONS_ALLOW_PRIVATE_IPS=True
+      - SECRET_KEY= #placeholder
+      - SITE_LOGO_URL=https://github.com/kaywoz/ka/blob/main/files/seal1.png?raw=true
       - REGISTRATION_OPEN=False
-      - PING_EMAIL_DOMAIN=vanity-domain.com
-      - PING_ENDPOINT=https://vanity-subdomain.domain.com:8000/ping/
-      - SMTPD_PORT=25
-      - SITE_NAME=site_name_and_app_name
-      - DISCORD_CLIENT_ID=discord_app_oauth_id
-      - DISCORD_CLIENT_SECRET=discord_app_oauth_secret
+      #- DB=sqlite
+      #- DB_NAME=/data/hc.sqlite
+      #- DB_PASSWORD=fixme-postgres-password
+      #- DB_USER=dbuser
+    volumes:
+      - ./healthchecks-data:/data
+      - ./healthchecks-data/config:/config
     ports:
       - 8000:8000
-      - 25:25
-    volumes:
-      - healthchecks-data:/data
+      - 2525:2525
     restart: unless-stopped
-volumes:
-  healthchecks-data: null
-version: "3.8"
-networks: {}
+    networks: {}

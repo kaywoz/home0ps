@@ -4,8 +4,8 @@ services:
     restart: always
     image: twinproduction/gatus:latest
     container_name: gatus11
-    ports:
-      - 8090:8080
+    expose:
+      - 8080
     volumes:
       - ./config:/config
       - ./data:/data/

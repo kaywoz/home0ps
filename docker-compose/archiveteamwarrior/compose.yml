@@ -3,8 +3,8 @@ services:
     image: atdr.meo.ws/archiveteam/warrior-dockerfile
     container_name: archivewarrior11
     hostname: archivewarrior11
-    expose:
-      - 8001
+    ports:
+      - 8001:8001
     restart: always
     environment:
       - HTTP_PASSWORD=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_PASSWORD }}
@@ -17,8 +17,8 @@ services:
     image: atdr.meo.ws/archiveteam/warrior-dockerfile
     container_name: archivewarrior12
     hostname: archivewarrior12
-    expose:
-      - 8002
+    ports:
+      - 8002:8001
     restart: always
     environment:
       - HTTP_PASSWORD=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_PASSWORD }}
@@ -31,8 +31,8 @@ services:
     image: atdr.meo.ws/archiveteam/warrior-dockerfile
     container_name: archivewarrior13
     hostname: archivewarrior13
-    expose:
-      - 8003
+    ports:
+      - 8003:8001
     restart: always
     environment:
       - HTTP_PASSWORD=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_PASSWORD }}

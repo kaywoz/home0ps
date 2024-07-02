@@ -1,0 +1,24 @@
+version: "3"
+services:
+  homeassistant:
+    container_name: homeassistant11
+    image: ghcr.io/home-assistant/home-assistant:stable
+    volumes:
+      - ./config:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    restart: always
+    privileged: true
+    ports:
+      - 8123:8123
+    networks:
+      macvlan13:
+        ipv4_address: 192.168.13.11
+    environment:
+      VLAN: 13
+networks:
+  macvlan13:
+    name: macvlan13
+    external: true

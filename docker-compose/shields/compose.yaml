@@ -1,0 +1,11 @@
+version: "3.3"
+services:
+  shields11:
+    restart: always
+    ports:
+      - 8091:8080
+    environment:
+      - PORT=8080
+    container_name: shields11
+    image: shieldsio/shields:server-2024-03-01
+networks: {}
