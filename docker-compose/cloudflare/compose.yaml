@@ -10,3 +10,5 @@ services:
 networks:
   macvlan99:
     external: true
+  #container-network-placeholder:
+    #external: true
