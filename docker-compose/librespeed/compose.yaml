@@ -1,0 +1,8 @@
+services:
+  librespeed:
+    image: ghcr.io/linuxserver/librespeed
+    container_name: librespeed11
+    restart: unless-stopped
+    ports:
+      - 91:80
+    networks: {}
