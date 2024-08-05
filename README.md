@@ -6,7 +6,7 @@ This project will document a self-hosted environment running on an **Odroid M1**
 
 It is meant to maximise the homeops (lul) enviroment and just run on this single board, with as many apps and services as possible.
 
-The project will only use **free** and **open source** software, the enterprise stuff will run in the homelab-environment.
+The project will only use **free** and/or **open source** software, the enterprise stuff will run in the homelab-environment.
 
 
 > [!IMPORTANT]
@@ -72,7 +72,7 @@ The project will only use **free** and **open source** software, the enterprise 
 
 There have been many steps in this project, and it has been hosted on different hardware, running different stacks of software since 2022?
 
-The primary design principes were set to the following, after much deliberation;
+The primary design principles were set to the following, after much deliberation;
 
 - **kiss** (because I always overcomplicate everything)
 - **self-hosted within reason** (take the hardware as far as it goes, reach out to cloud when there is a determined need)
@@ -92,6 +92,8 @@ These are the tools we are going to run :
 | <img src="images/logo-docker-compose.png" alt="Docker Compose logo" height="38"/> | Docker Compose | https://github.com/docker/compose           | Run multi-container applications with Docker         |
 |          <img src="images/logo-kopia.png" alt="Kopia logo" height="32"/>          | Kopia          | https://github.com/kopia/kopia              | Fast and secure open-source backup/restore tool      |
 |    <img src="images/logo-uptime-kuma.svg" alt="Uptime Kuma logo" height="34"/>    | Uptime Kuma    | https://github.com/louislam/uptime-kuma     | Easy-to-use self-hosted monitoring tool              |
+|    <img src="images/logo-tailscale.png" alt="Tailscale logo" height="34"/>    | Tailscale    | https://github.com/tailscale/tailscale    | Private WireGuard® networks made easy|
+
 # Acknowledgments
 
 Acks go here :
