@@ -1,3 +1,3 @@
-** header
+# ka's personal homeops documentation etc
 
-text
+![Static Badge](https://img.shields.io/badge/Free_&_Open_source-GPL_V3-green)
