@@ -94,6 +94,53 @@ These are the tools we are going to run :
 |    <img src="images/logo-uptime-kuma.svg" alt="Uptime Kuma logo" height="34"/>    | Uptime Kuma    | https://github.com/louislam/uptime-kuma     | Easy-to-use self-hosted monitoring tool              |
 |    <img src="images/logo-tailscale.png" alt="Tailscale logo" height="34"/>    | Tailscale    | https://github.com/tailscale/tailscale    | Private WireGuard® networks made easy|
 
+Below is a general connectivity diagram for the hosted services;
+
+```mermaid
+flowchart TB
+
+    style tailnet fill: #69582b
+    style provider-tailscale fill: #69587b
+    style provider-cloudflare fill: #205566
+    style docker fill: #664343
+    style container fill: #612
+    style firewall fill: #615
+    style client fill: #4d683b
+    style reverse-proxy fill: #806930
+
+    SUBDOMAIN_MYAPP1(public-app.krypi.net) --> | cf-tunnel| firewall --> |bypass| container
+    SUBDOMAIN_MYAPP2(internal-app.krypi.net) --> | tailscale sidecar| firewall --> |bypass| container
+
+   subgraph client[client connects via]
+        provider-cloudflare[cloudflare] --> |zta| ddns
+        provider-tailscale[tailscale] --> |vpn  and acl| tailnet
+    end
+
+subgraph ddns[cloudflare]
+        reverse-proxy -->|subdomain| SUBDOMAIN_MYAPP1
+    end
+
+subgraph tailnet[tailnet]
+        tailnet --> SUBDOMAIN_MYAPP2
+    end
+
+
+    subgraph sbc[odroid m1]
+        subgraph docker[docker]
+            subgraph container[containers]
+                    tailscale[tailscale]
+                    cloudflare[cloudflare]
+                    public-app[public-app]
+                    internal-app[internal-app]
+            end
+
+        end
+
+    end
+
+```
+
+
 # Acknowledgments
 
 Acks go here :
