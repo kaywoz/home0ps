@@ -77,7 +77,7 @@ The primary design principles were set to the following, after much deliberation
 - **kiss** (because I always overcomplicate everything)
 - **self-hosted within reason** (take the hardware as far as it goes, reach out to cloud when there is a determined need)
 - **privacy first** (software should honor privacy, encrypt everything))
-- **cloud-agnostic** (cheapes and best is the way to go)
+- **cloud-agnostic** (cheapest and best is the way to go)
 - **secure** (authentication, zero-trust, encryption, logging, backup etc)
 - **light** (4 arm-cores and 4GB RAM is not a lot.)
 - **container-first** (for deployability, transferability etc.)
