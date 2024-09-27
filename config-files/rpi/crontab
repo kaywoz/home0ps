@@ -1,0 +1,4 @@
+
+# sudo apt install isc-dhcp-client , needed for dhclient package as eth0 is not enabled in Ubuntu 24.04
+# sudo crontab -e
+@reboot dhclient -v
