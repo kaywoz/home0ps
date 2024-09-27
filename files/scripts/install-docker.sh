@@ -12,5 +12,5 @@ apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io
 systemctl start docker
 systemctl enable docker
-usermod -aG docker $USER
+sudo usermod -aG docker $USER
 echo "Docker installation complete. Please log out and back in for group changes to take effect."
