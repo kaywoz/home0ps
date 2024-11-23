@@ -1,0 +1,453 @@
+vars: {
+  d2-config: {
+    layout-engine: elk
+  }
+}
+
+direction: down
+
+classes: {
+  *: {
+    label: ""
+
+    shape: circle
+
+    style: {
+      border-radius: 10
+    }
+  }
+
+  vm: {
+    style: {
+      stroke-dash: 10
+    }
+  }
+  container: {
+    style: {
+      stroke-dash: 10
+    }
+  }
+}
+
+internet: {
+  shape: cloud
+
+  label: "ISP"
+}
+
+router: {
+  explanation: |md
+
+    ### ISP modem and bridge
+
+  |
+}
+
+network.ultry: {
+  explanation: |md
+
+    ### Unifi Ultra Gateway 1GbE
+
+  |
+}
+
+network.eighty: {
+  explanation: |md
+
+    ### Unifi Lite 8 port 1GbE
+
+  |
+}
+
+network.uswy: {
+  explanation: |md
+
+    ### Unifi Flex XG 10Gbe
+
+  |
+}
+
+network.proey: {
+  explanation: |md
+
+    ### Unifi U6 Pro
+
+  |
+}
+
+network.litey: {
+  explanation: |md
+
+    ### Unifi U6 Lite
+
+  |
+}
+
+vlan_untagged: {
+  label: "untagged - 192.168.1.0/24"
+}
+
+vlan_11_home: {
+  label: "home VLAN - 192.168.11.0/24"
+}
+
+vlan_12_guest: {
+  label: "guest VLAN - 192.168.12.0/24"
+}
+
+vlan_13_iot: {
+  label: "iot VLAN - 192.168.13.0/24"
+}
+
+vlan_2_hypervisor: {
+  label: "hypervisor VLAN - 192.168.2.0/24"
+}
+
+vlan_3_storage: {
+  label: "storage VLAN - 192.168.3.0/24"
+}
+
+vlan_4_docker: {
+  label: "docker VLAN - 192.168.4.0/24"
+}
+
+vlan_42_servers: {
+  label: "server VLAN - 192.168.42.0/24"
+}
+
+vlan_43_services: {
+  label: "services VLAN - 192.168.43.0/24"
+}
+
+vlan_home.wifi: {
+  explanation: |md
+
+    ## WiFi AP
+
+    ### 192.168.1.254
+
+    - SSID: **La La LAN**
+
+  |
+}
+
+vlan_guest.guest: {
+  explanation: |md
+
+    ## WiFi AP
+
+    ### 192.168.12.254
+
+    - SSID: **LANdalorian**
+
+  |
+}
+
+vlan_iot.iot: {
+  explanation: |md
+
+    ## WiFi AP
+
+    ### 192.168.1.254
+
+    - SSID: **LANIbal Lecter**
+
+  |
+}
+
+vlan_home.lazy-loris: {
+  explanation: |md
+
+    ## Laptop
+
+    ### DHCP
+
+    - Company laptop
+
+  |
+}
+
+vlan_home.Rebeckas-macbook: {
+  explanation: |md
+
+    ## Latop
+
+    ### DHCP
+
+    - Private laptop
+
+  |
+}
+
+vlan_iot.funny: {
+  explanation: |md
+
+    ## Playstation 5
+
+    ### DHCP
+
+  |
+}
+
+vlan_iot.framey: {
+  explanation: |md
+
+    ## Samsung Frame TV
+
+    ### DHCP
+
+  |
+}
+
+lab.compute.vlan_2_hypervisor.sexy-serval: {
+  explanation: |md
+
+      ## ASUS PN51
+
+      ### DHCP
+
+    - XCP-NG
+
+    - LAB-pool
+
+  |
+}
+
+lab.compute.vlan_2_hypervisor.edgy-elephant: {
+  explanation: |md
+
+      ## ASUS PN53
+
+      ### DHCP
+
+    - XCP-NG
+
+    - LAB-pool
+
+  |
+}
+
+lab.compute.vlan_2_hypervisor.wally-wombat: {
+  explanation: |md
+
+      ## Topton N305
+
+      ### DHCP
+
+    - XCP-NG
+
+    - Core-pool
+
+  |
+}
+
+homeops.storage.vlan_3_storage.nasty-nightfish: {
+  explanation: |md
+
+      ## Odroid M1
+
+      ### DHCP
+
+    - Debian
+
+    - NAS
+
+  |
+}
+
+homeops.compute.vlan_4_docker.plenty-penguin: {
+  explanation: |md
+
+      ## RPI 5
+
+      ### DHCP
+
+    - Armbian
+
+    - Docker
+
+  |
+}
+
+vlan_42_servers.core-pool.alp-xos11: {
+  class: vm
+
+  explanation: |md
+
+    alp-xos11
+
+    **Xen Orchestra**
+
+  |
+}
+
+vlan_42_servers.core-pool.alp-oo11: {
+  class: vm
+
+  explanation: |md
+
+    alp-0011
+
+    **Open Observe**
+
+  |
+}
+
+vlan_42_servers.core-pool.abp-opnsense11: {
+  class: vm
+
+  explanation: |md
+
+    abp-opnsense11
+
+      **OPNSense**
+
+  |
+}
+
+vlan_42_servers.core-pool.alp-sophos11: {
+  class: vm
+
+  explanation: |md
+
+    alp-sophos11
+
+      **Sophos XG**
+
+  |
+}
+
+vlan_43_services.uptime-kuma: {
+  class: container
+
+  explanation: |md
+
+    uptimekuma11
+
+    **Uptime Kuma**
+
+  |
+}
+
+vlan_43_services.gatus: {
+  class: container
+
+  explanation: |md
+
+    gatus11
+
+    **Gatus**
+
+  |
+}
+
+vlan_43_services.healthchecksio: {
+  class: container
+
+  explanation: |md
+
+    hc11
+
+    **Healthchecks.io**
+
+  |
+}
+
+internet -- router: "ISP Name\n2x600/50 MBps"
+
+router -- network.ultry
+
+network.ultry -- vlan_untagged: "VLAN 1"
+
+network.ultry -- vlan_11_home: "VLAN 11 - trusted"
+
+network.ultry -- vlan_12_guest: "VLAN 12 - untrusted"
+
+network.ultry -- vlan_13_iot: "VLAN 13 - untrusted"
+
+network.ultry -- vlan_2_hypervisor: "VLAN 2 - trusted - Tailscale"
+
+network.ultry -- vlan_3_storage: "VLAN 3 - trusted - Mixed"
+
+network.ultry -- vlan_4_docker: "VLAN 4 - private - Tailscale"
+
+network.ultry -- vlan_42_servers: "VLAN 42 - private - Tailscale"
+
+network.ultry -- vlan_43_services: "VLAN 43 - private - Tailscale"
+
+vlan_home.wifi -- vlan_home.lazy-loris: {style: {stroke-dash: 4}}
+
+vlan_home.wifi -- vlan_home.Rebeckas-macbook: {style: {stroke-dash: 4}}
+
+vlan_home.wifi -- vlan_home.passive-puffin: {style: {stroke-dash: 4}}
+
+vlan_home.wifi -- vlan_home.trusted-tabby: {style: {stroke-dash: 4}}
+
+vlan_iot.iot -- vlan_iot.framey: {style: {stroke-dash: 4}}
+
+vlan_iot.iot -- vlan_iot.funny: {style: {stroke-dash: 4}}
+
+vlan_2_hypervisor -- lab.compute.vlan_2_hypervisor.sexy-serval
+
+vlan_2_hypervisor -- lab.compute.vlan_2_hypervisor.edgy-elephant
+
+vlan_2_hypervisor -- lab.compute.vlan_2_hypervisor.wally-wombat
+
+vlan_4_docker -- homeops.compute.vlan_4_docker.plenty-penguin
+vlan_3_storage -- homeops.storage.vlan_3_storage.nasty-nightfish
+
+vlan_4_docker -- homeops.compute.vlan_4_docker.plenty-penguin
+
+vlan_11_home -- vlan_home.wifi
+
+vlan_12_guest -- vlan_guest.guest
+
+vlan_13_iot -- vlan_iot.iot
+
+vlan_untagged -- network.ultry
+vlan_untagged -- network.eighty
+vlan_untagged -- network.uswy
+vlan_untagged -- network.proey
+vlan_untagged -- network.litey
+
+network.ultry: {
+  icon: https://github.com/kaywoz/home0ps/blob/main/images/logo-ultry.png?raw=true
+}
+
+network.eighty: {
+  icon: https://github.com/kaywoz/home0ps/blob/main/images/logo-eighty.png?raw=true
+}
+
+network.uswy: {
+  icon: https://github.com/kaywoz/home0ps/blob/main/images/logo-uswy.png?raw=true
+}
+
+lab.compute.vlan_2_hypervisor.xcp-ng: {
+  icon: https://github.com/kaywoz/home0ps/blob/main/images/logo-xcp-ng.png?raw=true
+}
+
+lab.compute.vlan_2_hypervisor.style: {
+  opacity: 1
+  fill: lightgrey
+  3d: true
+  stroke: black
+}
+
+style: {
+  fill: lightgrey
+  stroke: black
+  stroke-width: 15
+  double-border: true
+  fill-pattern: lines
+}
+
+background: |md
+  # krypi.Net h0me0ps
+
+  - compute and network
+  - storage and services
+|
+
+network.unifi: {
+  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
+}
