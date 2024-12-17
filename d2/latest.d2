@@ -1,0 +1,492 @@
+vars: {
+  d2-config: {
+    layout-engine: elk
+  }
+}
+
+direction: down
+
+classes: {
+  *: {
+    label: ""
+
+    shape: circle
+
+    style: {
+      border-radius: 10
+    }
+  }
+
+  vm: {
+    style: {
+      stroke-dash: 10
+    }
+  }
+  container: {
+    style: {
+      stroke-dash: 10
+    }
+  }
+}
+
+internet: {
+  shape: cloud
+
+  label: "ISP"
+}
+
+vlan_untagged: {
+  label: "untagged - 192.168.1.0/24"
+}
+
+vlan_11_home: {
+  label: "home VLAN - 192.168.11.0/24"
+}
+
+vlan_12_guest: {
+  label: "guest VLAN - 192.168.12.0/24"
+}
+
+vlan_13_iot: {
+  label: "iot VLAN - 192.168.13.0/24"
+}
+
+vlan_2_hypervisor: {
+  label: "hypervisor VLAN - 192.168.2.0/24"
+}
+
+vlan_3_storage: {
+  label: "storage VLAN - 192.168.3.0/24"
+}
+
+vlan_4_docker: {
+  label: "docker VLAN - 192.168.4.0/24"
+}
+
+vlan_41_mgmt: {
+  label: "mgmt VLAN - 192.168.41.0/24"
+}
+
+vlan_42_servers: {
+  label: "server VLAN - 192.168.42.0/24"
+}
+
+vlan_43_services: {
+  label: "services VLAN - 192.168.43.0/24"
+}
+
+vlan_44_dev: {
+  label: "dev VLAN - 192.168.44.0/24"
+}
+
+vlan_home.wifi: {
+  explanation: |md
+
+    ## WiFi AP
+
+    ### 192.168.11.254
+
+    - SSID: **La La LAN**
+
+  |
+}
+
+vlan_guest.guest: {
+  explanation: |md
+
+    ## WiFi AP
+
+    ### 192.168.12.254
+
+    - SSID: **LANdalorian**
+
+  |
+}
+
+vlan_iot.iot: {
+  explanation: |md
+
+    ## WiFi AP
+
+    ### 192.168.1.254
+
+    - SSID: **LANIbal Lecter**
+
+  |
+}
+
+vlan_home.lazy-loris: {
+  explanation: |md
+
+    ## Laptop
+
+    ### DHCP
+
+    - Consultant laptop
+
+  |
+}
+
+vlan_guest.placeholder-laptop: {
+  explanation: |md
+
+    ## Laptop
+
+    ### DHCP
+
+    - Assignment laptop
+
+  |
+}
+
+vlan_home.r's-macbook: {
+  explanation: |md
+
+    ## Laptop
+
+    ### DHCP
+
+    - Private laptop
+
+  |
+}
+
+vlan_home.r's-iphone: {
+  explanation: |md
+
+    ## Iphone
+
+    ### DHCP
+
+    - Private Iphone
+
+  |
+}
+
+vlan_home.r's-ipad: {
+  explanation: |md
+
+    ## Ipad
+
+    ### DHCP
+
+    - Private Ipad
+
+  |
+}
+
+vlan_home.trusted-tabby: {
+  explanation: |md
+
+    ## Ipad
+
+    ### DHCP
+
+    - Private Ipad
+
+  |
+}
+
+vlan_home.passive-puffin: {
+  explanation: |md
+
+    ## Oneplus
+
+    ### DHCP
+
+    - Private Android
+
+  |
+}
+
+vlan_iot.funny: {
+  explanation: |md
+
+    ## Playstation 5
+
+    ### DHCP
+
+  |
+}
+
+vlan_iot.framey: {
+  explanation: |md
+
+    ## Samsung Frame TV
+
+    ### DHCP
+
+  |
+}
+
+lab.compute.hypervisors.style: {
+  opacity: 1
+  fill: lightyellow
+  3d: true
+  stroke: black
+}
+
+lab.compute.hypervisors: {
+  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/vmware.svg
+}
+
+lab.compute.hypervisors: {
+  explanation: |md
+
+    ## sexy-serval
+
+    ## edgy-elephant
+
+    ## wobbly-wombat
+  |
+}
+
+homeops.storage.nas.style: {
+  opacity: 1
+  fill: lightyellow
+  3d: true
+  stroke: black
+}
+
+homeops.storage.nas: {
+  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/synology-two-color.svg
+}
+
+homeops.storage.nas: {
+  explanation: |md
+
+    ## nasty-nightfish
+
+  |
+}
+
+homeops.compute.automations.style: {
+  opacity: 1
+  fill: orange
+  3d: true
+  stroke: black
+}
+
+homeops.compute.automations: {
+  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/homeassistant.svg
+}
+
+homeops.compute.automations: {
+  explanation: |md
+
+    ## haosy-hippo
+
+  |
+}
+
+workloads.vms.style: {
+  opacity: 1
+  fill: white
+  3d: true
+  stroke: black
+}
+
+workloads.vms: {
+  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/vmware.svg
+}
+
+workloads.vms: {
+  explanation: |md
+
+    ## vcenter
+
+    ## veeam
+
+    ## veeamproxy1
+
+    ## veeamproxy2
+
+    ## sophos-xg
+
+    ## opnsense
+
+    ## open observe
+  |
+}
+
+workloads.containers.style: {
+  opacity: 1
+  fill: white
+  3d: true
+  stroke: black
+}
+
+workloads.containers: {
+  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/docker-moby.svg
+}
+
+workloads.containers: {
+  explanation: |md
+
+    ## uptimekuma
+
+    ## gatus
+
+    ## healtchecks.io
+
+    ## vikunja
+  |
+}
+
+lab.compute <-> workloads
+
+internet <-> edge <-> network.ultry: {style.animated: true}
+edge <-> network.ultry: {style.animated: true}
+
+edge.modem: {
+  explanation: |md
+
+    ## 2x660/60 Mbps
+  |
+}
+
+edge.modem.style: {
+  opacity: 1
+  fill: red
+  3d: true
+  stroke: black
+}
+
+network.ultry <-> network.eighty: {style.animated: true}
+network.eighty <-> network.proey: {style.animated: true}
+network.eighty <-> network.flexy: {style.animated: true}
+network.eighty <-> network.uxy: {style.animated: true}
+
+network.ultry <-> homeops.compute.automations: "VLAN 13 - untrusted" {
+  style.animated: true
+}
+network.uxy <-> lab.compute.hypervisors: "VLAN 2,3,4,41,42,43,44 - trusted - Tailscale" {
+  style.animated: true
+}
+network.uxy <-> homeops.storage.nas: "VLAN 3 - trusted - Mixed" {
+  style.animated: true
+}
+network.proey <-> network.litey: "VLAN 11,12,13,44 - untrusted - Mixed" {
+  style.animated: true
+}
+
+vlan_home.wifi -- vlan_home.lazy-loris: {style: {stroke-dash: 4}}
+vlan_home.wifi -- vlan_home.r's-macbook: {style: {stroke-dash: 4}}
+vlan_home.wifi -- vlan_home.passive-puffin: {style: {stroke-dash: 4}}
+vlan_home.wifi -- vlan_home.trusted-tabby: {style: {stroke-dash: 4}}
+vlan_home.wifi -- vlan_home.r's-iphone: {style: {stroke-dash: 4}}
+vlan_home.wifi -- vlan_home.r's-ipad: {style: {stroke-dash: 4}}
+vlan_guest.guest -- vlan_guest.placeholder-laptop: {style: {stroke-dash: 4}}
+
+network.inventory.style: {
+  opacity: 1
+  fill: red
+  3d: true
+  stroke: black
+}
+
+network.ultry.style: {
+  opacity: 1
+  fill: red
+  3d: true
+  stroke: black
+}
+
+network.ultry: {
+  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
+}
+
+network.eighty.style: {
+  opacity: 1
+  fill: red
+  3d: true
+  stroke: black
+}
+
+network.eighty: {
+  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
+}
+
+network.proey.style: {
+  opacity: 1
+  fill: red
+  3d: true
+  stroke: black
+}
+
+network.proey: {
+  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
+}
+
+network.ultry: {
+  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
+}
+
+network.flexy.style: {
+  opacity: 1
+  fill: green
+  3d: true
+  stroke: black
+}
+
+network.flexy: {
+  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
+}
+
+network.litey.style: {
+  opacity: 1
+  fill: green
+  3d: true
+  stroke: black
+}
+
+network.litey: {
+  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
+}
+
+network.uxy.style: {
+  opacity: 1
+  fill: red
+  3d: true
+  stroke: black
+}
+
+network.uxy: {
+  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
+}
+
+network.inventory: {
+  explanation: |md
+
+    ## ultry - Unifi Ultra Gateway 1GbE
+
+    ## eighty - Unifi Lite 8 port 1GbE
+
+    ## uxy - Unifi Flex XG 10Gbe
+
+    ## flexy - Unifi Flex mini 2.5GbE
+
+    ## proey - Unifi U6 Pro
+
+    ## litey - Unifi U6 Lite
+  |
+}
+
+background: |md
+  # krypi.Net h0me0ps
+
+  - compute and network
+  - storage and services
+|
+
+style: {
+  fill: lightgrey
+  stroke: black
+  stroke-width: 15
+  double-border: true
+  fill-pattern: lines
+}
+
+test.box <-> test.net: hi {
+  style.animated: true
+}
