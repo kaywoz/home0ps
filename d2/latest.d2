@@ -35,186 +35,26 @@ internet: {
   label: "ISP"
 }
 
-vlan_untagged: {
-  label: "untagged - 192.168.1.0/24"
-}
-
-vlan_11_home: {
-  label: "home VLAN - 192.168.11.0/24"
-}
-
-vlan_12_guest: {
-  label: "guest VLAN - 192.168.12.0/24"
-}
-
-vlan_13_iot: {
-  label: "iot VLAN - 192.168.13.0/24"
-}
-
-vlan_2_hypervisor: {
-  label: "hypervisor VLAN - 192.168.2.0/24"
-}
-
-vlan_3_storage: {
-  label: "storage VLAN - 192.168.3.0/24"
-}
-
-vlan_4_docker: {
-  label: "docker VLAN - 192.168.4.0/24"
-}
-
-vlan_41_mgmt: {
-  label: "mgmt VLAN - 192.168.41.0/24"
-}
-
-vlan_42_servers: {
-  label: "server VLAN - 192.168.42.0/24"
-}
-
-vlan_43_services: {
-  label: "services VLAN - 192.168.43.0/24"
-}
-
-vlan_44_dev: {
-  label: "dev VLAN - 192.168.44.0/24"
-}
-
 vlan_home.wifi: {
   explanation: |md
-
-    ## WiFi AP
-
-    ### 192.168.11.254
 
     - SSID: **La La LAN**
 
   |
 }
 
-vlan_guest.guest: {
+vlan_guest.wifi: {
   explanation: |md
-
-    ## WiFi AP
-
-    ### 192.168.12.254
 
     - SSID: **LANdalorian**
 
   |
 }
 
-vlan_iot.iot: {
+vlan_iot.wifi: {
   explanation: |md
 
-    ## WiFi AP
-
-    ### 192.168.1.254
-
-    - SSID: **LANIbal Lecter**
-
-  |
-}
-
-vlan_home.lazy-loris: {
-  explanation: |md
-
-    ## Laptop
-
-    ### DHCP
-
-    - Consultant laptop
-
-  |
-}
-
-vlan_guest.placeholder-laptop: {
-  explanation: |md
-
-    ## Laptop
-
-    ### DHCP
-
-    - Assignment laptop
-
-  |
-}
-
-vlan_home.r's-macbook: {
-  explanation: |md
-
-    ## Laptop
-
-    ### DHCP
-
-    - Private laptop
-
-  |
-}
-
-vlan_home.r's-iphone: {
-  explanation: |md
-
-    ## Iphone
-
-    ### DHCP
-
-    - Private Iphone
-
-  |
-}
-
-vlan_home.r's-ipad: {
-  explanation: |md
-
-    ## Ipad
-
-    ### DHCP
-
-    - Private Ipad
-
-  |
-}
-
-vlan_home.trusted-tabby: {
-  explanation: |md
-
-    ## Ipad
-
-    ### DHCP
-
-    - Private Ipad
-
-  |
-}
-
-vlan_home.passive-puffin: {
-  explanation: |md
-
-    ## Oneplus
-
-    ### DHCP
-
-    - Private Android
-
-  |
-}
-
-vlan_iot.funny: {
-  explanation: |md
-
-    ## Playstation 5
-
-    ### DHCP
-
-  |
-}
-
-vlan_iot.framey: {
-  explanation: |md
-
-    ## Samsung Frame TV
-
-    ### DHCP
+    - SSID: **LANibal Lecter**
 
   |
 }
@@ -279,48 +119,117 @@ homeops.compute.automations: {
   |
 }
 
-workloads.vms.style: {
+workloads.vms.critical.style: {
   opacity: 1
-  fill: white
+  fill: pink
   3d: true
   stroke: black
 }
 
-workloads.vms: {
+workloads.vms.critical: {
   icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/vmware.svg
 }
 
-workloads.vms: {
+workloads.vms.critical: {
   explanation: |md
 
-    ## vcenter
+    ## alp-vcsa11 (vcenter)
 
-    ## veeam
+    ## cwp-vbr11 (veeam)
 
-    ## veeamproxy1
+    ## alp-fw11 (sophos-xg)
 
-    ## veeamproxy2
+    ## alp-fw12 (opnsense)
 
-    ## sophos-xg
+    ## clp-log11 (open observe)
 
-    ## opnsense
+    ## dlp-tools11 (docker stack)
 
-    ## open observe
+    ## dlp-media11 (docker stack)
+
+    ## dlp-ingress11 (docker stack)
+
+    ## alp-for11 (remnux)
+
+    ## alp-for12 (sift workstation)
+
+    ## cwp-for13 (flare-vm)
+
+    ## cwd-for11 (custom forensics)
   |
 }
 
-workloads.containers.style: {
+workloads.vms.not-critical.style: {
   opacity: 1
-  fill: white
+  fill: lightyellow
   3d: true
   stroke: black
 }
 
-workloads.containers: {
+workloads.vms.not-critical: {
+  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/vmware.svg
+}
+
+workloads.vms.not-critical: {
+  explanation: |md
+
+    ## cwp-vbrp11 (veeamproxy)
+
+    ## cwp-vbrp12 (veeamproxy)
+
+    ## cld-test11 (linux test)
+
+    ## cld-test12 (linux test)
+
+    ## cwd-test21 (windows test)
+
+    ## cwd-test22 (windows test)
+
+    ## alp-scan11 (tenable scanner)
+
+    ## alp-scan12 (qualys)
+
+    ## alp-scan13 (runzero)
+
+  |
+}
+
+workloads.vms.sans-env.style: {
+  opacity: 1
+  fill: lightyellow
+  3d: true
+  stroke: black
+}
+
+workloads.vms.sans-env: {
+  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/vmware.svg
+}
+
+workloads.vms.sans-env: {
+  explanation: |md
+
+    ## dc (for505)
+
+    ## member (for505)
+
+    ## for500 (for500)
+
+    ## for508 (for508)
+  |
+}
+
+workloads.containers.critical.style: {
+  opacity: 1
+  fill: pink
+  3d: true
+  stroke: black
+}
+
+workloads.containers.critical: {
   icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/docker-moby.svg
 }
 
-workloads.containers: {
+workloads.containers.critical: {
   explanation: |md
 
     ## uptimekuma
@@ -330,6 +239,26 @@ workloads.containers: {
     ## healtchecks.io
 
     ## vikunja
+  |
+}
+
+workloads.containers.not-critical.style: {
+  opacity: 1
+  fill: lightyellow
+  3d: true
+  stroke: black
+}
+
+workloads.containers.not-critical: {
+  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/docker-moby.svg
+}
+
+workloads.containers.not-critical: {
+  explanation: |md
+
+    ## dillinger
+
+    ## d2
   |
 }
 
@@ -378,9 +307,9 @@ vlan_home.wifi -- vlan_home.r's-iphone: {style: {stroke-dash: 4}}
 vlan_home.wifi -- vlan_home.r's-ipad: {style: {stroke-dash: 4}}
 vlan_guest.guest -- vlan_guest.placeholder-laptop: {style: {stroke-dash: 4}}
 
-network.inventory.style: {
+network.info.style: {
   opacity: 1
-  fill: red
+  fill: white
   3d: true
   stroke: black
 }
@@ -455,9 +384,9 @@ network.uxy: {
   icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
 }
 
-network.inventory: {
+network.info: {
   explanation: |md
-
+    # Unifi gear
     ## ultry - Unifi Ultra Gateway 1GbE
 
     ## eighty - Unifi Lite 8 port 1GbE
@@ -469,6 +398,31 @@ network.inventory: {
     ## proey - Unifi U6 Pro
 
     ## litey - Unifi U6 Lite
+    ## ##
+    # 
+    #
+    # Network segments
+    untagged - 192.168.1.0/24
+
+    home VLAN - 192.168.11.0/24
+
+    guest VLAN - 192.168.12.0/24
+
+    iot VLAN - 192.168.13.0/24
+
+    hypervisor VLAN - 192.168.2.0/24
+
+    storage VLAN - 192.168.3.0/24
+
+    sdocker VLAN - 192.168.4.0/24
+
+    mgmt VLAN - 192.168.41.0/24
+
+    server VLAN - 192.168.42.0/24
+
+    services VLAN - 192.168.43.0/24
+
+    dev VLAN - 192.168.44.0/24
   |
 }
 
@@ -485,8 +439,4 @@ style: {
   stroke-width: 15
   double-border: true
   fill-pattern: lines
-}
-
-test.box <-> test.net: hi {
-  style.animated: true
 }
