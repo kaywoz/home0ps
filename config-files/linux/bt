@@ -1,0 +1,15 @@
+# restarts bt for bt mouse after sleep
+#/lib/systemd/system-sleep/bt                                                    
+#!/bin/sh
+
+modprobe -r btusb
+sleep 1
+service bluetooth restart
+sleep 1
+modprobe btusb
+
+
+# add "sudo chmod +x /lib/systemd/system-sleep/bt" 
+
+
+
