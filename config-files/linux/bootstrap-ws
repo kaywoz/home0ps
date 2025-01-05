@@ -1,5 +1,5 @@
 #!/bin/sh
-apt install s-tui stress btop edge git sublime-text -y
+apt install s-tui stress btop edge git sublime-text tldr fuck -y
 sudo apt install software-properties-common apt-transport-https
 wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
 sudo install -o root -g root -m 644 packages.microsoft.gpg /etc/apt/trusted.gpg.d/
