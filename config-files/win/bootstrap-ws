@@ -1,0 +1,45 @@
+New-ItemProperty -Path HKCU:\AppEvents\Schemes -Name "(Default)" -Value ".None" -Force | Out-Null
+C:\Program Files\Git\bin\;C:\Program Files\Git\cmd\
+Install-Module -Name PowerShellGet -Force -Scope CurrentUser
+Enable-WindowsOptionalFeature -FeatureName "Containers-DisposableClientVM" -All -Online
+Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All
+wsl --install
+
+winget install "1password - password manager"
+winget install notepad++
+winget install git.git
+winget install "Microsoft Visual Studio Code"
+winget install tailscale
+winget install discord
+winget install "Microsoft PowerToys"
+winget install cyberduck
+winget install 7z
+winget install  SlackTechnologies.Slack
+winget install -e --id Docker.DockerDesktop
+winget install -e --id Canonical.Ubuntu.2204
+winget install OpenWhisperSystems.Signal
+winget install telegram.telegramdesktop
+winget install chocolatey
+winget install balenaetcher
+winget install Microsoft.PowerShell
+winget install postman
+winget remove Microsoft.BingNews_8wekyb3d8bbwe
+winget remove Microsoft.BingWeather_8wekyb3d8bbwe
+winget remove Microsoft.GamingApp_8wekyb3d8bbwe
+winget remove Microsoft.GamingServices_8wekyb3d8bbwe
+winget remove Microsoft.MicrosoftSolitaireCollection_8wekyb3d8bbwe
+winget remove Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe
+winget remove Microsoft.MixedReality.Portal_8wekyb3d8bbwe
+winget remove Microsoft.Xbox.TCUI_8wekyb3d8bbwe
+winget remove Microsoft.XboxGameOverlay_8wekyb3d8bbwe
+winget remove Microsoft.XboxGamingOverlay_8wekyb3d8bbwe
+winget remove Microsoft.XboxSpeechToTextOverlay_8wekyb3d8bbwe
+winget remove MirametrixInc.GlancebyMirametrix_17mer8kcn3j54
+winget install -e --id MullvadVPN.MullvadVPN
+winget install -e --id Balena.Etcher
+winget install Veeam.VeeamAgent
+winget install Spotify.Spotify
+winget install Chocolatey.Chocolatey
+winget install Microsoft.WindowsTerminal
+winget install "Microsoft Whiteboard"
+choco install openhardwaremonitor
