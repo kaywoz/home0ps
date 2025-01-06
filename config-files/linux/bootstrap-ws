@@ -5,6 +5,8 @@ sudo apt install build-essential linux-headers-$(uname -r) # pre-req for vmware 
 
 sudo ./VMware-Workstation-Full-17.6.2-24409262.x86_64.bundle
 
+curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up --auth-key=placeholder
+
 wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
 sudo install -o root -g root -m 644 packages.microsoft.gpg /etc/apt/trusted.gpg.d/
 sudo sh -c 'echo "deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/packages.microsoft.gpg] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list'
