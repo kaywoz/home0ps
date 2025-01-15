@@ -4,6 +4,22 @@ vars: {
   }
 }
 
+all of the goodies!
+
+title: krypi.net home0ps {
+  near: top-center
+
+  shape: text
+
+  style: {
+    font-size: 29
+
+    bold: true
+
+    underline: true
+  }
+}
+
 direction: down
 
 classes: {
@@ -22,6 +38,7 @@ classes: {
       stroke-dash: 10
     }
   }
+
   container: {
     style: {
       stroke-dash: 10
@@ -35,408 +52,344 @@ internet: {
   label: "ISP"
 }
 
-vlan_home.wifi: {
-  explanation: |md
-
-    - SSID: **La La LAN**
-
-  |
-}
-
-vlan_guest.wifi: {
-  explanation: |md
-
-    - SSID: **LANdalorian**
-
-  |
-}
-
-vlan_iot.wifi: {
-  explanation: |md
-
-    - SSID: **LANibal Lecter**
-
-  |
-}
-
-lab.compute.hypervisors.style: {
+internet.style: {
   opacity: 1
-  fill: lightyellow
-  3d: true
-  stroke: black
-}
 
-lab.compute.hypervisors: {
-  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/vmware.svg
-}
-
-lab.compute.hypervisors: {
-  explanation: |md
-
-    ## sexy-serval
-
-    ## edgy-elephant
-
-    ## wobbly-wombat
-  |
-}
-
-homeops.storage.nas.style: {
-  opacity: 1
-  fill: lightyellow
-  3d: true
-  stroke: black
-}
-
-homeops.storage.nas: {
-  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/synology-two-color.svg
-}
-
-homeops.storage.nas: {
-  explanation: |md
-
-    ## nasty-nightfish
-
-  |
-}
-
-homeops.compute.automations.style: {
-  opacity: 1
-  fill: orange
-  3d: true
-  stroke: black
-}
-
-homeops.compute.automations: {
-  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/homeassistant.svg
-}
-
-homeops.compute.automations: {
-  explanation: |md
-
-    ## haosy-hippo
-
-  |
-}
-
-workloads.vms.critical.style: {
-  opacity: 1
   fill: pink
-  3d: true
+
   stroke: black
 }
-
-workloads.vms.critical: {
-  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/vmware.svg
-}
-
-workloads.vms.critical: {
-  explanation: |md
-
-    ## alp-vcsa11 (vcenter)
-
-    ## cwp-vbr11 (veeam)
-
-    ## alp-fw11 (sophos-xg)
-
-    ## alp-fw12 (opnsense)
-
-    ## clp-log11 (open observe)
-
-    ## dlp-tools11 (docker stack)
-
-    ## dlp-media11 (docker stack)
-
-    ## dlp-ingress11 (docker stack)
-
-    ## alp-for11 (remnux)
-
-    ## alp-for12 (sift workstation)
-
-    ## cwp-for13 (flare-vm)
-
-    ## cwd-for11 (custom forensics)
-  |
-}
-
-workloads.vms.not-critical.style: {
-  opacity: 1
-  fill: lightyellow
-  3d: true
-  stroke: black
-}
-
-workloads.vms.not-critical: {
-  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/vmware.svg
-}
-
-workloads.vms.not-critical: {
-  explanation: |md
-
-    ## cwp-vbrp11 (veeamproxy)
-
-    ## cwp-vbrp12 (veeamproxy)
-
-    ## cld-test11 (linux test)
-
-    ## cld-test12 (linux test)
-
-    ## cwd-test21 (windows test)
-
-    ## cwd-test22 (windows test)
-
-    ## alp-scan11 (tenable scanner)
-
-    ## alp-scan12 (qualys)
-
-    ## alp-scan13 (runzero)
-
-  |
-}
-
-workloads.vms.sans-env.style: {
-  opacity: 1
-  fill: lightyellow
-  3d: true
-  stroke: black
-}
-
-workloads.vms.sans-env: {
-  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/vmware.svg
-}
-
-workloads.vms.sans-env: {
-  explanation: |md
-
-    ## dc (for505)
-
-    ## member (for505)
-
-    ## for500 (for500)
-
-    ## for508 (for508)
-  |
-}
-
-workloads.containers.critical.style: {
-  opacity: 1
-  fill: pink
-  3d: true
-  stroke: black
-}
-
-workloads.containers.critical: {
-  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/docker-moby.svg
-}
-
-workloads.containers.critical: {
-  explanation: |md
-
-    ## uptimekuma
-
-    ## gatus
-
-    ## healtchecks.io
-
-    ## vikunja
-  |
-}
-
-workloads.containers.not-critical.style: {
-  opacity: 1
-  fill: lightyellow
-  3d: true
-  stroke: black
-}
-
-workloads.containers.not-critical: {
-  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/docker-moby.svg
-}
-
-workloads.containers.not-critical: {
-  explanation: |md
-
-    ## dillinger
-
-    ## d2
-  |
-}
-
-lab.compute <-> workloads
-
-internet <-> edge <-> network.ultry: {style.animated: true}
-edge <-> network.ultry: {style.animated: true}
 
 edge.modem: {
   explanation: |md
 
+
+
     ## 2x660/60 Mbps
+
   |
 }
 
 edge.modem.style: {
   opacity: 1
-  fill: red
+
+  fill: pink
+
   3d: true
+
   stroke: black
 }
 
-network.ultry <-> network.eighty: {style.animated: true}
-network.eighty <-> network.proey: {style.animated: true}
-network.eighty <-> network.flexy: {style.animated: true}
-network.eighty <-> network.uxy: {style.animated: true}
-
-network.ultry <-> homeops.compute.automations: "VLAN 13 - untrusted" {
-  style.animated: true
-}
-network.uxy <-> lab.compute.hypervisors: "VLAN 2,3,4,41,42,43,44 - trusted - Tailscale" {
-  style.animated: true
-}
-network.uxy <-> homeops.storage.nas: "VLAN 3 - trusted - Mixed" {
-  style.animated: true
-}
-network.proey <-> network.litey: "VLAN 11,12,13,44 - untrusted - Mixed" {
-  style.animated: true
+edge.modem: {
+  icon: https://www.svgrepo.com/show/294974/router-modem.svg
 }
 
-vlan_home.wifi -- vlan_home.lazy-loris: {style: {stroke-dash: 4}}
-vlan_home.wifi -- vlan_home.r's-macbook: {style: {stroke-dash: 4}}
-vlan_home.wifi -- vlan_home.passive-puffin: {style: {stroke-dash: 4}}
-vlan_home.wifi -- vlan_home.trusted-tabby: {style: {stroke-dash: 4}}
-vlan_home.wifi -- vlan_home.r's-iphone: {style: {stroke-dash: 4}}
-vlan_home.wifi -- vlan_home.r's-ipad: {style: {stroke-dash: 4}}
-vlan_guest.guest -- vlan_guest.placeholder-laptop: {style: {stroke-dash: 4}}
-
-network.info.style: {
-  opacity: 1
-  fill: white
-  3d: true
-  stroke: black
-}
-
-network.ultry.style: {
-  opacity: 1
-  fill: red
-  3d: true
-  stroke: black
-}
-
-network.ultry: {
-  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
-}
-
-network.eighty.style: {
-  opacity: 1
-  fill: red
-  3d: true
-  stroke: black
-}
-
-network.eighty: {
-  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
-}
-
-network.proey.style: {
-  opacity: 1
-  fill: red
-  3d: true
-  stroke: black
-}
-
-network.proey: {
-  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
-}
-
-network.ultry: {
-  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
-}
-
-network.flexy.style: {
-  opacity: 1
-  fill: green
-  3d: true
-  stroke: black
-}
-
-network.flexy: {
-  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
-}
-
-network.litey.style: {
-  opacity: 1
-  fill: green
-  3d: true
-  stroke: black
-}
-
-network.litey: {
-  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
-}
-
-network.uxy.style: {
-  opacity: 1
-  fill: red
-  3d: true
-  stroke: black
-}
-
-network.uxy: {
-  icon: https://raw.githubusercontent.com/kaywoz/home0ps/b779dc008b4307e471f25ac9166bc1e610a110c3/images/logo-ubiquiti.svg
-}
-
-network.info: {
+network.vlans.home: {
   explanation: |md
-    # Unifi gear
-    ## ultry - Unifi Ultra Gateway 1GbE
 
-    ## eighty - Unifi Lite 8 port 1GbE
 
-    ## uxy - Unifi Flex XG 10Gbe
 
-    ## flexy - Unifi Flex mini 2.5GbE
+    - SSID: **La La LAN**
 
-    ## proey - Unifi U6 Pro
 
-    ## litey - Unifi U6 Lite
-    ## ##
-    # 
-    #
-    # Network segments
-    untagged - 192.168.1.0/24
 
-    home VLAN - 192.168.11.0/24
-
-    guest VLAN - 192.168.12.0/24
-
-    iot VLAN - 192.168.13.0/24
-
-    hypervisor VLAN - 192.168.2.0/24
-
-    storage VLAN - 192.168.3.0/24
-
-    sdocker VLAN - 192.168.4.0/24
-
-    mgmt VLAN - 192.168.41.0/24
-
-    server VLAN - 192.168.42.0/24
-
-    services VLAN - 192.168.43.0/24
-
-    dev VLAN - 192.168.44.0/24
   |
 }
 
-background: |md
-  # krypi.Net h0me0ps
+network.vlans.guest: {
+  explanation: |md
 
-  - compute and network
-  - storage and services
-|
 
-style: {
-  fill: lightgrey
+
+    - SSID: **LANdalorian**
+
+
+
+  |
+}
+
+network.vlans.iot: {
+  explanation: |md
+
+
+
+    - SSID: **LANibal Lecter**
+
+
+
+  |
+}
+
+network.vlans.media: {
+  explanation: |md
+
+
+
+    - SSID: **CandyLAN**
+
+
+
+  |
+}
+
+network.vlans.hypervisors: {
+  icon: https://www.svgrepo.com/show/485146/server-like.svg
+}
+
+network.vlans.hypervisors: {
+  explanation: |md
+    **sexy**
+
+    **edgy**
+  |
+}
+
+network.vlans.storage: {
+  icon: https://www.svgrepo.com/show/29750/server.svg
+}
+
+network.vlans.storage: {
+  explanation: |md
+
+
+
+    **nasty**
+
+
+
+  |
+}
+
+network.vlans.docker: {
+  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/xcpng.svg
+}
+
+network.vlans.docker: {
+  explanation: |md
+
+    **plenty**
+
+    krh-dld-docker11 
+      
+
+
+  |
+}
+
+network.vlans.mgmt: {
+  explanation: |md
+
+    krl-alp-xos-mgmt11
+
+
+  |
+}
+
+network.vlans.servers: {
+  explanation: |md
+
+
+
+    - 
+
+
+
+  |
+}
+
+network.vlans.services: {
+  explanation: |md
+
+
+
+    dockge
+
+    uptimekuma
+
+    healthchecks
+
+    cloudflare
+
+    gatus
+
+    rclone
+
+    filebrowser
+
+  |
+}
+
+network.vlans.security: {
+  explanation: |md
+
+
+
+    krl-alp-sophosxg-fw11
+
+    krl-abp-opnsense-fw21
+
+
+
+  |
+}
+
+network.vlans.logging: {
+  explanation: |md
+
+
+
+    krl-clp-oo-logs11
+
+
+
+  |
+}
+
+edge.modem: {
+  explanation: |md
+
+
+
+    ## 2x660/60 Mbps
+
+  |
+}
+
+network.unifi: {
+  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/ubiquiti.svg
+}
+
+network.unifi.router.ultry.style: {
+  opacity: 1
+
+  fill: pink
+
+  3d: true
+
   stroke: black
-  stroke-width: 15
-  double-border: true
-  fill-pattern: lines
+}
+
+network.unifi.router.ultry: {
+  icon: https://www.svgrepo.com/show/294977/router-modem.svg
+}
+
+network.unifi.switch.edgy: {
+  icon: https://www.svgrepo.com/show/278243/router.svg
+}
+
+network.unifi.switch.edgy.style: {
+  opacity: 1
+
+  fill: pink
+
+  3d: true
+
+  stroke: black
+}
+
+network.unifi.switch.uxy: {
+  icon: https://www.svgrepo.com/show/278243/router.svg
+}
+
+network.unifi.switch.uxy.style: {
+  opacity: 1
+
+  fill: pink
+
+  3d: true
+
+  stroke: black
+}
+
+network.unifi.switch.flexy: {
+  icon: https://www.svgrepo.com/show/278243/router.svg
+}
+
+network.unifi.switch.flexy.style: {
+  opacity: 1
+
+  fill: pink
+
+  3d: true
+
+  stroke: black
+}
+
+network.unifi.wifi.proey: {
+  icon: https://www.svgrepo.com/show/191821/wifi-router.svg
+}
+
+network.unifi.wifi.proey.style: {
+  opacity: 1
+
+  fill: pink
+
+  3d: true
+
+  stroke: black
+}
+
+network.unifi.wifi.litey: {
+  icon: https://www.svgrepo.com/show/191821/wifi-router.svg
+}
+
+network.unifi.wifi.litey.style: {
+  opacity: 1
+
+  fill: lightgreen
+
+  3d: true
+
+  stroke: black
+}
+
+internet <-> edge.modem: {style.animated: true}
+
+edge.modem <-> network.unifi.router.ultry: {style.animated: true}
+
+edge.modem <-> network.unifi.router.ultry: {style.animated: true}
+
+network.unifi <-> network.vlans
+network.unifi <-> network.vlans
+
+# network.unifi.router.ultry <-> network.unifi.switch.edgy: {style.animated: true}
+
+# network.unifi.switch.edgy <-> network.unifi.switch.uxy: {style.animated: true}
+
+# network.unifi.switch.edgy <-> network.unifi.switch.flexy: {style.animated: true}
+
+# network.unifi.switch.edgy <-> network.unifi.wifi.proey: {style.animated: true}
+
+# network.unifi.wifi.proey <-> network.unifi.wifi.litey: {style.animated: true}
+
+# network.unifi.wifi -> network.wifi.vlans: "vlans 11,12,13,44 - untrusted - mixed auth" {
+
+# style.animated: false
+
+# }
+
+# network.unifi.switch.uxy -> compute.lab.sexy
+
+server: {
+  icon: https://www.svgrepo.com/show/485146/server-like.svg
+}
+
+server2: {
+  icon: https://www.svgrepo.com/show/513345/server.svg
+}
+
+firewall: {
+  icon: https://www.svgrepo.com/show/246824/firewall.svg
+}
+
+wifi: {
+  icon: https://www.svgrepo.com/show/191821/wifi-router.svg
+}
+
+switch: {
+  icon: https://www.svgrepo.com/show/278243/router.svg
+}
+
+nas: {
+  icon: https://www.svgrepo.com/show/29750/server.svg
 }
