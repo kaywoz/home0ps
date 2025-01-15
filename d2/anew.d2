@@ -1,0 +1,202 @@
+vars: {
+    d2-config: {
+      layout-engine: elk
+    }
+  }
+  
+  all of the goodies!
+  
+  title: krypi.net home0ps {
+    near: top-center
+  
+    shape: text
+  
+    style: {
+      font-size: 29
+  
+      bold: true
+  
+      underline: true
+    }
+  }
+  
+  direction: down
+  
+  Network: "network" {
+    grid-rows: 3
+    style.fill: white
+    "ultry": {
+      shape: image
+      icon: https://github.com/kaywoz/home0ps/blob/main/images/logo-ultry.png?raw=true
+    }
+    "flexy": {
+      shape: image
+      icon: https://github.com/kaywoz/home0ps/blob/main/images/logo-unifi-mini.jpg?raw=true
+    }
+    "miny": {
+      shape: image
+      icon: https://github.com/kaywoz/home0ps/blob/main/images/logo-unifi-mini.jpg?raw=true
+    }
+    "eighty": {
+      shape: image
+      icon: https://github.com/kaywoz/home0ps/blob/main/images/logo-eighty.png?raw=true
+    }
+    "uxy": {
+      shape: image
+      icon: https://github.com/kaywoz/home0ps/blob/main/images/logo-uswy.png?raw=true
+    }
+    "proey": {
+      shape: image
+      icon: https://github.com/kaywoz/home0ps/blob/main/images/logo-unifi-ap.jpg?raw=true
+    }
+    "litey": {
+      shape: image
+      icon: https://github.com/kaywoz/home0ps/blob/main/images/logo-unifi-ap.jpg?raw=true
+    }
+  }
+  
+  Compute: "compute" {
+    grid-columns: 1
+    style.fill: white
+    "xcp-ng".sexy: {
+      shape: image
+      icon: https://cwwk.net/cdn/shop/products/05.png?v=1675223495&width=800
+    }
+    "xcp-ng".edgy: {
+      shape: image
+      icon: https://cwwk.net/cdn/shop/products/05.png?v=1675223495&width=800
+    }
+    "debian".plenty: {
+      shape: image
+      icon: https://dlcdnwebimgs.asus.com/gain/75c899c4-8e0d-4ccc-93f3-f571cc918820/w800/fwebp
+    }
+    "ubuntu".hkh-clp-aio-worker11: {
+      shape: image
+      icon: https://hostkey.com/hk/images/logo.svg
+    }
+  }
+  
+  compute.xcp-ng: {
+    explanation: |md
+      8c/48gb/1tb nvme/4x2.5gbe
+    |
+  }
+  
+  compute.debian: {
+    explanation: |md
+      4c/32gb/1tb nvme/1x2.5gbe
+    |
+  }
+  
+  compute.ubuntu: {
+    explanation: |md
+      8c/32gb/256gb nvme/1x1gbe/gtx4090
+    |
+  }
+  
+  Storage: "storage" {
+    grid-columns: 1
+    style.fill: white
+    "nasty".icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/synology-black.svg
+    "onedrive"
+    "hetzner storagebox".icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/hetzner.svg
+    "storadera"
+    "put.io"
+  }
+  
+  Servers: "servers" {
+    grid-rows: 4
+    style.fill: white
+    "krh-clp-xos-mgmt11": {
+      shape: image
+      icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/xcpng.svg
+    }
+    "krh-dld-test-docker11": {
+      shape: image
+      icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/f084a7da8dc72f44edcd8c21dd8650b5f781734c/assets/docker.svg
+    }
+    "plenty": {
+      shape: image
+      icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/f084a7da8dc72f44edcd8c21dd8650b5f781734c/assets/docker.svg
+    }
+  }
+  
+  Services: "services" {
+    grid-rows: 4
+    style.fill: white
+    "uptimekuma": {
+      shape: image
+      icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/uptimekuma.svg
+    }
+    "healthchecks": {
+      shape: image
+      icon: https://raw.githubusercontent.com/healthchecks/healthchecks/refs/heads/master/stuff/favicon.svg
+    }
+    archivewarrior: {
+      shape: image
+      icon: https://cdn.netzpolitik.org/wp-upload/2023/07/Warrior-vm-screenshot_1600_en-860x484.jpg
+    }
+    "foldingathome": {
+      shape: image
+      icon: https://upload.wikimedia.org/wikipedia/commons/8/83/FAH_Logo.svg
+    }
+    "dockge": {
+      shape: image
+      icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/dockge.svg
+    }
+    "cloudflare": {
+      shape: image
+      icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/cloudflare.svg
+    }
+    "gatus": {
+      shape: image
+      icon: https://status.britishrowing.org/img/logo.svg
+    }
+    "rclone": {
+      shape: image
+      icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/f084a7da8dc72f44edcd8c21dd8650b5f781734c/assets/rclone.svg
+    }
+    "filebrowser": {
+      shape: image
+      icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/f084a7da8dc72f44edcd8c21dd8650b5f781734c/assets/filebrowser.svg
+    }
+    "homeassistant": {
+      shape: image
+      icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/f084a7da8dc72f44edcd8c21dd8650b5f781734c/assets/homeassistant.svg
+    }
+  }
+  
+  internet: isp {
+    shape: cloud
+    style: {
+      opacity: 1
+      fill: pink
+      stroke: black
+    }
+  }
+  
+  internet <-> ultry
+  ultry <-> eighty
+  eighty <-> uxy: poe
+  eighty <-> miny: poe
+  eighty <-> flexy: poe
+  eighty <-> proey: poe
+  proey <-> litey: mesh {style.animated: true}
+  
+  ultry.shape: circle
+  
+  status: {
+    explanation: |md
+  
+      ![text](http://healthchecks-public.krypi.net/b/3/7744a705-5765-4618-827a-b56dd9add06d.svg)
+      ![text](http://healthchecks-public.krypi.net/b/3/7744a705-5765-4618-827a-b56dd9add06d.svg)
+      ![text](http://healthchecks-public.krypi.net/b/3/7744a705-5765-4618-827a-b56dd9add06d.svg)
+  
+      placeholder
+  
+  
+  
+      placeholder
+    |
+  }
+  
