@@ -1,0 +1,102 @@
+direction: right
+
+Daily -- Trigger -- Investigation
+
+Investigation -> "do nothing"
+Investigation -> "keep working"
+Investigation -> "pause working"
+Investigation -> "thewholeshebang"
+"keep working" -> Daily: {style.animated: true}
+
+Daily.daily: "" {
+  grid-columns: 1
+
+  "check feeds".icon: https://cdn.icon-icons.com/icons2/285/PNG/96/social_rss_box_orange_256_30633.png
+  "work backlog".icon: https://icons.terrastruct.com/tech%2Flaptop.svg
+  "select for dev".icon: https://cdn.icon-icons.com/icons2/2429/PNG/512/jira_logo_icon_147274.png
+  "validate data".icon: https://icons.terrastruct.com/essentials%2F089-data%20analysis.svg
+  "deploy to customers".icon: https://icons.terrastruct.com/essentials%2F171-flag.svg
+  style: {
+    opacity: 1
+    fill: white
+    3d: true
+    stroke: black
+  }
+}
+
+Trigger.trigger: "" {
+  grid-columns: 1
+
+  "hypothesis"
+  "ioc"
+  "ioa"
+  style: {
+    opacity: 1
+    fill: pink
+    3d: true
+    stroke: black
+  }
+}
+
+Investigation.investigation: "" {
+  grid-columns: 1
+
+  "triage"
+  "incident response"
+  style: {
+    opacity: 1
+    fill: lightyellow
+    3d: true
+    stroke: black
+  }
+}
+
+"do nothing": "do nothing" {
+  grid-columns: 1
+
+  "task completed"
+  style: {
+    opacity: 1
+    fill: lightgreen
+    3d: true
+    stroke: black
+  }
+}
+
+"keep working": "keep working" {
+  grid-columns: 1
+
+  "hunt again"
+  "recurring detection needed"
+  style: {
+    opacity: 1
+    fill: orange
+    3d: true
+    stroke: black
+  }
+}
+
+"pause working": "pause and wait for customer" {
+  grid-columns: 1
+
+  "report to customer"
+  "respond and escalate to customer"
+  style: {
+    opacity: 1
+    fill: lightblue
+    3d: true
+    stroke: black
+  }
+}
+
+"thewholeshebang": "do it all" {
+  grid-columns: 1
+
+  "all of the above"
+  style: {
+    opacity: 1
+    fill: "linear-gradient(red, lightgreen)"
+    3d: true
+    stroke: black
+  }
+}
