@@ -1,0 +1,161 @@
+vars: {
+  d2-config: {
+    layout-engine: elk
+    # Terminal theme code
+    theme-id: 300
+  }
+}
+
+direction: right
+
+venorian: {
+  shape: person
+}
+
+learn.forensics_step: {
+  shape: square
+}
+
+learn.acquisition_step: {
+  shape: square
+}
+
+learn.analysis_step: {
+  shape: square
+}
+
+perform.web/online/pdf_in_course: {
+  shape: circle
+}
+
+perform.ctfd/exam_in_course: {
+  shape: circle
+}
+
+get.Digital_badge: {
+  shape: circle
+}
+
+acquisitiontools: {
+  explanation: |md
+    Ftk imager
+
+    Kape
+
+    Brimor labs
+
+    Magnet
+
+    Winpmem
+  |
+}
+
+forensicstools: {
+  explanation: |md
+    FLAIR
+
+    Remnux
+
+    SANS
+
+  |
+}
+
+analysistools: {
+  explanation: |md
+    Zimmerman tools
+
+    powershell
+
+    volatility
+
+    cyberchef
+
+    exiftool
+
+    scalpet
+
+    networkminer
+
+    wireshark
+
+    urlscan.io
+
+    virustotal
+
+    wannabrowser
+
+    browserling
+
+    hybrid-analysis
+
+    any.run
+
+    pestudo
+
+    sysinternals
+
+    didier stevens
+
+  |
+}
+
+learningplatform: {
+  explanation: |md
+
+    pdf with material to study
+
+    ctfd for reinforcement
+
+    practice with tools from vm on vm with data
+
+  |
+}
+
+examplatform: {
+  explanation: |md
+
+    jeopardy style ctfd per step in learn
+
+    exam with tools from vm on vm with data, answers in ctfd
+
+  |
+}
+
+rewardplatform: {
+  explanation: |md
+
+    creddly, expensive asf
+
+    certopus, unknown, cheap
+
+  |
+}
+
+learn.acquisition_step: {style.fill: pink}
+learn.forensics_step: {style.fill: pink}
+learn.analysis_step: {style.fill: pink}
+
+perform.web/online/pdf_in_course: {style.fill: lightyellow}
+perform.ctfd/exam_in_course: {style.fill: lightyellow}
+
+get.Digital_badge: {style.fill: lightgreen}
+
+# # connections
+Venorian -> learn.acquisition_step -> learn.forensics_step -> learn.analysis_step
+
+learn -> perform -> get
+
+perform.web/online/pdf_in_course -> perform.ctfd/exam_in_course
+
+learn.acquisition_step -- acquisitiontools
+
+learn.forensics_step -- forensicstools
+
+learn.analysis_step -- analysistools
+
+perform.web/online/pdf_in_course -- learningplatform
+
+perform.ctfd/exam_in_course -- examplatform
+
+get -- rewardplatform
