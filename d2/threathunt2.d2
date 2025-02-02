@@ -1,0 +1,51 @@
+vars: {
+  d2-config: {
+    layout-engine: elk
+    # Terminal theme code
+    theme-id: 300
+  }
+}
+sketch
+
+title: LAIR threathunting {
+  near: top-center
+  shape: text
+  style: {
+    font-size: 29
+    bold: true
+    underline: true
+  }
+}
+
+sketch.crowdstrikestep1: Trigger (by Crowdstrike)
+
+sketch.crowdstrikestep2: Investigation
+
+sketch.crowdstrikestep3: Resolution
+
+sketch.crowdstrikestep1 -> sketch.crowdstrikestep2 -> sketch.crowdstrikestep3
+
+sketch.hypothesisstep1: Hypothesis, (we are guessing something is happening)
+
+sketch.iocioastep1: By IOC, By IOA, (something external is informing us to look for something)
+
+sketch.bigdatastep1: SIEM, datalake, ML/AI
+
+resolution.1timedetection: Just detect 1 time?
+resolution.recurringdetection: build detection for the future?
+resolution.completiondetection: perform detection and complete?
+resolution.reportdetection: perform detection and report to customer?
+resolution.responsedetection: perform detection and respond/escalate?
+
+sketch.hypothesisstep1 -> sketch.crowdstrikestep2 -> sketch.crowdstrikestep3
+
+sketch.iocioastep1 -> sketch.crowdstrikestep2 -> sketch.crowdstrikestep3
+
+sketch.bigdatastep1 -> sketch.crowdstrikestep2 -> sketch.crowdstrikestep3
+
+sketch.crowdstrikestep3 -> resolution.1timedetection
+
+sketch.crowdstrikestep3 -> resolution.recurringdetection
+sketch.crowdstrikestep3 -> resolution.completiondetection
+sketch.crowdstrikestep3 -> resolution.reportdetection
+sketch.crowdstrikestep3 -> resolution.responsedetection
