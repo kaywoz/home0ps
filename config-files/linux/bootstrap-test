@@ -1,0 +1,5 @@
+#!/bin/sh
+#cockpit install with storage and networking
+apt update
+apt install tldr -y
+echo "Done!"
