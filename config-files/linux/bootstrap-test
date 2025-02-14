@@ -2,4 +2,4 @@
 #cockpit install with storage and networking
 apt update
 apt install tldr -y
-echo "Done!"
+echo -e "\e[32mdone\e[0m"
