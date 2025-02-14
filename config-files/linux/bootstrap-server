@@ -5,10 +5,8 @@ echo "deb http://deb.debian.org/debian ${VERSION_CODENAME}-backports main" > /et
 apt update
 apt install -t ${VERSION_CODENAME}-backports cockpit
 apt install -t ${VERSION_CODENAME}-backports cockpit
-apt install cockpit-storaged
-apt install cockpit-networkmanager
+apt install cockpit-storaged -y
+apt install cockpit-networkmanager -y
 #other packages
-apt install btop git tldr cloud-utils nfs-utils
+apt install btop git tldr cloud-utils nfs-kernel-server -y
 echo "Done!"
-
-
