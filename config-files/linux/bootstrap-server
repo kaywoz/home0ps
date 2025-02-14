@@ -9,4 +9,4 @@ apt install cockpit-storaged -y
 apt install cockpit-networkmanager -y
 #other packages
 apt install btop git tldr cloud-utils nfs-kernel-server -y
-echo "Done!"
+echo -e "\e[32mdone\e[0m"
