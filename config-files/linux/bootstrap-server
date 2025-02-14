@@ -1,0 +1,18 @@
+#!/bin/sh
+
+#cockpit install with storage and networking
+. /etc/os-release
+echo "deb http://deb.debian.org/debian ${VERSION_CODENAME}-backports main" > \
+    /etc/apt/sources.list.d/backports.list
+apt update
+apt install -t ${VERSION_CODENAME}-backports cockpit
+apt install -t ${VERSION_CODENAME}-backports cockpit
+apt install cockpit-storaged -y
+apt install cockpit-networkmanager -y
+
+#other packages
+apt install btop git tldr cloud-utils nfs-utils -y
+
+echo "Done!"
+
+
