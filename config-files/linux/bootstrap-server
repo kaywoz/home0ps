@@ -7,10 +7,13 @@ apt install -t ${VERSION_CODENAME}-backports cockpit
 apt install -t ${VERSION_CODENAME}-backports cockpit
 apt install cockpit-storaged -y
 apt install cockpit-networkmanager -y
-# install docker
+
+# install docker and add current user to docker group
 curl -fsSL get.docker.com | bash
 sudo usermod -a -G docker $USER
 
 #other packages
 apt install btop git tldr cloud-utils nfs-kernel-server -y
+
+#done?
 echo -e "\e[32mdone\e[0m"

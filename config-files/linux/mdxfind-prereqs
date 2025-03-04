@@ -1,0 +1,6 @@
+#!/bin/sh
+
+apt install libmhash-dev libpcre3 libpcre3-dev libjudy-dev
+
+
+
