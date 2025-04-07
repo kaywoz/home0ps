@@ -1,0 +1,36 @@
+vars: {
+  d2-config: {
+    layout-engine: elk
+    # Terminal theme code
+  }
+}
+direction: down
+
+explanation: |md
+  # SOC - custom platform takeaways
+
+  - use common framework for detection logic, Atomic Red Team, Mitre ATTACK etc.
+  - start small with log sources already normalized
+  - normalize data early in pipeline and project
+  - prune ingestion early, not later
+  - SIEM is not an archive
+  - store SIEM events longer, not raw events
+  - work with app testing teams, pentesting teams, red teams
+  - test while evaluating, do not implement and then evaluate.
+  - if EDR is in place, enrich with other logs/data
+  - onboard logs which fill EDR gaps:
+  powershell logs, SSH/RDP logs
+  - make detections for EDR manipulation
+  - make detections for native recon tools
+  - make detections for file manipulation/connection attempts which do not match organisation.
+  - alerts should build off of detection chains, multiple detections or risky detections in timeframe or on asset to avoid false positives.
+
+  #1 focus is always immutable artifact, "Changes to HKLM\SYSTEM\CurrentControlSet\Services"
+  
+  #2 focus is statistical anomaly, "How often are new services created? Which ones?"
+  
+  #3 focus is syntax, "Event ID 4697"
+  
+
+
+|
