@@ -1,0 +1,186 @@
+vars: {
+  d2-config: {
+    layout-engine: elk
+    # Terminal theme code
+  }
+}
+direction: down
+
+"log sources": {
+EDR.style: {
+  stroke: orange
+  font-color: black
+  fill: white
+ }
+DHCP/DNS.style: {
+  stroke: red
+  font-color: black
+  fill: white
+ }
+IDP/AD.style: {
+  stroke: red
+  font-color: black
+  fill: white
+ }
+VPN.style: {
+  stroke: red
+  font-color: black
+  fill: white
+ }
+SSH/RDP.style: {
+  stroke: red
+  font-color: black
+  fill: white
+ }
+shape: step
+style: {
+  stroke: black
+  font-color: black
+ }
+}
+
+
+"siem":{
+"Ingestion/parsing".style: {
+  stroke: red
+  font-color: black
+  fill: white
+ }
+Storage.style: {
+  stroke: orange
+  font-color: black
+  fill: white
+ }
+Archive.style: {
+  stroke: green
+  font-color: black
+  fill: white
+ }
+shape: step
+style: {
+  stroke: black
+  font-color: black
+ }
+}
+
+"detections":{
+Immutable.style: {
+  stroke: red
+  font-color: black
+  fill: white
+ }
+Syntax.style: {
+  stroke: orange
+  font-color: black
+  fill: white
+ }
+Statistics.style: {
+  stroke: green
+  font-color: black
+  fill: white
+ }
+shape: step
+style: {
+  stroke: black
+  font-color: black
+ }
+}
+"alerts":{
+Email.style: {
+  stroke: green
+  font-color: black
+  fill: white
+ }
+Webhook.style: {
+  stroke: green
+  font-color: black
+  fill: white
+ }
+shape: step
+style: {
+  stroke: black
+  font-color: black
+ }
+}
+
+"triage":{
+Response.style: {
+  stroke: orange
+  font-color: black
+  fill: white
+ }
+Isolation.style: {
+  stroke: orange
+  font-color: black
+  fill: white
+ }
+Investigation.style: {
+  stroke: orange
+  font-color: black
+  fill: white
+ }
+style: {
+  stroke: black
+  font-color: black
+ }
+}
+
+
+##pipe
+
+"log sources".EDR -> syslog/json/custom
+"log sources".IDP/AD -> syslog/eventlog
+"log sources".DHCP/DNS -> syslog/eventlog
+"log sources".VPN -> syslog/eventlog
+"log sources".SSH/RDP -> syslog/eventlog
+
+"siem"."Ingestion/parsing" -> pre-processing/post-processing
+"siem".Storage -> storage cluster/multi-node
+"siem".Archive -> tape/cloud/none?
+
+"detections".Immutable -> long, unavoidable artifact
+"detections".Syntax -> common detections
+"detections".Statistics -> easy, long evaluation
+
+"alerts".Email -> soc mailbox/stakeholders
+"alerts".Webhook -> Teams/Slack/paging
+
+"triage".Response -> playbook/stakeholder buy-in
+"triage".Isolation -> risk assessment/categorization
+"triage".Investigation -> playbook/enrichment/3rd party source
+
+"log sources" -> "siem": {
+  style: {
+    stroke-width: 8
+  }
+}
+
+
+
+"siem" -> "detections": {
+  style: {
+    stroke-width: 8
+  }
+}
+
+
+
+"detections" -> "alerts": {
+  style: {
+    stroke-width: 8
+  }
+}
+
+
+"alerts" -> "triage": {
+  style: {
+    stroke-width: 8
+  }
+}
+
+
+##pipeline
+
+
+
+
