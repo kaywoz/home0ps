@@ -1,0 +1,53 @@
+vars: {
+  d2-config: {
+    layout-engine: elk
+    # Terminal theme code
+  }
+}
+direction: down
+
+event pipeline: {
+  shape: sequence_diagram
+  "log sources".style: {
+    stroke: black
+    font-color: black
+    fill: white
+   }
+  "siem".style: {
+    stroke: black
+    font-color: black
+    fill: white
+   }
+  "detections".style: {
+    stroke: orange
+    font-color: black
+    fill: white
+   }
+  "alerts".style: {
+    stroke: red
+    font-color: black
+    fill: white
+   }
+  "triage".style: {
+    stroke: orange
+    font-color: black
+    fill: white
+   }
+  END.style: {
+    stroke: green
+    font-color: green
+    fill: white
+   }
+  event happens: {
+    "log sources" -> "siem": EDR signature detection
+    "siem" -> "detections": rule triggers 
+    "detections" -> "alerts": Slack message to SOC
+    "alerts" -> "triage": playbook run by analyst
+    outcome bad: false positive {
+      triage -> siem: tune rule
+    }
+    outcome good: positive/benign positive {
+      triage -> END
+    }
+  }
+  }
