@@ -1,0 +1,82 @@
+direction: down
+success rate: {
+  shape: callout
+  explanation: |md
+    Brute-forcing a Username and Password: 0% success probability (MFA)
+
+    Credentials Sold on the Dark Web: 0% (proportion of accounts without MFA)
+
+    Spear Phishing Attack: 10% (False Negative rate of our email security gateway?) * 10% (phishing click-through rate) * 0% (proportion of accounts without MFA) = 0% success probability
+
+    Malware Infection: 10% success probability (inverse of detection of 90%)
+
+    _________________________
+
+    Buying Credentials on the Dark Web -> Stealing 1pw secrets: 0% * 70% (proportion of employees with access to the source code) = 0% success probability
+
+    Spear Phishing -> 1pw secrets: 0% * 70% = 0% success probability
+
+    Malware -> 1pw secrets: 15% * 70%/30% = 10.5%/4.5% success probability
+
+    ______________________________
+
+  |
+}
+
+likelihood: {
+  shape: callout
+  explanation: |md
+    Likelihood of a Credential Leak on the Dark Web Leading to 1pw secret theft:
+    Calculation: Probability of success * Number of occurrences in a year 
+
+    Result: 0% * 0 = 0% (placeholder)
+
+    Likelihood of Spear Phishing Leading to 1pw secret theft:
+    Calculation: 0% * 2,400 = (placeholder)
+
+    Likelihood of Malware Leading to 1pw secret theft:
+    Calculation: 10.5%/4.5% * 12 = 126%/54% during 1 year
+
+    _________________________
+
+    what happens?
+
+    2 more analysts?
+
+    100 more phishing attacks?
+
+    malware attack increase due to Et3rnalBluuu2029?
+
+  |
+}
+
+identity compromise: {
+  shape: circle
+}
+
+identity compromise -> non-tech(AH): 4.5%
+non-tech(AH) -- corp-device
+
+identity compromise -> tech(KA): 10.5%
+tech(KA) -- corp-device
+
+identity compromise -> 3rdparty(hr-service): 0%
+
+corp-device -> loot in 1pw
+corp-device -> Web browser
+
+Web browser -> loot in 1pw
+
+loot in 1pw: {
+  shape: cloud
+  style.fill: pink
+}
+
+spearphish -> email security: 80% blocked
+spearphish -> email security: 20% bypass
+email security -> user runs attachment: 10%
+user runs attachment -> EDR: 85%
+email security -> user enters credential: 10%
+user enters credential -> MFA
+x amount leaked credentials -> MFA: 0?%
+x amount malware installation -> EDR: 15%
