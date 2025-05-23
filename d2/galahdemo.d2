@@ -1,0 +1,47 @@
+"curl -i 'http://galah-host:8080/sys.php?file=../etc/passwd'" -> tcp ports 80, 8080, 443 etc: {
+    style: {
+      # All CSS color names are valid
+      stroke: red
+    }
+  }
+  
+  tcp ports 80, 8080, 443 etc -> galah: {
+    style: {
+      # All CSS color names are valid
+      stroke: red
+    }
+  }
+  
+  galah -> llm: input from request
+  llm -> galah: fake output from llm
+  
+  tcp ports 80, 8080, 443 etc: fake output on port
+  
+  galah -> tcp ports 80, 8080, 443 etc: fake output {
+    style: {
+      # All CSS color names are valid
+      stroke: green
+    }
+  }
+  
+  attacker_request: {
+    style: {
+      # All CSS color names are valid
+      stroke: red
+    }
+  }
+  
+  "curl -i 'http://galah-host:8080/sys.php?file=../etc/passwd'": {
+    style: {
+      # All CSS color names are valid
+      stroke: red
+    }
+  }
+  
+  attacker_request -> "curl -i 'http://galah-host:8080/sys.php?file=../etc/passwd'": {
+    style: {
+      # All CSS color names are valid
+      stroke: red
+    }
+  }
+  
