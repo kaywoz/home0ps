@@ -1,0 +1,72 @@
+vars: {
+  d2-config: {
+    layout-engine: elk
+  }
+}
+
+
+direction: right
+
+baremetal: grunty@hostkey {
+  style: {
+    opacity: 1
+    fill: lightgrey
+    3d: true
+    stroke: black
+    stroke-width: 5
+  }
+}
+
+apps.style: {
+  fill: lightyellow
+  opacity: 1
+  3d: false
+  stroke: black
+  stroke-width: 5
+}
+
+ports.style: {
+  fill: orange
+  opacity: 1
+  3d: false
+  stroke: black
+  stroke-width: 5
+}
+
+apps.prod.archivewarrior
+apps.prod.folding at home
+apps.prod.t-potce
+apps.prod.ollama
+apps.prod.open-webui
+apps.infra.tailscale
+apps.infra.beszel
+apps.infra.dozzle
+apps.infra.docker-socket-proxy
+apps.infra.dockge
+
+baremetal -- apps -- ports
+
+status: {
+  explanation: |md
+
+    ![test](https://healthchecks.io/b/2/1fe77d08-23f6-40a0-84af-fe49e35d0297.svg)
+
+    ![text](http://healthchecks-public.krypi.net/b/3/7744a705-5765-4618-827a-b56dd9add06d.svg)
+
+  |
+}
+
+status: {
+  explanation: |md
+    <img src="https://healthchecks.io/b/2/ee11b2f0-36ec-4193-84eb-e6b633266392.svg" alt="drawing" style="width:150px,height:150px;"/>
+
+
+    placeholder
+  |
+}
+
+kvs: Kinesis Video Streams {
+  link: https://aws.amazon.com/kinesis/video-streams
+  icon: https://www.svgrepo.com/download/484343/server-like.svg
+  shape: image
+}
