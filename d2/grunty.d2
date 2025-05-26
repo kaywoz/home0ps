@@ -25,8 +25,23 @@ title: krypi.net cloudops @grunty {
 
 ## objects
 
-baremetal.grunty: grunty {
+baremetal.baremetal: 8c\n64gb\n240gb\n gtx4090\n .{
+  shape: image
+  icon: https://hostkey.com/hk/images/logo.svg
+# icon.near: top-center
+ # label.near: bottom-right
+  style: {
+    stroke: black
+    font-color: black
+    stroke-dash: 3
+    fill: lightgrey
+    opacity: 1
+  }
+ 
+}
+baremetal.grunty: Grunty{
   icon: https://www.svgrepo.com/download/484343/server-like.svg
+  label.near: top-left
   style: {
     stroke: black
     font-color: black
@@ -35,19 +50,8 @@ baremetal.grunty: grunty {
     opacity: 1
     3d: false
   }
-}
-baremetal: 8c\n64gb\n240gb\n gtx4090\n .{
-  icon: https://hostkey.com/hk/images/logo.svg
-  icon.near: top-left
-  label.near: center-right
-  style: {
-    stroke: black
-    font-color: black
-    stroke-dash: 3
-    fill: lightgrey
-    opacity: 1
-    3d: true
-  }
+
+
 }
 public_links:links {
   shape: cloud
@@ -84,14 +88,14 @@ result.style: {
 
 
 app stacks.compute: {
-  label: COMPUTE\n archivewarrior\n foldingathome\n galah\n llama\n open-webui 
+  label: COMPUTE\n archivewarrior\n foldingathome\n ollama\n open-webui 
   style: {
     fill:"#f9f641"
   }
 }
 
 app stacks.honeypot: {
-  label: HONEYPOT \n t-potce\n beelzebub\n galah\n galah\n
+  label: HONEYPOT \n t-potce\n beelzebub\n galah\n
   style: {
     fill:"#ec4e2c"
   }
