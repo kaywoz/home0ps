@@ -9,14 +9,10 @@ vars: {
 direction: right
 title: krypi.net cloudops @grunty {
   near: top-center
-
   shape: text
-
   style: {
-    font-size: 29
-
+    font-size: 35
     bold: true
-
     underline: true
   }
 }
@@ -25,30 +21,31 @@ title: krypi.net cloudops @grunty {
 
 ## objects
 
-baremetal.baremetal: 8c\n64gb\n240gb\n gtx4090\n .{
-  shape: image
-  icon: https://hostkey.com/hk/images/logo.svg
+##grunty.baremetal: 8c\n64gb\n240gb\n gtx4090\n .{
+ ## shape: image
+ ## icon: https://hostkey.com/hk/images/logo.svg
 # icon.near: top-center
  # label.near: bottom-right
-  style: {
-    stroke: black
-    font-color: black
-    stroke-dash: 3
-    fill: lightgrey
-    opacity: 1
-  }
+ ## style: {
+  ##  stroke: black
+  ##  font-color: black
+   ## stroke-dash: 3
+   ## fill: lightgrey
+  ## opacity: 1
+  ##  font-size: 20
+ ## }
  
-}
-baremetal.grunty: Grunty{
+##}
+##grunty.grunty: Grunty{ 
+grunty:  {
   icon: https://www.svgrepo.com/download/484343/server-like.svg
-  label.near: top-left
+  shape: image
   style: {
     stroke: black
     font-color: black
     stroke-dash: 3
     fill: lightgrey
     opacity: 1
-    3d: false
   }
 
 
@@ -78,7 +75,7 @@ app stacks.style: {
   stroke-width: 5
 }
 
-result.style: {
+proxy.style: {
   fill: orange
   opacity: 1
   3d: true
@@ -110,7 +107,7 @@ app stacks.infra: {
 
 ## connections
 
-baremetal -- app stacks -> result -> public_links {
+grunty -- app stacks <- proxy <- public_links {
   style.stroke: black
   style.animated:true
   style.opacity: 1
@@ -121,4 +118,3 @@ baremetal -- app stacks -> result -> public_links {
 
 
 ## other
-
