@@ -1,72 +1,120 @@
+## global
 vars: {
   d2-config: {
     layout-engine: elk
+    sketch: true
   }
 }
-
 
 direction: right
+title: krypi.net cloudops @grunty {
+  near: top-center
 
-baremetal: grunty@hostkey {
+  shape: text
+
   style: {
-    opacity: 1
-    fill: lightgrey
-    3d: true
-    stroke: black
-    stroke-width: 5
+    font-size: 29
+
+    bold: true
+
+    underline: true
   }
 }
 
-apps.style: {
-  fill: lightyellow
+
+
+## objects
+
+baremetal.grunty: grunty {
+  icon: https://www.svgrepo.com/download/484343/server-like.svg
+  style: {
+    stroke: black
+    font-color: black
+    stroke-dash: 3
+    fill: lightgrey
+    opacity: 1
+    3d: false
+  }
+}
+baremetal: 8c\n64gb\n240gb\n gtx4090\n .{
+  icon: https://hostkey.com/hk/images/logo.svg
+  icon.near: top-left
+  label.near: center-right
+  style: {
+    stroke: black
+    font-color: black
+    stroke-dash: 3
+    fill: lightgrey
+    opacity: 1
+    3d: true
+  }
+}
+public_links:links {
+  shape: cloud
+  direction: right
+  style: {
+    stroke: black
+    font-color: black
+    stroke-dash: 3
+    fill: white
+    opacity: 1
+  }
+}
+public_links.links: |md
+ 
+[folding at home](https://folding.extremeoverclocking.com/user_summary.php?s=&u=378752)
+
+|
+
+app stacks.style: {
+  fill: lightgrey
   opacity: 1
-  3d: false
+  3d: true
   stroke: black
   stroke-width: 5
 }
 
-ports.style: {
+result.style: {
   fill: orange
   opacity: 1
-  3d: false
+  3d: true
   stroke: black
   stroke-width: 5
 }
 
-apps.prod.archivewarrior
-apps.prod.folding at home
-apps.prod.t-potce
-apps.prod.ollama
-apps.prod.open-webui
-apps.infra.tailscale
-apps.infra.beszel
-apps.infra.dozzle
-apps.infra.docker-socket-proxy
-apps.infra.dockge
 
-baremetal -- apps -- ports
-
-status: {
-  explanation: |md
-
-    ![test](https://healthchecks.io/b/2/1fe77d08-23f6-40a0-84af-fe49e35d0297.svg)
-
-    ![text](http://healthchecks-public.krypi.net/b/3/7744a705-5765-4618-827a-b56dd9add06d.svg)
-
-  |
+app stacks.compute: {
+  label: COMPUTE\n archivewarrior\n foldingathome\n galah\n llama\n open-webui 
+  style: {
+    fill:"#f9f641"
+  }
 }
 
-status: {
-  explanation: |md
-    <img src="https://healthchecks.io/b/2/ee11b2f0-36ec-4193-84eb-e6b633266392.svg" alt="drawing" style="width:150px,height:150px;"/>
-
-
-    placeholder
-  |
+app stacks.honeypot: {
+  label: HONEYPOT \n t-potce\n beelzebub\n galah\n galah\n
+  style: {
+    fill:"#ec4e2c"
+  }
 }
 
-kvs: Kinesis Video Streams {
-  link: https://aws.amazon.com/kinesis/video-streams
-  icon: https://www.svgrepo.com/download/484343/server-like.svg
-  shape: image
+app stacks.infra: {
+  label: INFRA \n tailscale\n beszel\n dozzle\n docker-socketproxy\n dockge
+  style: {
+    fill:"#9df941"
+  }
 }
+
+## connections
+
+baremetal -- app stacks -> result -> public_links {
+  style.stroke: black
+  style.animated:true
+  style.opacity: 1
+  style.3d: true
+  style.stroke: black
+  style.stroke-width: 5
+}
+
+
+## other
+
