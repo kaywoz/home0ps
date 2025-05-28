@@ -7,7 +7,7 @@ vars: {
 }
 
 direction: right
-title: krypi.net cloudops @grunty {
+title: krypi.net ops {
   near: top-center
   shape: text
   style: {
@@ -18,28 +18,14 @@ title: krypi.net cloudops @grunty {
 }
 
 
-
+##________________________cloudops begin____________________
 ## objects
-
-##grunty.baremetal: 8c\n64gb\n240gb\n gtx4090\n .{
- ## shape: image
- ## icon: https://hostkey.com/hk/images/logo.svg
-# icon.near: top-center
- # label.near: bottom-right
- ## style: {
-  ##  stroke: black
-  ##  font-color: black
-   ## stroke-dash: 3
-   ## fill: lightgrey
-  ## opacity: 1
-  ##  font-size: 20
- ## }
- 
-##}
-##grunty.grunty: Grunty{ 
-grunty:  {
-  icon: https://www.svgrepo.com/download/484343/server-like.svg
+cloudops.grunty: grunty@ \n 8c\n64gb\n240gb\n gtx4090\n .  {
+  #icon: https://www.svgrepo.com/show/241658/server.svg
+  icon:https://www.svgrepo.com/show/418654/cloud-hosting-server.svg
   shape: image
+  width: 100
+  height: 100
   style: {
     stroke: black
     font-color: black
@@ -47,10 +33,8 @@ grunty:  {
     fill: lightgrey
     opacity: 1
   }
-
-
 }
-public_links:links {
+cloudops.public_links:links {
   shape: cloud
   direction: right
   style: {
@@ -61,53 +45,117 @@ public_links:links {
     opacity: 1
   }
 }
-public_links.links: |md
- 
+cloudops.public_links.links: |md
 [folding at home](https://folding.extremeoverclocking.com/user_summary.php?s=&u=378752)
 
 |
-
-app stacks.style: {
+cloudops.app stacks.style: {
   fill: lightgrey
   opacity: 1
   3d: true
   stroke: black
   stroke-width: 5
 }
-
-proxy.style: {
+cloudops.proxy: {
+icon: https://www.svgrepo.com/show/420172/cloud-lock-protect.svg
+shape: image
+width: 100
+height: 100
+style: {
   fill: orange
   opacity: 1
-  3d: true
   stroke: black
   stroke-width: 5
+ }
 }
-
-
-app stacks.compute: {
-  label: COMPUTE\n archivewarrior\n foldingathome\n ollama\n open-webui 
-  style: {
-    fill:"#f9f641"
+cloudops.app stacks.compute: {
+  grid-rows: 2
+  style.stroke: "#f9f641"
+  "": {
+    shape: image
+    icon: https://upload.wikimedia.org/wikipedia/commons/8/83/FAH_Logo.svg
+    width: 50
+    height: 50
   }
 }
-
-app stacks.honeypot: {
-  label: HONEYPOT \n t-potce\n beelzebub\n galah\n
-  style: {
-    fill:"#ec4e2c"
+cloudops.app stacks.compute.archivewarrior: "" {
+  shape: image
+  icon: https://cdn.netzpolitik.org/wp-upload/2023/07/Warrior-vm-screenshot_1600_en-860x484.jpg
+  width: 50
+  height: 50
+}
+cloudops.app stacks.compute.ollama: ""{
+  shape: image
+  icon: https://www.ollama.com/public/assets/c889cc0d-cb83-4c46-a98e-0d0e273151b9/42f6b28d-9117-48cd-ac0d-44baaf5c178e.png
+  width: 50
+  height: 50
+}
+cloudops.app stacks.compute.open-webui:"" {
+  shape: image
+  icon: https://github.com/open-webui/open-webui/blob/main/static/favicon.png?raw=true
+  width: 50
+  height: 50
+}
+cloudops.app stacks.honeypot: {
+  grid-rows: 2
+  style.stroke: "#ec4e2c"
+  "": {
+    shape: image
+    icon: https://miro.medium.com/v2/resize:fit:640/format:webp/1*gNdhQzFVQNsjOD7ekLJrOw.png
+    width: 50
+    height: 50
   }
 }
-
-app stacks.infra: {
-  label: INFRA \n tailscale\n beszel\n dozzle\n docker-socketproxy\n dockge
+cloudops.app stacks.honeypot.beelzebub: "" {
+  shape: image
+  icon: https://camo.githubusercontent.com/b2ee43685df4cc4d6f425d7ba11f60c019ad555199656a688b8a5999334d5a40/68747470733a2f2f6265656c7a656275622e6e65746c6966792e6170702f676f2d6265656c7a656275622e706e67
+  width: 50
+  height: 50
+}
+cloudops.app stacks.honeypot.galah: "" {
+  shape: image
+  icon: https://github.com/0x4D31/galah/blob/main/docs/images/galah.png?raw=true
+  width: 50
+  height: 50
+}
+cloudops.app stacks.infra: {
+  grid-rows: 2
   style: {
-    fill:"#9df941"
+    stroke:"#9df941"
   }
 }
-
+cloudops.app stacks.infra.tailscale: "" {
+  shape: image
+  icon: https://vectorwiki.com/images/eldpO__tailscale.svg
+  width: 50
+  height: 50
+}
+cloudops.app stacks.infra.dozzle:"" {
+  shape: image
+  icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/dozzle.svg
+  width: 50
+  height: 50
+}
+cloudops.app stacks.infra.docker-socketproxy: ""{
+  shape: image
+  icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/linuxserver-io.svg
+  width: 50
+  height: 50
+}
+cloudops.app stacks.infra.beszel:"" {
+  shape: image
+  icon: https://www.myqnap.org/wp-content/uploads/beszel-logo-100x100.png
+  width: 50
+  height: 50
+}
+cloudops.app stacks.infra.dockge:"" {
+  shape: image
+  icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/dockge.svg
+  width: 50
+  height: 50
+}
 ## connections
-
-grunty -- app stacks <- proxy <- public_links {
+cloudops.grunty -- cloudops.app stacks <- cloudops.proxy <- cloudops.public_links {
   style.stroke: black
   style.animated:true
   style.opacity: 1
@@ -115,6 +163,116 @@ grunty -- app stacks <- proxy <- public_links {
   style.stroke: black
   style.stroke-width: 5
 }
+## other
+# 
+# ##________________________cloudops end______________________
 
+
+##________________________homeops begin____________________
+## objects
+
+homeops.compute: {
+  grid-rows: 2
+  style: {
+    stroke:"#ec4e2c"
+  }
+}
+homeops.compute.sexy: "sexy" {
+  shape: image
+  icon: https://www.svgrepo.com/show/241658/server.svg
+  width: 50
+  height: 50
+}
+homeops.compute.edgy: "edgy" {
+  shape: image
+  icon: https://www.svgrepo.com/show/241658/server.svg
+  width: 50
+  height: 50
+}
+homeops.compute.plenty: "plenty" {
+  shape: image
+  icon: https://www.svgrepo.com/show/241658/server.svg
+  width: 50
+  height: 50
+}
+
+
+homeops.compute.servers: {
+  grid-rows: 2
+  style: {
+    stroke:"#9df941"
+  }
+}
+
+homeops.compute.servers: {
+  grid-rows: 2
+  style.stroke: "#f9f641"
+}
+
+homeops.compute.servers.xos: "" {
+  shape: image
+  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/xcpng.svg
+  width: 50
+  height: 50
+}
+
+homeops.network
+edge.modem: {
+  icon: https://www.svgrepo.com/show/294974/router-modem.svg
+}
+
+network.unifi.router.ultry: {
+  icon: https://www.svgrepo.com/show/294977/router-modem.svg
+}
+network.unifi.wifi.proey: {
+  icon: https://www.svgrepo.com/show/191821/wifi-router.svg
+}
+
+
+homeops.storage
+
+homeops.storage.nasty: {
+  shape: image
+  icon: https://www.svgrepo.com/show/484869/hard-disk.svg
+  width: 50
+  height: 50
+}
+
+plenty
+
+homeops.app stacks.infra:{
+  grid-rows: 2
+  style.stroke: "#f9f641"
+}
+
+
+homeops.app stacks.infra.ha: "" {
+  shape: image
+  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/f084a7da8dc72f44edcd8c21dd8650b5f781734c/assets/homeassistant.svg
+  width: 50
+  height: 50
+}
+homeops.app stacks.infra.hc"": {
+  shape: image
+  icon: https://raw.githubusercontent.com/healthchecks/healthchecks/refs/heads/master/stuff/favicon.svg
+  width: 50
+  height: 50
+}
+homeops.app stacks.infra.uptimekuma:"" {
+  shape: image
+  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/uptimekuma.svg
+  width: 50
+  height: 50
+}
+homeops.app stacks.infra.cloudflare:"" {
+  shape: image
+  icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/cloudflare.svg
+  width: 50
+  height: 50
+}
+
+## connections
 
 ## other
+# 
+# cloudops.app stacks.honeypot: {
