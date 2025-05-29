@@ -22,7 +22,7 @@ title: krypi.net ops {
 ## objects
 cloudops.grunty: grunty@ \n 8c\n64gb\n240gb\n gtx4090\n .  {
   #icon: https://www.svgrepo.com/show/241658/server.svg
-  icon:https://www.svgrepo.com/show/418654/cloud-hosting-server.svg
+  icon:https://www.svgrepo.com/show/228184/server.svg
   shape: image
   width: 100
   height: 100
@@ -172,7 +172,7 @@ cloudops.grunty -- cloudops.app stacks <- cloudops.proxy <- cloudops.public_link
 ## objects
 
 homeops.compute: {
-  grid-rows: 2
+  grid-rows: 4
   style: {
     stroke:"#ec4e2c"
   }
@@ -195,7 +195,18 @@ homeops.compute.plenty: "plenty" {
   width: 50
   height: 50
 }
-
+homeops.compute.blueberry: "blueberry" {
+  shape: image
+  icon: https://www.svgrepo.com/show/408602/food-grape-blueberry.svg
+  width: 50
+  height: 50
+}
+homeops.compute.redberry: "redberry" {
+  shape: image
+  icon: https://www.svgrepo.com/show/408604/food-berry.svg
+  width: 50
+  height: 50
+}
 
 homeops.compute.servers: {
   grid-rows: 2
@@ -216,55 +227,68 @@ homeops.compute.servers.xos: "" {
   height: 50
 }
 
-homeops.network
-edge.modem: {
+homeops.network: {
+  grid-rows: 2
+  style: {
+    stroke:"#ec4e2c"
+  }
+}
+
+homeops.network.modem: "isp modem" {
   icon: https://www.svgrepo.com/show/294974/router-modem.svg
 }
 
-network.unifi.router.ultry: {
+homeops.network.ultry: "ultry router"{
   icon: https://www.svgrepo.com/show/294977/router-modem.svg
 }
-network.unifi.wifi.proey: {
+homeops.network.maxy: "maxy 10gbe switch" {
+  icon: https://www.svgrepo.com/show/295026/ethernet.svg
+}
+homeops.network.flexy: "flexy 10gbe switch" {
+  icon: https://www.svgrepo.com/show/295026/ethernet.svg
+}
+homeops.network.proey: "proey ap"{
+  icon: https://www.svgrepo.com/show/191821/wifi-router.svg
+}
+homeops.network.litey: "litey ap"{
   icon: https://www.svgrepo.com/show/191821/wifi-router.svg
 }
 
 
 homeops.storage
 
-homeops.storage.nasty: {
+homeops.storage.nasty: "nasty nas" {
   shape: image
-  icon: https://www.svgrepo.com/show/484869/hard-disk.svg
+  icon: https://www.svgrepo.com/show/234935/server.svg
   width: 50
   height: 50
 }
 
-plenty
-
-homeops.app stacks.infra:{
+homeops.compute.app stacks.infra:{
   grid-rows: 2
   style.stroke: "#f9f641"
 }
 
 
-homeops.app stacks.infra.ha: "" {
+homeops.compute.app stacks.infra.ha: "" {
   shape: image
   icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/f084a7da8dc72f44edcd8c21dd8650b5f781734c/assets/homeassistant.svg
   width: 50
   height: 50
 }
-homeops.app stacks.infra.hc"": {
+homeops.compute.app stacks.infra.hc: ""{
   shape: image
   icon: https://raw.githubusercontent.com/healthchecks/healthchecks/refs/heads/master/stuff/favicon.svg
   width: 50
   height: 50
 }
-homeops.app stacks.infra.uptimekuma:"" {
+homeops.compute.app stacks.infra.uptimekuma:"" {
   shape: image
   icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/uptimekuma.svg
   width: 50
   height: 50
 }
-homeops.app stacks.infra.cloudflare:"" {
+homeops.compute.app stacks.infra.cloudflare:"" {
   shape: image
   icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/cloudflare.svg
   width: 50
@@ -275,4 +299,15 @@ homeops.app stacks.infra.cloudflare:"" {
 
 ## other
 # 
-# cloudops.app stacks.honeypot: {
+##________________________cloudresources begin____________________
+## objects
+cloudresources.storage
+
+cloudresources.service
+
+
+
+# ## connections
+
+## other
+# 
