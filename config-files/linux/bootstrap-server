@@ -3,8 +3,8 @@
 . /etc/os-release
 echo "deb http://deb.debian.org/debian ${VERSION_CODENAME}-backports main" > /etc/apt/sources.list.d/backports.list
 apt update
-apt install -t ${VERSION_CODENAME}-backports cockpit
-apt install -t ${VERSION_CODENAME}-backports cockpit
+apt install -t ${VERSION_CODENAME}-backports cockpit -y
+apt install -t ${VERSION_CODENAME}-backports cockpit -y
 apt install cockpit-storaged -y
 apt install cockpit-networkmanager -y
 
