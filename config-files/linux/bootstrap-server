@@ -15,5 +15,8 @@ sudo usermod -a -G docker $USER
 #other packages
 apt install btop ncdu git tldr cloud-utils nfs-kernel-server gpustat sshfs -y
 
+#fixup
+mkdir -p ~/.local/share # because sometimes it's broken apparently
+
 #done?
 echo -e "\e[32mdone\e[0m"
