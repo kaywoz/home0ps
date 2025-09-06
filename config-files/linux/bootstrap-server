@@ -15,6 +15,9 @@ sudo usermod -a -G docker $USER
 #other packages
 apt install btop ncdu git tldr cloud-utils nfs-kernel-server gpustat sshfs -y
 
+#install beszel agent
+#curl -sL https://get.beszel.dev -o /tmp/install-agent.sh && chmod +x /tmp/install-agent.sh && /tmp/install-agent.sh
+
 #fixup
 mkdir -p ~/.local/share # because sometimes it's broken apparently
 
