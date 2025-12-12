@@ -1,0 +1,58 @@
+direction: right
+
+Infektion: {
+  label: "Infektion\n\nSkadlig kod"
+  shape: image
+  icon: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/Biohazard_symbol.svg/960px-Biohazard_symbol.svg.png
+  style: {
+    font-color: "red"
+  }
+}
+
+Monitorering: {
+  label: "Monitorering\n\nSysmon registrerar tekniker"
+  shape: image
+  icon: https://www.svgrepo.com/show/130967/monitoring.svg
+  style: {
+    font-color: "orange"
+  }
+}
+
+Insamling: {
+  label: "Insamling\n\nKape samlar in artifakter, loggar"
+  shape: image
+  icon: https://www.svgrepo.com/show/22720/image.svg
+  style: {
+    font-color: "green"
+  }
+}
+
+Exfiltrering: {
+  label: "Transport\n\nUppladdning via SFTP"
+  shape: image
+  icon: https://www.svgrepo.com/show/22720/image.svg
+  style: {
+    font-color: "green"
+  }
+}
+
+Överlämning: {
+  label: "Insamling\n\nBearbete och analys"
+  icon: https://www.svgrepo.com/show/22720/image.svg
+  shape: image
+  style: {
+    font-color: "green"
+  }
+}
+Infektion -> Monitorering: {
+  label: "↓ "
+}
+Monitorering -> Insamling: {
+  label: "↓ "
+}
+Insamling -> Exfiltrering: {
+  label: "↓ "
+}
+Exfiltrering -> Överlämning: {
+  label: "↓ "
+}
