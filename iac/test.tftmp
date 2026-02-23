@@ -1,0 +1,6 @@
+# Create new zone with TTL
+resource "hetzner_dns_zone" "this" {
+  name = "kaywoz.xyz"
+  ttl  = 3600
+}
+
