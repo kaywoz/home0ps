@@ -120,7 +120,6 @@ resource "hcloud_zone_rrset" "mx_root" {
   zone = hcloud_zone.krypi.name
   name = "@"
   type = "MX"
-  ttl  = 1
 
   records = [
     { value = "0 606660219.pamx1.hotmail.com." },
@@ -135,7 +134,6 @@ resource "hcloud_zone_rrset" "txt_dmarc" {
   zone = hcloud_zone.krypi.name
   name = "_dmarc"
   type = "TXT"
-  ttl  = 1
 
   records = [
     { value = provider::hcloud::txt_record("v=DMARC1; p=none;") },
@@ -146,7 +144,6 @@ resource "hcloud_zone_rrset" "txt_root" {
   zone = hcloud_zone.krypi.name
   name = "@"
   type = "TXT"
-  ttl  = 1
 
   records = [
     { value = provider::hcloud::txt_record("v=spf1 include:outlook.com -all") },
@@ -157,7 +154,6 @@ resource "hcloud_zone_rrset" "txt_outlook" {
   zone = hcloud_zone.krypi.name
   name = "_outlook"
   type = "TXT"
-  ttl  = 1
 
   records = [
     { value = provider::hcloud::txt_record("606660219") },
