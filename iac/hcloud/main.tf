@@ -7,6 +7,11 @@ terraform {
   }
 }
 
+variable "hcloud_token" {
+  type      = string
+  sensitive = true
+}
+
 provider "hcloud" {
-  token = "BULjGaqiiHqivVUqSd3Bbcii1lXDHyumKhUrFWloZxvkE8uMf4Z3ubNibLl8dQLl"
+  token = var.hcloud_token
 }
