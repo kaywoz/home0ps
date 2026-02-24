@@ -1,0 +1,32 @@
+name: Deploy Hetzner DNS-config
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu-version: latest
+
+      - name: Init
+        run: tofu init
+
+      - name: Plan
+        run: tofu plan
+
+      - name: Apply
+        run: tofu apply -auto-approve
