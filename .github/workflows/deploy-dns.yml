@@ -1,8 +1,4 @@
-name: Deploy Hetzner DNS-config
-
-defaults:
-  run:
-    working-directory: iac
+name: Deploy DNS via OpenTofu
 
 on:
   push:
@@ -14,11 +10,26 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    # These env vars become available to OpenTofu
     env:
+      # Backend (S3) configuration
+      S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+      S3_BUCKET: ${{ secrets.S3_BUCKET }}
+      S3_KEY: ${{ secrets.S3_KEY }}
+
+      # S3 credentials (Hetzner Object Storage)
+      AWS_ACCESS_KEY_ID: ${{ secrets.HETZNER_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_SECRET_KEY }}
+
+      # Provider token for Hetzner Cloud DNS
       TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
 
+    defaults:
+      run:
+        working-directory: iac
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install OpenTofu
@@ -26,11 +37,15 @@ jobs:
         with:
           tofu-version: latest
 
-      - name: Init
+      - name: Initialize backend
         run: tofu init
 
-      - name: Plan
-        run: tofu plan
+      - name: Validate configuration
+        run: tofu validate
 
-      - name: Apply
-        run: tofu apply -auto-approve
+      - name: Plan changes
+        run: tofu plan -no-color
+
+      - name: Apply changes
+        if: github.ref == 'refs/heads/main'
+        run: tofu apply -auto-approve -no-color
