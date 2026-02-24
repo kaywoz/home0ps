@@ -1,0 +1,56 @@
+#############################################
+# OpenTofu / Terraform
+#############################################
+
+# Local state files (never commit)
+*.tfstate
+*.tfstate.*
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Local working directory
+.terraform/
+
+# Lock file (optional — keep if you want reproducible provider versions)
+# If you prefer not to commit it, uncomment the line below:
+# .terraform.lock.hcl
+
+#############################################
+# Sensitive variable files
+#############################################
+
+# Never commit secrets
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+secrets.auto.tfvars
+
+#############################################
+# Editor / OS junk
+#############################################
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+.history/
+
+# JetBrains
+.idea/
+
+# Windows
+Thumbs.db
+
+#############################################
+# Logs
+#############################################
+*.log
+
+#############################################
+# Python virtualenvs (if you ever use them)
+#############################################
+venv/
+.env/
