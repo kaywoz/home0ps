@@ -1,8 +1,8 @@
 terraform {
   backend "s3" {
-    endpoint   = "${env.S3_ENDPOINT}"
-    bucket     = "${env.S3_BUCKET}"
-    key        = "${env.S3_KEY}"
+    endpoint   = "https://hel1.your-objectstorage.com"
+    bucket     = "krypinet-iac"
+    key        = "B9VAIBFMAPZA49IYDN3B"
 
     skip_credentials_validation = true
     skip_region_validation      = true
