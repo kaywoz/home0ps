@@ -1,8 +1,0 @@
-# repo-1/email.tf
-resource "hcloud_zone_record" "t1" {
-  zone    = "m41w423mu572un.xyz"
-  name    = "opentofu"
-  type    = "TXT"
-  value   = provider::hcloud::txt_record("sometext")
-  comment = "For email provider XYZ"
-}
