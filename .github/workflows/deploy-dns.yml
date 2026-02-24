@@ -2,7 +2,7 @@ name: Deploy Hetzner DNS-config
 
 defaults:
   run:
-    working-directory: iac
+    working-directory: iac/hcloud
 
 on:
   push:
