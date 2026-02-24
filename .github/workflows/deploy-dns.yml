@@ -1,5 +1,9 @@
 name: Deploy Hetzner DNS-config
 
+defaults:
+  run:
+    working-directory: iac
+
 on:
   push:
     branches:
