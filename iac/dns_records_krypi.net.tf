@@ -114,7 +114,7 @@ resource "hcloud_zone_rrset" "cname_s1_domainkey" {
 
 resource "hcloud_zone_rrset" "cname_s2_domainkey" {
   zone = hcloud_zone.krypi.name
-  name = "ss2._domainkey"
+  name = "s2._domainkey"
   type = "CNAME"
   ttl  = 60
 
@@ -168,7 +168,7 @@ resource "hcloud_zone_rrset" "mx_root" {
 
 resource "hcloud_zone_rrset" "txt_dmarc" {
   zone = hcloud_zone.krypi.name
-  name = "@"
+  name = "_dmarc"
   type = "TXT"
 
   records = [
