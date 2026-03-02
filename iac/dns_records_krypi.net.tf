@@ -101,14 +101,90 @@ resource "hcloud_zone_rrset" "cname_www" {
   ]
 }
 
+resource "hcloud_zone_rrset" "cname_s1_domainkey" {
+  zone = hcloud_zone.krypi.name
+  name = "s1._domainkey"
+  type = "CNAME"
+  ttl  = 60
+
+  records = [
+    { value = "s1.domainkey.tutanota.de." },
+  ]
+}
+
+resource "hcloud_zone_rrset" "cname_s2_domainkey" {
+  zone = hcloud_zone.krypi.name
+  name = "ss2._domainkey"
+  type = "CNAME"
+  ttl  = 60
+
+  records = [
+    { value = "s2.domainkey.tutanota.de." },
+  ]
+}
+
+resource "hcloud_zone_rrset" "cname__mta-sts" {
+  zone = hcloud_zone.krypi.name
+  name = "_mta-sts"
+  type = "CNAME"
+  ttl  = 60
+
+  records = [
+    { value = "mta-sts.tutanota.de." },
+  ]
+}
+
+resource "hcloud_zone_rrset" "cname_mta-sts" {
+  zone = hcloud_zone.krypi.name
+  name = "mta-sts"
+  type = "CNAME"
+  ttl  = 60
+
+  records = [
+    { value = "mta-sts.tutanota.de." },
+  ]
+}
+
+
+
 #############################################
 # MX Records
 #############################################
 
+resource "hcloud_zone_rrset" "mx_krypinet" {
+  zone = hcloud_zone.krypi.name
+  name = "@"
+  type = "MX"
+  ttl  = 60
+
+  records = [
+    { value = "mail.tutanota.de." },
+  ]
+}
 
 #############################################
 # TXT Records
 #############################################
+
+resource "hcloud_zone_rrset" "txt_dmarc" {
+  zone = hcloud_zone.krypi.name
+  name = "@"
+  type = "TXT"
+
+  records = [
+    { value = provider::hcloud::txt_record("v=DMARC1; p=quarantine; adkim=s") },
+  ]
+}
+
+resource "hcloud_zone_rrset" "txt_spf" {
+  zone = hcloud_zone.krypi.name
+  name = "@"
+  type = "TXT"
+
+  records = [
+    { value = provider::hcloud::txt_record("v=spf1 include:spf.tutanota.de -all") },
+  ]
+}
 
 resource "hcloud_zone_rrset" "txt_root" {
   zone = hcloud_zone.krypi.name
