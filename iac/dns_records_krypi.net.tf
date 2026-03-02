@@ -155,7 +155,6 @@ resource "hcloud_zone_rrset" "mx_root" {
   zone = hcloud_zone.krypi.name
   name = "@"
   type = "MX"
-  ttl  = 60
 
   records = [
     { value = "mail.tutanota.de." },
