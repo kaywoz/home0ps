@@ -75,7 +75,7 @@ resource "hcloud_zone_rrset" "cname_kaywoz" {
   ttl  = 60
 
   records = [
-    { value = "github.io." },
+    { value = "kaywoz.github.io." },
   ]
 }
 
