@@ -151,7 +151,7 @@ resource "hcloud_zone_rrset" "cname_mta-sts" {
 # MX Records
 #############################################
 
-resource "hcloud_zone_rrset" "mx_krypinet" {
+resource "hcloud_zone_rrset" "mx_root" {
   zone = hcloud_zone.krypi.name
   name = "@"
   type = "MX"
