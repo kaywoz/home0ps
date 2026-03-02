@@ -157,9 +157,13 @@ resource "hcloud_zone_rrset" "mx_root" {
   type = "MX"
 
   records = [
-    { value = "mail.tutanota.de." },
+    {
+      priority = 10
+      value  = "mail.tutanota.de."
+    },
   ]
 }
+
 
 #############################################
 # TXT Records
