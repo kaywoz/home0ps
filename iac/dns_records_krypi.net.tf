@@ -13,17 +13,6 @@ resource "hcloud_zone_rrset" "cname_39580102" {
   ]
 }
 
-resource "hcloud_zone_rrset" "cname_autodiscover" {
-  zone = hcloud_zone.krypi.name
-  name = "autodiscover"
-  type = "CNAME"
-  ttl  = 60
-
-  records = [
-    { value = "autodiscover.outlook.com." },
-  ]
-}
-
 resource "hcloud_zone_rrset" "cname_blog" {
   zone = hcloud_zone.krypi.name
   name = "blog"
@@ -116,29 +105,10 @@ resource "hcloud_zone_rrset" "cname_www" {
 # MX Records
 #############################################
 
-resource "hcloud_zone_rrset" "mx_root" {
-  zone = hcloud_zone.krypi.name
-  name = "@"
-  type = "MX"
-
-  records = [
-    { value = "0 606660219.pamx1.hotmail.com." },
-  ]
-}
 
 #############################################
 # TXT Records
 #############################################
-
-resource "hcloud_zone_rrset" "txt_dmarc" {
-  zone = hcloud_zone.krypi.name
-  name = "_dmarc"
-  type = "TXT"
-
-  records = [
-    { value = provider::hcloud::txt_record("v=DMARC1; p=none;") },
-  ]
-}
 
 resource "hcloud_zone_rrset" "txt_root" {
   zone = hcloud_zone.krypi.name
@@ -146,16 +116,6 @@ resource "hcloud_zone_rrset" "txt_root" {
   type = "TXT"
 
   records = [
-    { value = provider::hcloud::txt_record("v=spf1 include:outlook.com -all") },
-  ]
-}
-
-resource "hcloud_zone_rrset" "txt_outlook" {
-  zone = hcloud_zone.krypi.name
-  name = "_outlook"
-  type = "TXT"
-
-  records = [
-    { value = provider::hcloud::txt_record("606660219") },
+    { value = provider::hcloud::txt_record("t-verify=de3ef1ac0ac0437a4029962cefe769dc") },
   ]
 }
