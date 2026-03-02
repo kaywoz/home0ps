@@ -157,7 +157,7 @@ resource "hcloud_zone_rrset" "mx_root" {
   type = "MX"
 
   records = [
-    { value = "0 606660219.pamx1.hotmail.com." },
+    { value = "10 mail.tutanota.de." },
   ]
 }
 
