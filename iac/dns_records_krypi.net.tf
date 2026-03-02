@@ -184,13 +184,3 @@ resource "hcloud_zone_rrset" "txt_spf" {
     { value = provider::hcloud::txt_record("v=spf1 include:spf.tutanota.de -all") },
   ]
 }
-
-resource "hcloud_zone_rrset" "txt_root" {
-  zone = hcloud_zone.krypi.name
-  name = "@"
-  type = "TXT"
-
-  records = [
-    { value = provider::hcloud::txt_record("t-verify=de3ef1ac0ac0437a4029962cefe769dc") },
-  ]
-}
