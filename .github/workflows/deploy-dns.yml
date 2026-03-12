@@ -1,4 +1,4 @@
-name: Deploy DNS via OpenTofu
+name: deploy DNS via OpenTofu
 
 on:
   push:
@@ -35,7 +35,7 @@ jobs:
       - name: Install OpenTofu
         uses: opentofu/setup-opentofu@v1
         with:
-          tofu-version: latest
+          tofu_version: latest
 
       - name: Initialize backend
         run: tofu init
