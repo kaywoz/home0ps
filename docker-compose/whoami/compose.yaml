@@ -1,3 +1,4 @@
+
 services:
   whoami:
     image: denga/whoami:latest
@@ -10,10 +11,12 @@ services:
     networks:
       - whoami
     healthcheck:
-      test: [ "CMD", "/app/pocket-id", "healthcheck" ]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost"]
       interval: 1m30s
       timeout: 5s
       retries: 2
-      start_period: 10s      
-  networks:
-    whoami:
+      start_period: 10s
+
+networks:
+  whoami:
+    driver: bridge
