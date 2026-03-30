@@ -10,16 +10,15 @@ services:
       - 1411:1411
     volumes:
       - "/opt/docker/projects/pocketid/data:/app/data"
-    # Optional healthcheck    
     networks:
       - pocketid
     healthcheck:
-      test: [ "CMD", "/app/pocket-id", "healthcheck" ]
+      test: ["CMD", "/app/pocket-id", "healthcheck"]
       interval: 1m30s
       timeout: 5s
       retries: 2
-      start_period: 10s      
-  networks:
-    pocketid:
-      driver: bridge
+      start_period: 10s
 
+networks:
+  pocketid:
+    driver: bridge
