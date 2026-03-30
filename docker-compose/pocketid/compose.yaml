@@ -6,6 +6,9 @@ services:
     environment:
       - ENCRYPTION_KEY=${POCKETID_ENCRYPTION_KEY}
       - MAXMIND_LICENSE_KEY=${POCKETID_MAXMIND_LICENSE_KEY}
+      - TRUST_PROXY=true
+      - PUID=1000
+      - PGID=1000
     ports:
       - 1411:1411
     volumes:
