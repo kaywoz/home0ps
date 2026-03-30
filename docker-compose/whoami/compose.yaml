@@ -1,6 +1,7 @@
 services:
   whoami:
     image: denga/whoami:latest
+    container_name: sh-whoami-0101
     ports:
       - "8085:80"
     environment:
