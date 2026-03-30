@@ -3,7 +3,7 @@ services:
     image: ghcr.io/pocket-id/pocket-id:v2
     container_name: sh-pocketid-0101
     restart: unless-stopped
-    env_file: .env
+    #env_file: .env
     ports:
       - 1411:1411
     volumes:
