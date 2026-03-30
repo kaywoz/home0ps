@@ -3,7 +3,9 @@ services:
     image: ghcr.io/pocket-id/pocket-id:v2
     container_name: sh-pocketid-0101
     restart: unless-stopped
-    #env_file: .env
+    environment:
+      - ENCRYPTION_KEY
+      - MAXMIND_LICENSE_KEY
     ports:
       - 1411:1411
     volumes:
