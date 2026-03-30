@@ -4,7 +4,7 @@ services:
     container_name: sh-pocketid-0101
     restart: unless-stopped
     environment:
-      ENCRYPTION_KEY: "f5T82V14QSh0m2iIaTdDHtzfbmES+PmjbucKW5ZARTk="
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
     ports:
       - 1411:1411
     volumes:
