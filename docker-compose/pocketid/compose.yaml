@@ -9,7 +9,7 @@ services:
     ports:
       - 1411:1411
     volumes:
-      - "./data:/app/data"
+      - "/opt/docker/projects/data:/app/data"
     # Optional healthcheck    
     networks:
       - pocketid
