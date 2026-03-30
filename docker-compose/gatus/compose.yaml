@@ -3,10 +3,15 @@ services:
   gatus:
     restart: always
     image: twinproduction/gatus:latest
-    container_name: gatus11
-    expose:
-      - 8080
+    container_name: sh-gatus-0101
+    ports:
+      - 8080:8080
     volumes:
-      - ./config:/config
-      - ./data:/data/
-    networks: {}
+      - "/opt/docker/projects/gatus/config:/config"
+       - "/opt/docker/projects/gatus/data:/data"
+    networks:
+      - gatus
+
+networks:
+  gatus:
+    driver: bridge
