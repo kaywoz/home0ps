@@ -8,7 +8,7 @@ services:
       - 8080:8080
     volumes:
       - "/opt/docker/projects/gatus/config:/config"
-       - "/opt/docker/projects/gatus/data:/data"
+      - "/opt/docker/projects/gatus/data:/data"
     networks:
       - gatus
 
