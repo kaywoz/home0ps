@@ -6,7 +6,6 @@ services:
       - "8085:80"
     environment:
       - WHOAMI_NAME=${WHOAMI_WHOAMI_NAME}
-     # - env_file: .env
     restart: unless-stopped
     networks:
       - whoami
