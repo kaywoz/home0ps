@@ -2,7 +2,7 @@ services:
   whoami:
     image: denga/whoami:latest
     ports:
-      - "8080:80"
+      - "8085:80"
     environment:
       - WHOAMI_NAME=ka
     restart: unless-stopped
