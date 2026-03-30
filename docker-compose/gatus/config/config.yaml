@@ -1,130 +1,119 @@
-alerting:
-  slack:
-    webhook-url: ${{ secrets.GATUS_WEBHOOK_URL }}
-    default-alert:
-      description: "health check failed"
-      send-on-resolved: true
-      failure-threshold: 1
-      success-threshold: 5    
+ui:
+  default-sort-by: group
 
-security:
-  basic:
-    username: ${{ secrets.GATUS_BASIC_USERNAME }}
-    password-bcrypt-base64: ${{ secrets.GATUS_BASIC_AUTH }}
+connectivity:
+  checker:
+    target: 9.9.9.9:53
+    interval: 60s
 
-baremetal-defaults: &defaults-baremetal
-  group: baremetal
+icmp-test: &test
+  interval: 1s
+  client:
+    timeout: 10s
+  conditions:
+    - "[CONNECTED] == true"
+
+icmp-defaults: &icmp
   interval: 60s
   client:
     timeout: 10s
   conditions:
     - "[CONNECTED] == true"
 
-network-defaults: &defaults-network
-  group:  network
-  interval: 60s
+tcp-defaults: &tcp
+  interval: 10s
   client:
     timeout: 10s
   conditions:
     - "[CONNECTED] == true"
 
-storage-defaults: &defaults-storage
-  group: storage
+ssh-defaults: &ssh
+  interval: 120s
+  client:
+    timeout: 10s
+  conditions:
+    - "[CONNECTED] == true"
+
+dns-defaults: &dns
+  interval: 5m
+  url: "9.9.9.9"
+  client:
+    timeout: 10s
+  conditions:
+    - "[DNS_RCODE] == NOERROR"
+
+cert-defaults: &certs
   interval: 60s
   client:
     timeout: 10s
   conditions:
     - "[STATUS] == 200"
     - "[CERTIFICATE_EXPIRATION] > 48h"
-
-docker-defaults: &defaults-docker
-  group: docker
-  interval: 60s
-  client:
-    timeout: 10s
-  conditions:
-    - "[STATUS] == 200"
-
-iot-defaults: &defaults-iot
-  group: iot
-  interval: 60s
-  client:
-    timeout: 10s
-  conditions:
-    - "[CONNECTED] == true"
-
-hosted-defaults: &defaults-hosted
-  group: hosted
-  interval: 60s
-  client:
-    timeout: 10s
-  conditions:
-    - "[STATUS] == 200"
-    - "[CERTIFICATE_EXPIRATION] > 48h"
-
-cloud-defaults: &defaults-cloud
-  group: cloud
-  interval: 60s
-  client:
-    timeout: 10s
-  conditions:
-    - "[CONNECTED] == true"    
-
+###########################
 endpoints:
-  - name: blog - kaywozplayz - HTTP
-    <<: *defaults-hosted
+
+  - name:  infra-0101-ping
+    <<: *icmp
+    group: vm
+    url: "icmp://172.16.23.6"
+
+  - name:  heavy-ping
+    <<: *icmp
+    group: xcpng
+    url: "icmp://172.16.21.2"
+
+  - name:  middy-ping
+    <<: *icmp
+    group: xcpng
+    url: "icmp://172.16.21.3"
+
+  - name:  sexy-ping
+    <<: *icmp
+    group: xcpng
+    url: "icmp://172.16.21.4"
+
+  - name:  xos-0101-ping
+    <<: *icmp
+    group: vm
+    url: "icmp://172.16.21.5"
+
+  - name: blog-ping
+    <<: *icmp
+    group: hosted
+    url: "icmp://kaywozplayz.krypi.net"
+
+  - name: blog-DNS
+    <<: *dns
+    group: hosted
+    dns:
+      query-type: "A"
+      query-name: "kaywozplayz.krypi.net"
+
+  - name: blog-Certs
+    <<: *certs
+    group: hosted
     url: "https://kaywozplayz.krypi.net"
 
-  - name: blog - kaywozplayz.krypi.net - DNS
-    group: dns
-    url: "1.1.1.1"
-    interval: 5m
-    dns:
-      query-name: "kaywozplayz.krypi.net"
-      query-type: "A"
-    conditions:
-      - "[DNS_RCODE] == NOERROR"   
+  - name: npm-ping
+    <<: *icmp
+    group: docker
+    url: "icmp://172.16.23.6"
 
-  - name: firewall - abp-opnsense11 - ping
-    <<: *defaults-baremetal
-    url: "icmp://abp-opnsense11"
+  - name: socket-proxy-tcp
+    <<: *tcp
+    group: docker
+    url: "tcp://172.16.23.6:2375"
 
-  - name: hypervisor - sexy-serval - ping
-    <<: *defaults-baremetal
-    url: "icmp://sexy-serval"
+  - name: sexy-ssh
+    <<: *tcp
+    group: xcpng
+    url: ssh://172.16.21.4:22
+    username: ""
+    password: ""
 
-  - name: hypervisor - edgy-elephant - ping
-    <<: *defaults-baremetal
-    url: "icmp://edgy-elephant"
+  - name: test
+    <<: *test
+    group: test
+    url: "icmp://9.9.9.9"
 
-  - name: hypervisor - wally-wombat - ping
-    <<: *defaults-baremetal
-    url: "icmp://wally-wombat"
-
-  - name: storage - nappy-nightfish - ping
-    <<: *defaults-baremetal
-    url: "icmp://nappy-nightfish"
-
-  - name: docker - plenty-penguin - ping
-    <<: *defaults-baremetal
-    url: "icmp://plenty-penguin"
-
-  - name: sbc - banging-blueberry - ping
-    <<: *defaults-baremetal
-    url: "icmp://banging-blueberry"
-
-  - name: gpu-vps - clp-worker11 - ping
-    <<: *defaults-cloud
-    url: "icmp://clp-worker11"
-
-  - name: vps - clp-monitor11 - ping
-    <<: *defaults-cloud
-    url: "icmp://clp-monitor11"
-
-  - name: cloudworker - na - ping
-    <<: *defaults-cloud
-    url: "icmp://na"
-
-  - name: test - test - ping
-    <<: *defaults-cloud
-    url: "icmp://1.1.1.1"
+    ## sample badge as: http://172.16.23.6:8082/api/v1/endpoints/xcpng_sexy-ping/uptimes/7d/badge.svg
