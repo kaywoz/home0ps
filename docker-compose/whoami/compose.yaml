@@ -18,4 +18,3 @@ services:
       start_period: 10s      
   networks:
     whoami:
-      driver: bridge
