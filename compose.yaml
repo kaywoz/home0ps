@@ -1,0 +1,19 @@
+version: "3.3"
+services:
+  dozzle:
+    container_name: dozzle11
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    expose:
+      - 8080
+    image: amir20/dozzle:latest
+    environment:
+      DOZZLE_AUTH_PROVIDER: forward-proxy
+      DOZZLE_AUTH_HEADER_USER: Cf-Access-Authenticated-User-Email
+      DOZZLE_AUTH_HEADER_EMAIL: Cf-Access-Authenticated-User-Email
+      DOZZLE_AUTH_HEADER_NAME: Cf-Access-Authenticated-User-Email
+      DOZZLE_HOSTNAME: #placeholder
+      DOZZLE_REMOTE_HOST: tcp://hostname:2375|label,tcp://hostname:2375|label
+      DOZZLE_ENABLE_ACTIONS: true
+    networks: {}
