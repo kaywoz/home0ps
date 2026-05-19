@@ -3,11 +3,11 @@ services:
     image: ghcr.io/athombv/homey-shs:latest
     container_name: sh-homey-shs-0101
     restart: unless-stopped
-    #network_mode: ipvlan
+    network_mode: ipvlan
     privileged: true
     volumes:
       - /mnt/data/docker/homey-shs:/homey/user
-    network_mode: host
+    #network_mode: host
       networks:
         ipv-vlan13-iot:
           ipv4_address: 192.168.13.32
