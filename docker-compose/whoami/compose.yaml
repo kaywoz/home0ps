@@ -5,8 +5,8 @@ services:
     container_name: sh-whoami-0101
     ports:
       - "8085:80"
-    environment:
-      - WHOAMI_NAME=${WHOAMI_WHOAMI_NAME}
+    #environment:
+     # - WHOAMI_NAME=${WHOAMI_WHOAMI_NAME}
     restart: unless-stopped
     networks:
       ipv-vlan13-iot: 
