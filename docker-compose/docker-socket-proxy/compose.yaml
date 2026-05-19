@@ -1,4 +1,3 @@
-version: "3.3"
 services:
   docker-socket-proxy:
     container_name: sh-docker-socket-proxy-0101
