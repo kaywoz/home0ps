@@ -19,14 +19,6 @@ services:
       retries: 2
       start_period: 10s
 
-#networks:
- # ipv-vlan13-iot: 
-  #  driver: ipvlan
-   # ipam:
-    #  config:
-     #   - subnet: 192.168.13.0/24
-      #    gateway: 192.168.13.1
-
 networks:
   ipvlan-vlan13-iot:
     driver: ipvlan
