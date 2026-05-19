@@ -8,7 +8,7 @@ services:
     #environment:
      # - WHOAMI_NAME=${WHOAMI_WHOAMI_NAME}
     restart: unless-stopped
-    network_mode: ipvlan
+    #network_mode: ipvlan
     networks:
       ipv-vlan13-iot: 
         ipv4_address: 192.168.13.32
@@ -19,10 +19,20 @@ services:
       retries: 2
       start_period: 10s
 
+#networks:
+ # ipv-vlan13-iot: 
+  #  driver: ipvlan
+   # ipam:
+    #  config:
+     #   - subnet: 192.168.13.0/24
+      #    gateway: 192.168.13.1
+
 networks:
-  ipv-vlan13-iot: 
+  ipv-vlan13-iot:
     driver: ipvlan
+    driver_opts:
+      parent: enp5s0
+      ipvlan_mode: l3
     ipam:
       config:
         - subnet: 192.168.13.0/24
-          gateway: 192.168.13.1
