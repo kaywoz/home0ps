@@ -11,7 +11,7 @@ services:
     #network_mode: ipvlan
     networks:
       ipvlan-vlan13-iot: 
-        ipv4_address: 192.168.13.32
+        ipv4_address: 192.168.13.28
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://localhost"]
       interval: 1m30s
