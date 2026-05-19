@@ -8,6 +8,7 @@ services:
     #environment:
      # - WHOAMI_NAME=${WHOAMI_WHOAMI_NAME}
     restart: unless-stopped
+    network_mode: ipvlan
     networks:
       ipv-vlan13-iot: 
         ipv4_address: 192.168.13.32
