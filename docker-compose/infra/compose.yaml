@@ -45,7 +45,7 @@ services:
     command: server start
     user: root
     ports:
-      - "8988:8888"
+      - "8888:8888"
     volumes:
       - "/mnt/data/docker/atuin/config:/config"
     environment:
