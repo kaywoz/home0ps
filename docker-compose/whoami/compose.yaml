@@ -9,7 +9,8 @@ services:
       - WHOAMI_NAME=${WHOAMI_WHOAMI_NAME}
     restart: unless-stopped
     networks:
-      - generic
+      ipv-vlan13-iot: 
+        ipv4_address: 192.168.13.32
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://localhost"]
       interval: 1m30s
@@ -18,5 +19,9 @@ services:
       start_period: 10s
 
 networks:
-  generic:
-    driver: bridge
+  ipv-vlan13-iot: 
+    driver: ipvlan
+    ipam:
+      config:
+        - subnet: 192.168.13.0/24
+          gateway: 192.168.13.1
