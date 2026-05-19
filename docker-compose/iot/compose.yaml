@@ -11,5 +11,5 @@ services:
       - generic
       
 networks:
-  ipv-vlan13-iot:
-  external: true
+  ipv-vlan13-iot:  
+    external: true
