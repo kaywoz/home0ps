@@ -10,7 +10,7 @@ services:
     restart: unless-stopped
     #network_mode: ipvlan
     networks:
-      macvlan-vlan13-iot: 
+      ipvlan-vlan13-iot: 
         ipv4_address: 192.168.13.32
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://localhost"]
@@ -28,11 +28,5 @@ services:
       #    gateway: 192.168.13.1
 
 networks:
-  macvlan-vlan13-iot:
-    driver: macvlan
-    driver_opts:
-      parent: enp5s0
-      ipvlan_mode: l3
-    ipam:
-      config:
-        - subnet: 192.168.13.0/24
+  ipvlan-vlan13-iot:
+    driver: ipvlan
