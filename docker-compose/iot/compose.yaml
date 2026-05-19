@@ -8,8 +8,14 @@ services:
     volumes:
       - /mnt/data/docker/homey-shs:/homey/user
     networks:
-      - ipv-vlan13-iot
-      
+      ipv-vlan13-iot:
+        ipv4_address: 192.168.13.32
+
 networks:
-  ipv-vlan13-iot:  
-    external: true
+  ipv-vlan13-iot: 
+    driver: ipvlan
+    ipam:
+      config:
+        - subnet: 192.168.13.0/24 # The full available range
+          gateway: 192.168.13.1  # The gateway IP for this subnet
+
