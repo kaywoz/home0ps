@@ -16,6 +16,3 @@ services:
     image: tecnativa/docker-socket-proxy
     networks:
       - generic
-networks:
-  generic:
-    driver: bridge
