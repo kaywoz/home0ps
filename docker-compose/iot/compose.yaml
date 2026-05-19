@@ -8,7 +8,7 @@ services:
     volumes:
       - /mnt/data/docker/homey-shs:/homey/user
     networks:
-      - generic
+      - ipv-vlan13-iot
       
 networks:
   ipv-vlan13-iot:  
