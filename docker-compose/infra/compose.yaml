@@ -1,1 +1,101 @@
-123
+services:
+  docker-socket-proxy:
+    container_name: sh-docker-socket-proxy-0101
+    image: tecnativa/docker-socket-proxy
+    restart: always
+    privileged: true
+    ports:
+      - 127.0.0.1:2375:2375
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CONTAINERS=1
+      - SERVICES=1
+      - TASKS=1
+      - POST=0
+    networks:
+      - generic
+
+  dozzle:
+    container_name: sh-dozzle-0101
+    image: amir20/dozzle:latest
+    restart: always
+    ports:
+      - 8080:8080
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      # Uncomment and replace the placeholders if necessary.
+      # DOZZLE_AUTH_PROVIDER: forward-proxy
+      # DOZZLE_AUTH_HEADER_USER: Cf-Access-Authenticated-User-Email
+      # DOZZLE_AUTH_HEADER_EMAIL: Cf-Access-Authenticated-User-Email
+      # DOZZLE_AUTH_HEADER_NAME: Cf-Access-Authenticated-User-Email
+      # DOZZLE_HOSTNAME: #placeholder  # <--- Replace with actual hostname
+      # DOZZLE_REMOTE_HOST: tcp://hostname:2375|label,tcp://hostname:2375|label  # <--- Replace with actual remote host
+      DOZZLE_ENABLE_ACTIONS: true
+    networks:
+      - generic
+
+  atuin:
+    container_name: sh-atuin-0101
+    image: ghcr.io/atuinsh/atuin:64b7581
+    restart: always
+    command: server start
+    user: root
+    ports:
+      - 8988:8888
+    volumes:
+      - /mnt/data/docker/atuin/config:/config
+    links:
+      - postgresql:db
+    environment:
+      ATUIN_HOST: 0.0.0.0
+      ATUIN_OPEN_REGISTRATION: "true"
+      ATUIN_DB_URI: postgres://$ATUIN_DB_USERNAME:$ATUIN_DB_PASSWORD@db/atuin
+      RUST_LOG: info,atuin_server=debug
+    networks:
+      - generic
+
+  postgresql:
+    container_name: sh-postgresql-0101
+    image: postgres:14
+    restart: unless-stopped
+    volumes:
+      - /mnt/data/docker/postgresql/database:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_USER: ${ATUIN_DB_USERNAME}
+      POSTGRES_PASSWORD: ${ATUIN_DB_PASSWORD}
+      POSTGRES_DB: ${ATUIN_DB_NAME}
+    networks:
+      - generic
+
+  healthchecks:
+    container_name: sh-healthchecks-0101
+    image: lscr.io/linuxserver/healthchecks:latest
+    restart: unless-stopped
+    ports:
+      - 8000:8000
+      - 2525:2525
+    volumes:
+      - /mnt/data/docker/healthchecks-data:/data
+      - /mnt/data/docker/healthchecks-config:/config
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Stockholm
+      # Replace the placeholders with actual values.
+      SITE_ROOT: #placeholder  # <--- Replace with actual site root
+      SITE_NAME: healthchecks
+      SUPERUSER_EMAIL: #placeholder  # <--- Replace with actual email for superuser
+      SUPERUSER_PASSWORD: #placeholder  # <--- Replace with actual password for superuser
+      DEBUG=False
+      PING_EMAIL_DOMAIN= #placeholder  # <--- Replace with email domain for pinging
+      INTEGRATIONS_ALLOW_PRIVATE_IPS=True
+      SECRET_KEY= #placeholder  # <--- Replace with actual secret key
+      SITE_LOGO_URL=https://github.com/kaywoz/ka/blob/main/files/seal1.png?raw=true
+      REGISTRATION_OPEN=False
+    networks:
+      - generic
+
+networks:
+  generic:
