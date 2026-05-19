@@ -48,8 +48,6 @@ services:
       - "8988:8888"
     volumes:
       - "/mnt/data/docker/atuin/config:/config"
-    links:
-      - postgresql:db
     environment:
       ATUIN_HOST: 0.0.0.0
       ATUIN_OPEN_REGISTRATION: "true"
