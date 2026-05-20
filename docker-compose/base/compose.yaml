@@ -1,0 +1,17 @@
+services:
+  dockhand:
+    image: fnsys/dockhand:latest
+    container_name: sh-dockhand-0101
+    restart: unless-stopped
+    ports:
+      - 3000:3000
+    volumes:
+       - /var/run/docker.sock:/var/run/docker.sock
+      # - 127.0.0.1:2375:/var/run/docker/sock
+       - /mnt/data/docker/dockhand:/app/data
+    networks:
+      - generic
+
+networks:
+  generic:
+    driver: bridge
