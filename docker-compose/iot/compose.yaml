@@ -7,7 +7,7 @@ services:
     volumes:
       - /mnt/data/docker/homey-shs:/homey/user
     networks:
-      ipvlan-vlan13-iot: 
+      macvlan-vlan13-iot: 
         ipv4_address: 192.168.13.30
     ports:
      - 4861:4861
@@ -16,8 +16,8 @@ services:
       HOMEY_LOCAL_ADDRESS: 192.168.13.32
 
 networks:
-  ipvlan-vlan13-iot:
-    driver: ipvlan
+  macvlan-vlan13-iot:
+    driver: macvlan
     driver_opts:
       parent: enp5s0.13
     ipam:
