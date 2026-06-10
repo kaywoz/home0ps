@@ -6,9 +6,11 @@ resource "netbird_dns_zone" "internal" {
   distribution_groups  = [netbird_group.example.id]
 }
 
-resource "netbird_group" "example" {
-  name = "ingress"
-  peers = [
-    shpc-netbird-0101.netbird.cloud,
-  ]
+resource "netbird_network_resource" "example" {
+  network_id  = netbird_network.example.id
+  name        = "shpc-netbird-0101.netbird.cloud"
+  description = "shpc-netbird-0101.netbird.cloud"
+  address     = "172.16.31.10/32"
+  groups      = [ingress]
+  enabled     = true
 }
