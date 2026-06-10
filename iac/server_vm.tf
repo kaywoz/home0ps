@@ -2,7 +2,7 @@
 resource "hcloud_server" "honeypot" {
   name        = "hlpa-tpotce-0101"
   image       = "debian-12"
-  server_type = "cax11"
+  server_type = "cx23"
   location    = "hel1"
   ssh_keys    = ["github"]
   public_net {
