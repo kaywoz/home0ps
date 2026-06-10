@@ -145,7 +145,7 @@ resource "hcloud_zone_rrset" "cname_mta-sts" {
   ]
 }
 
-resource "hcloud_zone_rrset" "cname_netbird" {
+resource "hcloud_zone_rrset" "cname_netbird1" {
   zone = hcloud_zone.krypi.name
   name = "*.sh-internal"
   type = "CNAME"
@@ -156,7 +156,7 @@ resource "hcloud_zone_rrset" "cname_netbird" {
   ]
 }
 
-resource "hcloud_zone_rrset" "cname_netbird" {
+resource "hcloud_zone_rrset" "cname_netbird2" {
   zone = hcloud_zone.krypi.name
   name = "*.hl-internal"
   type = "CNAME"
