@@ -147,7 +147,18 @@ resource "hcloud_zone_rrset" "cname_mta-sts" {
 
 resource "hcloud_zone_rrset" "cname_netbird" {
   zone = hcloud_zone.krypi.name
-  name = "*.int"
+  name = "*.sh-internal"
+  type = "CNAME"
+  ttl  = 60
+
+  records = [
+    { value = "eu1.netbird.services." },
+  ]
+}
+
+resource "hcloud_zone_rrset" "cname_netbird" {
+  zone = hcloud_zone.krypi.name
+  name = "*.hl-internal"
   type = "CNAME"
   ttl  = 60
 
