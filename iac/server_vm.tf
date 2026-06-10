@@ -1,6 +1,6 @@
 # Create a new server running debian
-resource "hcloud_server" "pangolin" {
-  name        = "hh-clp-pangolin-0101"
+resource "hcloud_server" "honeypot" {
+  name        = "hlpa-tpotce-0101"
   image       = "debian-12"
   server_type = "cax11"
   location    = "hel1"
