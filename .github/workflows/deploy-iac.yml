@@ -1,4 +1,4 @@
-name: deploy DNS via OpenTofu
+name: deploy iac via OpenTofu
 
 on:
   push:
