@@ -8,7 +8,7 @@ terraform {
     netbird = {
       # This line tells Terraform where to find the NetBird API provider.
       source = "registry.terraform.io/netbirdio/netbird"
-      version = "latest" # Or specify a concrete version if needed
+      version = "0.0.9" # Or specify a concrete version if needed
     }
   }
 }
