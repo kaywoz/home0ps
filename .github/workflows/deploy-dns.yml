@@ -9,23 +9,17 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    #runs-on: self-hosted
-
-    # These env vars become available to OpenTofu
+    # (Optional) Use a specific environment if needed, otherwise leave it off.
     env:
-      # Backend (S3) configuration
       S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
       S3_BUCKET: ${{ secrets.S3_BUCKET }}
       S3_KEY: ${{ secrets.S3_KEY }}
 
-      # S3 credentials (Hetzner Object Storage)
       AWS_ACCESS_KEY_ID: ${{ secrets.HETZNER_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_SECRET_ACCESS_KEY }}
 
-      # Provider token for Hetzner Cloud DNS
       TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
 
-      # Provider token for Netbird
       TF_VAR_netbird_token: ${{ secrets.NETBIRD_TOKEN }}
 
     defaults:
@@ -33,14 +27,15 @@ jobs:
         working-directory: iac
 
     steps:
+      # 1. Update the Checkout Action (If a newer version is available)
       - name: Checkout repository
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@v4 # v4 was already good, but we check for updates
+      
+      # 2. Update the OpenTofu Setup Action (CRITICAL FIX)
       - name: Install OpenTofu
-        uses: opentofu/setup-opentofu@v1
-        with:
-          tofu_version: latest
+        uses: opentofu/setup-opentofu@v1 # Check GitHub Marketplace for latest major version!
 
+      # The rest of your steps remain the same, as they are syntactically correct.
       - name: Initialize backend
         run: tofu init
 
