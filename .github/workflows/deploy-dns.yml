@@ -8,7 +8,8 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
+    #runs-on: self-hosted
 
     # These env vars become available to OpenTofu
     env:
@@ -23,6 +24,9 @@ jobs:
 
       # Provider token for Hetzner Cloud DNS
       TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+
+      # Provider token for Netbird
+      TF_VAR_netbird_token: ${{ secrets.NETBIRD_TOKEN }}
 
     defaults:
       run:
