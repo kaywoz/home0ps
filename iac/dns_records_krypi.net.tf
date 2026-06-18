@@ -167,6 +167,17 @@ resource "hcloud_zone_rrset" "cname_netbird2" {
   ]
 }
 
+resource "hcloud_zone_rrset" "cname_netbird3" {
+  zone = hcloud_zone.krypi.name
+  name = "*.pub"
+  type = "CNAME"
+  ttl  = 60
+
+  records = [
+    { value = "eu1.netbird.services." },
+  ]
+}
+
 
 #############################################
 # MX Records
