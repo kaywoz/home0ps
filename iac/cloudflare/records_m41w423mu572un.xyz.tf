@@ -22,7 +22,7 @@
 #############################################
 
 resource "cloudflare_dns_record" "a_c2_malware_edr_tester" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "c2-malware-edr-tester"
   type    = "A"
   content = "35.228.196.57"
@@ -31,7 +31,7 @@ resource "cloudflare_dns_record" "a_c2_malware_edr_tester" {
 }
 
 resource "cloudflare_dns_record" "a_phish_tester" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "phish-tester"
   type    = "A"
   content = "34.88.103.162"
@@ -44,7 +44,7 @@ resource "cloudflare_dns_record" "a_phish_tester" {
 #############################################
 
 resource "cloudflare_dns_record" "txt_absalomabsalomortherottersclub_1" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "absalomabsalomortherottersclub"
   type    = "TXT"
   ttl     = 60
@@ -52,7 +52,7 @@ resource "cloudflare_dns_record" "txt_absalomabsalomortherottersclub_1" {
 }
 
 resource "cloudflare_dns_record" "txt_absalomabsalomortherottersclub_2" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "absalomabsalomortherottersclub"
   type    = "TXT"
   ttl     = 60
@@ -60,7 +60,7 @@ resource "cloudflare_dns_record" "txt_absalomabsalomortherottersclub_2" {
 }
 
 resource "cloudflare_dns_record" "txt_multipass" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "multipass"
   type    = "TXT"
   ttl     = 60
@@ -68,7 +68,7 @@ resource "cloudflare_dns_record" "txt_multipass" {
 }
 
 resource "cloudflare_dns_record" "txt_opentofu" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "opentofu"
   type    = "TXT"
   ttl     = 3600
@@ -76,7 +76,7 @@ resource "cloudflare_dns_record" "txt_opentofu" {
 }
 
 resource "cloudflare_dns_record" "txt_pneumono_1" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "pneumonoultramicroscopicsilicovolcanoconiosis"
   type    = "TXT"
   ttl     = 60
@@ -84,7 +84,7 @@ resource "cloudflare_dns_record" "txt_pneumono_1" {
 }
 
 resource "cloudflare_dns_record" "txt_pneumono_2" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "pneumonoultramicroscopicsilicovolcanoconiosis"
   type    = "TXT"
   ttl     = 60
@@ -92,7 +92,7 @@ resource "cloudflare_dns_record" "txt_pneumono_2" {
 }
 
 resource "cloudflare_dns_record" "txt_ps" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "ps"
   type    = "TXT"
   ttl     = 60
@@ -100,7 +100,7 @@ resource "cloudflare_dns_record" "txt_ps" {
 }
 
 resource "cloudflare_dns_record" "txt_second" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "second"
   type    = "TXT"
   ttl     = 60
@@ -108,7 +108,7 @@ resource "cloudflare_dns_record" "txt_second" {
 }
 
 resource "cloudflare_dns_record" "txt_test" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "test"
   type    = "TXT"
   ttl     = 60
@@ -116,7 +116,7 @@ resource "cloudflare_dns_record" "txt_test" {
 }
 
 resource "cloudflare_dns_record" "txt_trainstation" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "trainstation"
   type    = "TXT"
   ttl     = 60
@@ -124,7 +124,7 @@ resource "cloudflare_dns_record" "txt_trainstation" {
 }
 
 resource "cloudflare_dns_record" "txt_wolfeschlegel_1" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "wolfeschlegelsteinhausenbergerdorff"
   type    = "TXT"
   ttl     = 60
@@ -132,7 +132,7 @@ resource "cloudflare_dns_record" "txt_wolfeschlegel_1" {
 }
 
 resource "cloudflare_dns_record" "txt_wolfeschlegel_2" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "wolfeschlegelsteinhausenbergerdorff"
   type    = "TXT"
   ttl     = 60
@@ -140,7 +140,7 @@ resource "cloudflare_dns_record" "txt_wolfeschlegel_2" {
 }
 
 resource "cloudflare_dns_record" "txt_supersoaker" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "supersoaker5"
   type    = "TXT"
   ttl     = 60
@@ -148,7 +148,7 @@ resource "cloudflare_dns_record" "txt_supersoaker" {
 }
 
 resource "cloudflare_dns_record" "txt_tester123dafinalone" {
-  zone_id = cloudflare_zone.m41w423mu572un_xyz.id
+  zone_id = data.cloudflare_zone.m41w423mu572un_xyz.id
   name    = "tester123dafinalone"
   type    = "TXT"
   ttl     = 60

@@ -11,7 +11,7 @@
 #############################################
 
 resource "cloudflare_dns_record" "a_root" {
-  zone_id = cloudflare_zone.obviousphish_com.id
+  zone_id = data.cloudflare_zone.obviousphish_com.id
   name    = "@"
   type    = "A"
   content = "34.38.169.145"
@@ -20,7 +20,7 @@ resource "cloudflare_dns_record" "a_root" {
 }
 
 resource "cloudflare_dns_record" "a_example" {
-  zone_id = cloudflare_zone.obviousphish_com.id
+  zone_id = data.cloudflare_zone.obviousphish_com.id
   name    = "example"
   type    = "A"
   content = "34.38.169.145"
@@ -29,7 +29,7 @@ resource "cloudflare_dns_record" "a_example" {
 }
 
 resource "cloudflare_dns_record" "a_example_really" {
-  zone_id = cloudflare_zone.obviousphish_com.id
+  zone_id = data.cloudflare_zone.obviousphish_com.id
   name    = "example.really"
   type    = "A"
   content = "35.228.144.182"
@@ -38,7 +38,7 @@ resource "cloudflare_dns_record" "a_example_really" {
 }
 
 resource "cloudflare_dns_record" "a_login" {
-  zone_id = cloudflare_zone.obviousphish_com.id
+  zone_id = data.cloudflare_zone.obviousphish_com.id
   name    = "login"
   type    = "A"
   content = "34.38.169.145"
@@ -47,7 +47,7 @@ resource "cloudflare_dns_record" "a_login" {
 }
 
 resource "cloudflare_dns_record" "a_microsoft365" {
-  zone_id = cloudflare_zone.obviousphish_com.id
+  zone_id = data.cloudflare_zone.obviousphish_com.id
   name    = "microsoft365"
   type    = "A"
   content = "34.38.169.145"
@@ -56,7 +56,7 @@ resource "cloudflare_dns_record" "a_microsoft365" {
 }
 
 resource "cloudflare_dns_record" "a_office365" {
-  zone_id = cloudflare_zone.obviousphish_com.id
+  zone_id = data.cloudflare_zone.obviousphish_com.id
   name    = "office365"
   type    = "A"
   content = "34.38.169.145"
@@ -69,7 +69,7 @@ resource "cloudflare_dns_record" "a_office365" {
 #############################################
 
 resource "cloudflare_dns_record" "txt_hippopotomonstrosesquippedaliophobia" {
-  zone_id = cloudflare_zone.obviousphish_com.id
+  zone_id = data.cloudflare_zone.obviousphish_com.id
   name    = "hippopotomonstrosesquippedaliophobia"
   type    = "TXT"
   ttl     = 3600
@@ -77,7 +77,7 @@ resource "cloudflare_dns_record" "txt_hippopotomonstrosesquippedaliophobia" {
 }
 
 resource "cloudflare_dns_record" "txt_llanfairpwllgwyngyllgogerychwyrndrobwyllllantysiliogogogoch" {
-  zone_id = cloudflare_zone.obviousphish_com.id
+  zone_id = data.cloudflare_zone.obviousphish_com.id
   name    = "llanfairpwllgwyngyllgogerychwyrndrobwyllllantysiliogogogoch"
   type    = "TXT"
   ttl     = 3600

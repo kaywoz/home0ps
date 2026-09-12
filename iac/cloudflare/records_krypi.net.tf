@@ -12,7 +12,7 @@
 #############################################
 
 resource "cloudflare_dns_record" "cname_39580102" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "39580102"
   type    = "CNAME"
   content = "sendgrid.net"
@@ -21,7 +21,7 @@ resource "cloudflare_dns_record" "cname_39580102" {
 }
 
 resource "cloudflare_dns_record" "cname_blog" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "blog"
   type    = "CNAME"
   content = "kaywozplayz.krypi.net"
@@ -30,7 +30,7 @@ resource "cloudflare_dns_record" "cname_blog" {
 }
 
 resource "cloudflare_dns_record" "cname_domainconnect" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "_domainconnect"
   type    = "CNAME"
   content = "_domainconnect.gd.domaincontrol.com"
@@ -39,7 +39,7 @@ resource "cloudflare_dns_record" "cname_domainconnect" {
 }
 
 resource "cloudflare_dns_record" "cname_em1932" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "em1932"
   type    = "CNAME"
   content = "u39580102.wl103.sendgrid.net"
@@ -48,7 +48,7 @@ resource "cloudflare_dns_record" "cname_em1932" {
 }
 
 resource "cloudflare_dns_record" "cname_ghpages" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "ghpages"
   type    = "CNAME"
   content = "kaywoz.github.io"
@@ -57,7 +57,7 @@ resource "cloudflare_dns_record" "cname_ghpages" {
 }
 
 resource "cloudflare_dns_record" "cname_kaywoz" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "kaywoz"
   type    = "CNAME"
   content = "kaywoz.github.io"
@@ -66,7 +66,7 @@ resource "cloudflare_dns_record" "cname_kaywoz" {
 }
 
 resource "cloudflare_dns_record" "cname_kaywozplayz" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "kaywozplayz"
   type    = "CNAME"
   content = "kaywoz.github.io"
@@ -75,7 +75,7 @@ resource "cloudflare_dns_record" "cname_kaywozplayz" {
 }
 
 resource "cloudflare_dns_record" "cname_url1230" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "url1230"
   type    = "CNAME"
   content = "sendgrid.net"
@@ -84,7 +84,7 @@ resource "cloudflare_dns_record" "cname_url1230" {
 }
 
 resource "cloudflare_dns_record" "cname_www" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "www"
   type    = "CNAME"
   content = "kaywoz.github.io"
@@ -93,7 +93,7 @@ resource "cloudflare_dns_record" "cname_www" {
 }
 
 resource "cloudflare_dns_record" "cname_s1_domainkey" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "s1._domainkey"
   type    = "CNAME"
   content = "s1.domainkey.tutanota.de"
@@ -102,7 +102,7 @@ resource "cloudflare_dns_record" "cname_s1_domainkey" {
 }
 
 resource "cloudflare_dns_record" "cname_s2_domainkey" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "s2._domainkey"
   type    = "CNAME"
   content = "s2.domainkey.tutanota.de"
@@ -111,7 +111,7 @@ resource "cloudflare_dns_record" "cname_s2_domainkey" {
 }
 
 resource "cloudflare_dns_record" "cname_mta_sts_underscore" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "_mta-sts"
   type    = "CNAME"
   content = "mta-sts.tutanota.de"
@@ -120,7 +120,7 @@ resource "cloudflare_dns_record" "cname_mta_sts_underscore" {
 }
 
 resource "cloudflare_dns_record" "cname_mta_sts" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "mta-sts"
   type    = "CNAME"
   content = "mta-sts.tutanota.de"
@@ -129,7 +129,7 @@ resource "cloudflare_dns_record" "cname_mta_sts" {
 }
 
 resource "cloudflare_dns_record" "cname_netbird_sh_internal" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "*.sh-internal"
   type    = "CNAME"
   content = "eu1.netbird.services"
@@ -138,7 +138,7 @@ resource "cloudflare_dns_record" "cname_netbird_sh_internal" {
 }
 
 resource "cloudflare_dns_record" "cname_netbird_hl_internal" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "*.hl-internal"
   type    = "CNAME"
   content = "eu1.netbird.services"
@@ -147,7 +147,7 @@ resource "cloudflare_dns_record" "cname_netbird_hl_internal" {
 }
 
 resource "cloudflare_dns_record" "cname_netbird_pub" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "*.pub"
   type    = "CNAME"
   content = "eu1.netbird.services"
@@ -160,7 +160,7 @@ resource "cloudflare_dns_record" "cname_netbird_pub" {
 #############################################
 
 resource "cloudflare_dns_record" "mx_root" {
-  zone_id  = cloudflare_zone.krypi_net.id
+  zone_id  = data.cloudflare_zone.krypi_net.id
   name     = "@"
   type     = "MX"
   content  = "mail.tutanota.de"
@@ -173,7 +173,7 @@ resource "cloudflare_dns_record" "mx_root" {
 #############################################
 
 resource "cloudflare_dns_record" "txt_dmarc" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "_dmarc"
   type    = "TXT"
   content = "v=DMARC1; p=quarantine; adkim=s"
@@ -181,7 +181,7 @@ resource "cloudflare_dns_record" "txt_dmarc" {
 }
 
 resource "cloudflare_dns_record" "txt_spf" {
-  zone_id = cloudflare_zone.krypi_net.id
+  zone_id = data.cloudflare_zone.krypi_net.id
   name    = "@"
   type    = "TXT"
   content = "v=spf1 include:spf.tutanota.de -all"
