@@ -1,8 +1,7 @@
-version: "3.8"
 services:
   folding-at-home-gpu:
     image: yurinnick/folding-at-home:latest-nvidia
-    container_name: fahgpu11
+    container_name: sh-fahgpu-0101
     environment:
       - USER=Morna
       - TEAM=37451

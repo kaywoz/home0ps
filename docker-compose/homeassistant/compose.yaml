@@ -1,7 +1,6 @@
-version: "3"
 services:
   homeassistant:
-    container_name: homeassistant11
+    container_name: sh-homeassistant-0101
     image: ghcr.io/home-assistant/home-assistant:stable
     volumes:
       - ./config:/config

@@ -1,8 +1,7 @@
-version: "2.3"
 services:
   mongo:
     image: mongo:3.6
-    container_name: unifi_controller_mongo11
+    container_name: sh-unifi-mongo-0101
     networks: {}
     restart: always
     volumes:
@@ -10,7 +9,7 @@ services:
       - ./dbcfg:/data/configdb
   controller:
     image: jacobalberty/unifi:${TAG:-latest}
-    container_name: unifi_controller11
+    container_name: sh-unifi-controller-0101
     depends_on:
       - mongo
     init: true
@@ -41,7 +40,7 @@ services:
       - 10001:10001/udp
   logs:
     image: bash
-    container_name: unifi_controller_logs11
+    container_name: sh-unifi-logs-0101
     depends_on:
       - controller
     command: bash -c 'tail -F /unifi/log/*.log'

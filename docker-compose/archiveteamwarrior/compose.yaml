@@ -1,0 +1,43 @@
+services:
+  archiveTeamWarrior:
+    image: atdr.meo.ws/archiveteam/warrior-dockerfile
+    container_name: sh-archivewarrior-0101
+    hostname: sh-archivewarrior-0101
+    ports:
+      - 8001:8001
+    restart: always
+    environment:
+      - HTTP_PASSWORD=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_PASSWORD }}
+      - HTTP_USERNAME=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_USERNAME }}
+      - SELECTED_PROJECT=pastebin
+      - CONCURRENT_ITEMS=2
+      - DOWNLOADER=morna
+    networks: {}
+  archiveTeamWarrior12:
+    image: atdr.meo.ws/archiveteam/warrior-dockerfile
+    container_name: sh-archivewarrior-0102
+    hostname: sh-archivewarrior-0102
+    ports:
+      - 8002:8001
+    restart: always
+    environment:
+      - HTTP_PASSWORD=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_PASSWORD }}
+      - HTTP_USERNAME=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_USERNAME }}
+      - SELECTED_PROJECT=imgur
+      - CONCURRENT_ITEMS=2
+      - DOWNLOADER=morna
+    networks: {}
+  archiveTeamWarrior13:
+    image: atdr.meo.ws/archiveteam/warrior-dockerfile
+    container_name: sh-archivewarrior-0103
+    hostname: sh-archivewarrior-0103
+    ports:
+      - 8003:8001
+    restart: always
+    environment:
+      - HTTP_PASSWORD=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_PASSWORD }}
+      - HTTP_USERNAME=${{ secrets.ARCHIVETEAMWARRIOR_HTTP_USERNAME }}
+      - SELECTED_PROJECT=auto
+      - CONCURRENT_ITEMS=2
+      - DOWNLOADER=morna
+    networks: {}

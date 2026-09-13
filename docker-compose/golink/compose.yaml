@@ -1,7 +1,7 @@
 services:
   golink:
     image: ghcr.io/tailscale/golink:main
-    container_name: golink11
+    container_name: sh-golink-0101
     restart: unless-stopped
     user: root
     ports:

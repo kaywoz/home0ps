@@ -1,0 +1,30 @@
+services:
+  healthchecks:
+    image: lscr.io/linuxserver/healthchecks:latest
+    container_name: sh-healthchecks-0101
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Stockholm
+      - SITE_ROOT= #placeholder
+      - SITE_NAME=healthchecks
+      - SUPERUSER_EMAIL= #placeholder
+      - SUPERUSER_PASSWORD= #placeholder
+      - DEBUG=False
+      - PING_EMAIL_DOMAIN= #placeholder
+      - INTEGRATIONS_ALLOW_PRIVATE_IPS=True
+      - SECRET_KEY= #placeholder
+      - SITE_LOGO_URL=https://github.com/kaywoz/ka/blob/main/files/seal1.png?raw=true
+      - REGISTRATION_OPEN=False
+      #- DB=sqlite
+      #- DB_NAME=/data/hc.sqlite
+      #- DB_PASSWORD=fixme-postgres-password
+      #- DB_USER=dbuser
+    volumes:
+      - ./healthchecks-data:/data
+      - ./healthchecks-data/config:/config
+    ports:
+      - 8000:8000
+      - 2525:2525
+    restart: unless-stopped
+    networks: {}

@@ -1,9 +1,8 @@
-version: "3"
 services:
   xen-orchestra:
     restart: unless-stopped
     image: ronivay/xen-orchestra:latest
-    container_name: xos11
+    container_name: sh-xos-0101
     stop_grace_period: 1m
     ports:
       - 89:80

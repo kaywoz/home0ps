@@ -1,14 +1,15 @@
-version: "3.3"
 services:
   cloudflared:
     restart: always
-    container_name: cloudflareds11
+    container_name: sh-cloudflared-0101
     image: cloudflare/cloudflared:latest
+    # TODO: cloudflared needs a real `command:` (e.g. tunnel run) --
+    # currently empty, this container won't do anything as-is
     command: >
-    ##(placeholder)
-    ##networks: {}
 networks:
   macvlan99:
     external: true
+  # TODO: placeholder for a second external network if this stack ever
+  # needs to join more than macvlan99
   #container-network-placeholder:
     #external: true
