@@ -1,0 +1,13 @@
+# Normalize text files to LF on checkin, regardless of the OS they were
+# authored on. Keeps compose files, scripts, and configs diff-friendly.
+* text=auto eol=lf
+
+# Known binary types -- never touch line endings, just to be safe on top of
+# git's own content-based auto-detection.
+*.png -text
+*.PNG -text
+*.jpg -text
+*.jpeg -text
+*.svg -text
+*.deb -text
+*.ico -text
