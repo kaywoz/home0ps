@@ -1,0 +1,114 @@
+vars: {
+  d2-config: {
+    layout-engine: tala
+  }
+}
+title: krypi.net home0ps {
+  near: top-center
+  shape: text
+  style: {
+    font-size: 29
+    bold: true
+    underline: true
+  }
+}
+Network.Internet <-> Network."ISP router": 2x600/60Mbps
+Network."ISP router" <-> Network.ucg: bridged
+Network.UCG <-> Network.Pro max switch
+Network.Pro max switch <-> Network.Pro AP: 1gbe poe
+Network.Pro max switch <-> Network.Jetkvm1: 1gbe
+Network.Pro max switch <-> Network.Jetkvm2: 1gbe
+Network.Pro max switch <-> Network.Jetkvm3: 1gbe
+Network.Pro max switch <-> Network.Hue-bridge: 1gbe
+Network.Pro max switch <-> Network.Ps5: 1gbe
+Network.Pro max switch <-> Network.Macmini: 2.5gbe
+Network.Pro max switch <-> Network.Hypervisor1: 2.5gbe
+Network.Pro max switch <-> Network.Hypervisor2: 2.5gbe
+Network.Pro max switch <-> Network.Nas: 2.5gbe
+Network.Pro AP <-> Network.Lite AP: mesh {style.animated: true}
+
+Compute.Hypervisor1.XCP-ng: {
+  explanation: |md
+    24t/128gb/6tb nvme/2tb ssd/1x2.5gbe
+  |
+}
+Compute.Hypervisor2.XCP-ng: {
+  explanation: |md
+    24t/112gb/6tb nvme/2tb ssd/1x2.5gbe
+  |
+}
+Storage.Nas.MOS: {
+  explanation: |md
+    4t/48gb/4tb nvme/8tb ssd/1x2.5gbe
+  |
+}
+Storage.Cloud.Onedrive: {
+  explanation: |md
+    1tb
+  |
+}
+Storage.Cloud.Filen: {
+  explanation: |md
+    200gb
+  |
+}
+Storage.Cloud.Storadera S3: {
+  explanation: |md
+    1tb
+  |
+}
+Storage.Cloud."Hetzner S3": {
+  explanation: |md
+    1tb
+  |
+}
+Storage.Cloud."Hetzner Storagebox": {
+  explanation: |md
+    5tb
+  |
+}
+Storage.Cloud."Put.io": {
+  explanation: |md
+    100gb
+  |
+}
+
+Services.selfhosted.example: {
+  explanation: |md
+    samplename
+  |
+}
+
+VMs.selfhosted.example: {
+  explanation: |md
+    samplename
+  |
+}
+
+# #appearance
+Network.UCG.icon: https://www.svgrepo.com/show/246824/firewall.svg
+Network.Internet.shape: cloud
+Network.ISP router.style.fill: pink
+Network.ISP router.icon: https://www.svgrepo.com/show/246824/firewall.svg
+Network.UCG.style.fill: pink
+Network.Pro max switch.style.fill: pink
+Network.Pro max switch.icon: https://www.svgrepo.com/show/278243/router.svg
+Network.Internet.style.fill: red
+Network.Lite AP.style.fill: lightgreen
+Network.Lite AP.icon: https://www.svgrepo.com/show/191821/wifi-router.svg
+Network.Pro AP.style.fill: lightgreen
+Network.Pro AP.icon: https://www.svgrepo.com/show/191821/wifi-router.svg
+Compute.Hypervisor1.XCP-ng.icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/xcpng.svg
+Compute.Hypervisor2.XCP-ng.icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/xcpng.svg
+Storage.Nas.MOS.icon: https://github.com/mos-nas/mos-releases/raw/master/images/mos-black.png
+Network.Nas.icon: https://www.svgrepo.com/show/29750/server.svg
+Network.Hypervisor1.icon: https://www.svgrepo.com/show/513345/server.svg
+Network.Hypervisor2.icon: https://www.svgrepo.com/show/513345/server.svg
+Network.Macmini.icon: https://www.svgrepo.com/show/288589/mac-mini.svg
+
+Storage.Cloud.Onedrive.icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/hetzner.svg
+Storage.Cloud.Filen.icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/hetzner.svg
+Storage.Cloud."Storadera S3".icon: https://storadera.com/wp-content/themes/storadera1.1/assets/images/logo_full_storadera.svg
+Storage.Cloud."Hetzner S3".icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/hetzner.svg
+Storage.Cloud."Hetzner Storagebox".icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/hetzner.svg
+Storage.Cloud."Put.io".icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/hetzner.svg
