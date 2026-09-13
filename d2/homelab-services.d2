@@ -1,0 +1,99 @@
+direction: right
+
+internet: Internet {
+  shape: cloud
+  style.fill: "#e04b3f"
+  style.font-color: white
+}
+
+dns: "DNS and Edge (krypi.net)" {
+  style.fill: "#eafaf1"
+  ghpages: "GitHub Pages (www/blog/ghpages/kaywoz)"
+  mail: "Tutanota mail (MX/DKIM/MTA-STS)"
+  sendgrid: "SendGrid (outbound)"
+  netbird: "NetBird wildcards (sh-internal / hl-internal / pub)" {
+    style.stroke: "#7c3aed"
+  }
+  tunnel: "Cloudflare Tunnel: public-app.krypi.net (planned)" {
+    style.stroke-dash: 4
+    style.stroke: "#999999"
+  }
+}
+
+decoys: "Decoy zones (isolated, no path back in)" {
+  style.fill: "#fdecea"
+  style.stroke: "#c0392b"
+  m41: "m41w423mu572un.xyz (honeypot / training)"
+  phish: "obviousphish.com (phishing sim)"
+}
+
+mesh: "NetBird mesh (WireGuard overlay)" {
+  shape: hexagon
+  style.fill: "#ede9fe"
+}
+
+compute: "Compute" {
+  style.fill: "#eef1f4"
+  hv1: "Hypervisor1 (XCP-ng)"
+  hv2: "Hypervisor2 (XCP-ng)"
+  nas: "NAS (MOS)"
+}
+
+services: "Docker services (not pinned to a specific host)" {
+  style.fill: "#f7f7f7"
+
+  monitoring: "Monitoring" {
+    dozzle
+    uptime_kuma: "uptime-kuma"
+    healthchecks
+    glances
+  }
+  productivity: "Productivity" {
+    vikunja
+    atuin
+    homepage
+    golink
+  }
+  infra: "Infra" {
+    pocket_id: "pocket-id"
+    unifi: "unifi-controller"
+    socket_proxy: "docker-socket-proxy"
+    xos: "xos (Xen Orchestra)"
+  }
+  network_iot: "Network / IoT" {
+    homeassistant
+    iot: "iot (homey-shs)"
+    whoami
+    librespeed
+  }
+  misc: "Misc / experimental" {
+    archiveteamwarrior
+    shields
+    test_macvlan: "test-macvlan"
+    cloudflared: "cloudflared (planned)" {
+      style.stroke-dash: 4
+      style.stroke: "#999999"
+    }
+  }
+}
+
+internet -> dns.ghpages: HTTPS
+internet -> dns.mail: SMTP
+internet -> decoys.m41: probes {
+  style.stroke: "#c0392b"
+}
+internet -> decoys.phish: probes {
+  style.stroke: "#c0392b"
+}
+
+dns.tunnel -> services.misc.cloudflared: {
+  style.stroke-dash: 4
+  style.stroke: "#999999"
+}
+dns.netbird -> mesh: resolves via
+
+mesh -> compute.hv1
+mesh -> compute.hv2
+mesh -> compute.nas
+
+compute -> services: hosts

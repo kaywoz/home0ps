@@ -70,6 +70,12 @@ A root-level `compose.yaml` also runs its own `dozzle` instance (fronted with Cl
 
 Two XCP-ng hypervisors (Hypervisor1: 24t/128GB/6TB nvme/2TB ssd, Hypervisor2: 24t/112GB/6TB nvme/2TB ssd), a NAS running MOS, and cloud storage spread across OneDrive (1TB), Filen (200GB), Storadera S3 (1TB), Hetzner S3 (1TB), Hetzner Storagebox (5TB), and Put.io (100GB). Source diagram: [`d2/homelab-topology.d2`](d2/homelab-topology.d2).
 
+## DNS, edge & services
+
+![krypi.net DNS, edge and service topology](d2/homelab-services.svg)
+
+A logical view layered on top of the hardware diagram above: how `krypi.net`'s DNS/edge resolves into the NetBird mesh and down to the compute layer, and how the docker-compose stacks group functionally. Services are drawn as hosted by the compute cluster as a whole rather than pinned to a specific hypervisor/NAS, since the compose files don't currently record that placement. The Cloudflare Tunnel edge and its `cloudflared` container are dashed because that path is planned, not live yet (see `docker-compose/cloudflare/compose.yaml`). The two decoy zones (`m41w423mu572un.xyz`, `obviousphish.com`) are drawn deliberately isolated -- they're SOC/detection-engineering training domains with no path back into real infrastructure. Source diagram: [`d2/homelab-services.d2`](d2/homelab-services.d2).
+
 ## Infrastructure as code (`iac/`)
 
 - **`iac/cloudflare/`** -- manages Cloudflare DNS records for `krypi.net`, `m41w423mu572un.xyz`, and `obviousphish.com` via OpenTofu (zones are created manually in the dashboard; Terraform only looks them up and manages records). Applied by `.github/workflows/deploy-cloudflare-dns.yml` -- plan on PR, apply on push to `main`.
@@ -80,6 +86,7 @@ Two XCP-ng hypervisors (Hypervisor1: 24t/128GB/6TB nvme/2TB ssd, Hypervisor2: 24
 - Detailed IP addressing / VLAN assignment (the topology diagram above shows link speeds and physical layout, not the addressing scheme)
 - Backup and disaster-recovery plan
 - Secrets management approach
+- Which docker-compose stack runs on which physical host (hypervisor1/hypervisor2/NAS) -- not currently recorded anywhere, so the services diagram above shows them as a logical layer instead
 
 ## Acknowledgments
 
