@@ -64,6 +64,12 @@ Personal home-lab and home-ops repo: Docker Compose service stacks, infrastructu
 
 A root-level `compose.yaml` also runs its own `dozzle` instance (fronted with Cloudflare Access auth headers), separate from `docker-compose/dozzle/`. Worth reconciling which one is actually the live deployment.
 
+## Network & hardware topology
+
+![Homelab network and hardware topology](d2/homelab-topology.svg)
+
+Two XCP-ng hypervisors (Hypervisor1: 24t/128GB/6TB nvme/2TB ssd, Hypervisor2: 24t/112GB/6TB nvme/2TB ssd), a NAS running MOS, and cloud storage spread across OneDrive (1TB), Filen (200GB), Storadera S3 (1TB), Hetzner S3 (1TB), Hetzner Storagebox (5TB), and Put.io (100GB). Source diagram: [`d2/homelab-topology.d2`](d2/homelab-topology.d2).
+
 ## Infrastructure as code (`iac/`)
 
 - **`iac/cloudflare/`** -- manages Cloudflare DNS records for `krypi.net`, `m41w423mu572un.xyz`, and `obviousphish.com` via OpenTofu (zones are created manually in the dashboard; Terraform only looks them up and manages records). Applied by `.github/workflows/deploy-cloudflare-dns.yml` -- plan on PR, apply on push to `main`.
@@ -71,8 +77,7 @@ A root-level `compose.yaml` also runs its own `dozzle` instance (fronted with Cl
 
 ## Not yet documented
 
-- Current physical hardware and host topology -- earlier versions of this README described a single Odroid M1 board, but the number and variety of stacks now running (including Xen Orchestra for XCP-ng, and a UniFi controller) suggests that's no longer the complete picture. Worth a rewrite once confirmed.
-- Network layout / IP addressing / VLAN plan
+- Detailed IP addressing / VLAN assignment (the topology diagram above shows link speeds and physical layout, not the addressing scheme)
 - Backup and disaster-recovery plan
 - Secrets management approach
 
