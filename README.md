@@ -1,151 +1,86 @@
-# ka's personal homeops documentation etc
+# home0ps
+
+Personal home-lab and home-ops repo: Docker Compose service stacks, infrastructure-as-code (OpenTofu), bootstrap/provisioning scripts, and supporting diagrams for a self-hosted environment.
 
 ![Static Badge](https://img.shields.io/badge/Free_&_Open_source-GPL_V3-green)
-
-This project will document a self-hosted environment running on an **Odroid M1** board and is supposed to be self contained.
-
-It is meant to maximise the homeops (lul) enviroment and just run on this single board, with as many apps and services as possible.
-
-The project will only use **free** and/or **open source** software, the enterprise stuff will run in the homelab-environment.
-
 
 > [!IMPORTANT]
 > The content of this repository is provided "as is", with no guarantee that the information is complete or error-free.
 > The techniques and tools discussed here come with inherent risks.
 > The author takes absolutely no responsibility for possible consequences due to the use of the related software.
 
-# Table of Content
- 
-
-1. <details>
-   <summary><a href="#overview">Overview</a></summary>
-
-    1. [Plan](#plan)
-    2. [Architecture](#architecture)
-
-   </details>
-2. <details>
-   <summary><a href="oOdroid setup">Odroid setup</a></summary>
-
-    1. [step-name](#step-comment)
-
-   </details>
-3. <details>
-   <summary><a href="#initial-prep">Initial prep</a></summary>
-
-    1. [step1](#step1)
-
-
-   </details>
-4. <details>
-   <summary><a href="#network-configuration">Network configuration</a></summary>
-
-    1. [ip-stuff](#ip-stuff)
-
-   </details>
-5. <details>
-   <summary><a href="#install-services">Install services</a></summary>
-
-    1. [service1](#service1)
-   
-   </details>
-
-6. <details>
-   <summary><a href="#docker-apps">Docker apps</a></summary>
-
-    1. [app1](#app1)
-
-   </details>
-
-
-7. <details>
-   <summary><a href="#acknowledgments">Acknowledgments</a></summary>
-   </details>
-
-8. <details>
-   <summary><a href="#license">License</a></summary>
-   </details>
-  
-# Overview
-
-## Plan
-
-There have been many steps in this project, and it has been hosted on different hardware, running different stacks of software since 2022?
-
-The primary design principles were set to the following, after much deliberation;
+## Design principles
 
 - **kiss** (because I always overcomplicate everything)
 - **self-hosted within reason** (take the hardware as far as it goes, reach out to cloud when there is a determined need)
-- **privacy first** (software should honor privacy, encrypt everything))
+- **privacy first** (software should honor privacy, encrypt everything)
 - **cloud-agnostic** (cheapest and best is the way to go)
 - **secure** (authentication, zero-trust, encryption, logging, backup etc)
-- **light** (4 arm-cores and 4GB RAM is not a lot.)
 - **container-first** (for deployability, transferability etc.)
 - **accessible** (usability wherever I'm at)
 - **monitored** (monitoring, alerting, tracking, the good stuff)
 
-These are the tools we are going to run :
+## Repository layout
 
-|                                       Logo                                        | Name           | Repository                                  | Description                                          |
-|:---------------------------------------------------------------------------------:|----------------|---------------------------------------------|------------------------------------------------------|
-|         <img src="images/logo-docker.svg" alt="Docker logo" height="24"/>         | Docker         | https://github.com/docker                   | Help to build, share, and run container applications |
-| <img src="images/logo-docker-compose.png" alt="Docker Compose logo" height="38"/> | Docker Compose | https://github.com/docker/compose           | Run multi-container applications with Docker         |
-|          <img src="images/logo-kopia.png" alt="Kopia logo" height="32"/>          | Kopia          | https://github.com/kopia/kopia              | Fast and secure open-source backup/restore tool      |
-|    <img src="images/logo-uptime-kuma.svg" alt="Uptime Kuma logo" height="34"/>    | Uptime Kuma    | https://github.com/louislam/uptime-kuma     | Easy-to-use self-hosted monitoring tool              |
-|    <img src="images/logo-tailscale.png" alt="Tailscale logo" height="34"/>    | Tailscale    | https://github.com/tailscale/tailscale    | Private WireGuard® networks made easy|
+| Path              | What's in it                                                                                           |
+|-------------------|---------------------------------------------------------------------------------------------------------|
+| `docker-compose/` | One subfolder per service stack, each with its own `compose.yaml`                                       |
+| `iac/`            | OpenTofu -- Cloudflare DNS (`iac/cloudflare/`), plus Hetzner Cloud / NetBird config (`main.tf`, `netbird.tf`, `server_vm.tf`) |
+| `config-files/`   | Bootstrap/setup scripts and dotfiles for `linux`, `rpi`, and `win` hosts                                 |
+| `files/scripts/`  | Standalone install/maintenance scripts (Docker install, rclone backup, Time Machine snapshot purge, Windows bootstrap) |
+| `files/pix/`, `images/` | Logo and image assets used in this README and in diagrams                                         |
+| `d2/`             | [d2](https://d2lang.com/)-format architecture, threat-modeling, and SOC-process diagrams                |
+| `archive/`        | Retired docs and diagrams, kept for reference and not actively maintained                                |
 
-Below is a general connectivity diagram for the hosted services;
+## Services (docker-compose stacks)
 
-```mermaid
-flowchart TB
+| Stack                | Image(s)                                                                                   | What it is |
+|-----------------------|---------------------------------------------------------------------------------------------|------------|
+| `archiveteamwarrior` | `atdr.meo.ws/archiveteam/warrior-dockerfile`                                                | ArchiveTeam Warrior -- distributed web-archiving client |
+| `atuin`              | `ghcr.io/atuinsh/atuin`, `postgres:14`                                                       | Synced, searchable shell history |
+| `base`               | `fnsys/dockhand:latest`                                                                      | Dockhand -- Docker management UI |
+| `cloudflare`         | `cloudflare/cloudflared:latest`                                                              | Cloudflare Tunnel client (config incomplete -- see TODO in the compose file) |
+| `docker-socket-proxy`| `tecnativa/docker-socket-proxy`                                                              | Restricts what talks to the Docker socket, for containers that only need read-only API access |
+| `dockge`             | `louislam/dockge:1`                                                                          | Docker Compose stack manager UI |
+| `dozzle`             | `amir20/dozzle:latest`                                                                       | Real-time Docker log viewer |
+| `fahgpu`             | `yurinnick/folding-at-home:latest-nvidia`                                                    | Folding@home, GPU-accelerated |
+| `gatus`              | `twinproduction/gatus:latest`                                                                | Status page / synthetic monitoring (ICMP, TCP, DNS, SSH checks) |
+| `glances`            | `joweisberg/glances:latest`                                                                  | System resource monitoring |
+| `golink`             | `ghcr.io/tailscale/golink:main`                                                              | Short, memorable `go/` links |
+| `healthchecks`       | `lscr.io/linuxserver/healthchecks:latest`                                                    | Self-hosted [healthchecks.io](https://healthchecks.io/) -- cron/job dead-man's-switch monitoring |
+| `homeassistant`      | `ghcr.io/home-assistant/home-assistant:stable`                                               | Home Assistant |
+| `homepage`           | `ghcr.io/gethomepage/homepage:latest`                                                        | Dashboard / service homepage |
+| `infra`              | `docker-socket-proxy`, `dozzle`, `atuin` + `postgres`, `healthchecks`                        | Combined stack bundling several of the above -- check which of this or the standalone folders is the one actually deployed |
+| `iot`                | `ghcr.io/athombv/homey-shs`                                                                  | Homey smart-home hub server |
+| `librespeed`         | `ghcr.io/linuxserver/librespeed`                                                             | Self-hosted internet speed test |
+| `pocketid`           | `ghcr.io/pocket-id/pocket-id:v2`                                                             | Pocket ID -- passkey-based OIDC identity provider |
+| `shields`            | `shieldsio/shields:server-2024-03-01`                                                        | Self-hosted Shields.io badge server |
+| `test-macvlan`       | `nginx:latest`                                                                               | Scratch stack for testing macvlan networking |
+| `unifi-controller`   | `jacobalberty/unifi`, `mongo:3.6`                                                            | UniFi network controller |
+| `uptime-kuma`        | `louislam/uptime-kuma:1.23.11`                                                               | Uptime/status monitoring |
+| `vikunja`            | `vikunja/vikunja`, `mariadb:10`                                                              | To-do / task management |
+| `whoami`             | `denga/whoami:latest`                                                                        | Minimal HTTP echo service, useful for testing routing |
+| `xos`                | `ronivay/xen-orchestra:latest`                                                               | Xen Orchestra -- management UI for an XCP-ng hypervisor |
 
-    style tailnet fill: #69582b
-    style provider-tailscale fill: #69587b
-    style provider-cloudflare fill: #205566
-    style docker fill: #664343
-    style container fill: #612
-    style firewall fill: #615
-    style client fill: #4d683b
-    style reverse-proxy fill: #806930
+A root-level `compose.yaml` also runs its own `dozzle` instance (fronted with Cloudflare Access auth headers), separate from `docker-compose/dozzle/`. Worth reconciling which one is actually the live deployment.
 
-    SUBDOMAIN_MYAPP1(public-app.krypi.net) --> | cf-tunnel| firewall --> |bypass| container
-    SUBDOMAIN_MYAPP2(internal-app.krypi.net) --> | tailscale sidecar| firewall --> |bypass| container
+## Infrastructure as code (`iac/`)
 
-   subgraph client[client connects via]
-        provider-cloudflare[cloudflare] --> |zta| ddns
-        provider-tailscale[tailscale] --> |vpn  and acl| tailnet
-    end
+- **`iac/cloudflare/`** -- manages Cloudflare DNS records for `krypi.net`, `m41w423mu572un.xyz`, and `obviousphish.com` via OpenTofu (zones are created manually in the dashboard; Terraform only looks them up and manages records). Applied by `.github/workflows/deploy-cloudflare-dns.yml` -- plan on PR, apply on push to `main`.
+- **`iac/main.tf`, `iac/netbird.tf`, `iac/server_vm.tf`** -- Hetzner Cloud and NetBird provider config; `server_vm.tf` currently has its server resource commented out. Applied by `.github/workflows/deploy-iac.yml`.
 
-subgraph ddns[cloudflare]
-        reverse-proxy -->|subdomain| SUBDOMAIN_MYAPP1
-    end
+## Not yet documented
 
-subgraph tailnet[tailnet]
-        tailnet --> SUBDOMAIN_MYAPP2
-    end
+- Current physical hardware and host topology -- earlier versions of this README described a single Odroid M1 board, but the number and variety of stacks now running (including Xen Orchestra for XCP-ng, and a UniFi controller) suggests that's no longer the complete picture. Worth a rewrite once confirmed.
+- Network layout / IP addressing / VLAN plan
+- Backup and disaster-recovery plan
+- Secrets management approach
 
-
-    subgraph sbc[odroid m1]
-        subgraph docker[docker]
-            subgraph container[containers]
-                    tailscale[tailscale]
-                    cloudflare[cloudflare]
-                    public-app[public-app]
-                    internal-app[internal-app]
-            end
-
-        end
-
-    end
-
-```
-
-
-# Acknowledgments
+## Acknowledgments
 
 Acks go here :
 
-# License
+## License
 
 Please refer to the license of each product mentioned in this guide.
 
