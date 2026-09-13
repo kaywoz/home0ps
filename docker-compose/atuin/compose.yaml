@@ -1,8 +1,7 @@
-version: "3.5"
 services:
   atuin:
     restart: always
-    container_name: atuin11
+    container_name: sh-atuin-0101
     image: ghcr.io/atuinsh/atuin:64b7581
     command: server start
     user: root
@@ -20,7 +19,7 @@ services:
     networks: {}
   postgresql:
     image: postgres:14
-    container_name: postgresql11
+    container_name: sh-postgresql-0101
     restart: unless-stopped
     volumes:
       # Don't remove permanent storage for index database files!

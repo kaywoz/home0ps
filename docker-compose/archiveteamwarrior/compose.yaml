@@ -1,8 +1,8 @@
 services:
-  archiveTeamWarrior11:
+  archiveTeamWarrior:
     image: atdr.meo.ws/archiveteam/warrior-dockerfile
-    container_name: archivewarrior11
-    hostname: archivewarrior11
+    container_name: sh-archivewarrior-0101
+    hostname: sh-archivewarrior-0101
     ports:
       - 8001:8001
     restart: always
@@ -15,8 +15,8 @@ services:
     networks: {}
   archiveTeamWarrior12:
     image: atdr.meo.ws/archiveteam/warrior-dockerfile
-    container_name: archivewarrior12
-    hostname: archivewarrior12
+    container_name: sh-archivewarrior-0102
+    hostname: sh-archivewarrior-0102
     ports:
       - 8002:8001
     restart: always
@@ -29,8 +29,8 @@ services:
     networks: {}
   archiveTeamWarrior13:
     image: atdr.meo.ws/archiveteam/warrior-dockerfile
-    container_name: archivewarrior13
-    hostname: archivewarrior13
+    container_name: sh-archivewarrior-0103
+    hostname: sh-archivewarrior-0103
     ports:
       - 8003:8001
     restart: always

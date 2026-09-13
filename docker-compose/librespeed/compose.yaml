@@ -1,7 +1,7 @@
 services:
   librespeed:
     image: ghcr.io/linuxserver/librespeed
-    container_name: librespeed11
+    container_name: sh-librespeed-0101
     restart: unless-stopped
     ports:
       - 91:80

@@ -6,11 +6,11 @@
 #  macvlan13
 
   
-version: "3.8"
 services:
   nginx:
     image: nginx:latest
-    container_name: nginx_macvlan
+    container_name: sh-test-macvlan-0101
+    restart: "no"
     networks:
       macvlan_network:
         ipv4_address: 192.168.13.3

@@ -1,8 +1,7 @@
-version: "3.3"
 services:
   cloudflared:
     restart: always
-    container_name: cloudflareds11
+    container_name: sh-cloudflared-0101
     image: cloudflare/cloudflared:latest
     # TODO: cloudflared needs a real `command:` (e.g. tunnel run) --
     # currently empty, this container won't do anything as-is
