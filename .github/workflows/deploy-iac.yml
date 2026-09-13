@@ -1,4 +1,4 @@
-name: deploy iac via OpenTofu
+name: deploy s3 via OpenTofu
 
 on:
   push:
