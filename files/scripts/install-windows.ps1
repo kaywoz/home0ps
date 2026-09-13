@@ -1,13 +1,13 @@
-
 # Set the execution policy to unrestricted
 Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope LocalMachine -Force -ErrorAction Ignore
-$ErrorActionPreference = "stop"
+$ErrorActionPreference = "Stop"
 
-# Create a directory for Veeam (this is only needed if you are using PowerShell automated installs, not if Ansible is used)
-New-Item -Path "c:\" -Name "tmp" -ItemType "directory"
+# Scratch directory for automated installs (only needed for PowerShell-driven
+# installs, e.g. Veeam; not required when Ansible is used)
+New-Item -Path "C:\tmp" -ItemType Directory -Force | Out-Null
 
-#Set Windows Firewall to OFF
-#set-NetFirewallProfile -All -Enabled False
+# Set Windows Firewall to OFF
+# Set-NetFirewallProfile -All -Enabled False
 
 # Install and configure OpenSSH Server
 Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
