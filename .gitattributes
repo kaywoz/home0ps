@@ -11,3 +11,6 @@
 *.svg -text
 *.deb -text
 *.ico -text
+
+# d2 diagrams are left exactly as originally authored -- do not renormalize
+*.d2 -text
