@@ -1,6 +1,4 @@
 // This tailnet's ACLs are maintained in https://github.com/kaywoz/home0ps (iac/tailscale/policy.hujson)
-//teststring
-// pipeline check 2026-10-03: comment-only change to exercise test (PR) and apply (merge)
 {
 	"groups": {
 		"group:privusers": ["${TS_PRIVUSER}"],
@@ -17,7 +15,7 @@
 		"tag:oob":        ["group:privusers"], //all oob-devices
 		"tag:security":   ["group:privusers"], //all security devices and infra
 		"tag:monitoring": ["group:privusers"], //all monitoring devices and infra
-		"tag:proxy":      ["group:privusers"], //all monitoring devices and infra
+		"tag:proxy":      ["group:privusers"], //TODO: description
 		"tag:guests":     ["group:privusers"], //guest assets
 		"tag:trusted":    ["group:privusers"], //natively trusted assets
 		"tag:ha":         ["group:privusers"], //all home automation
@@ -30,28 +28,27 @@
 		//"tag:app-golink":       ["group:privusers"], //golink container access
 		//"tag:app-docker-socket-proxy":       ["group:privusers"], //docker-socket-proxy container access
 		//"tag:app-dockge":       ["group:privusers"], //dockge container access
-		//"tag:app-beszel-agent":       ["group:privusers"], //dockge container access
+		//"tag:app-beszel-agent":       ["group:privusers"], //TODO: description
 	},
 
 	"hosts": {
 		// "some subnet": "192.168.199.0/24" //sample net not in use
 	},
 
-	//randomizeClientPort": true, //previously used when opnsense was edge gw
 	"ssh": [
-		// privusers and trusted devices can access ssh tags with ka/root accounts
+		// privusers and trusted devices can access ssh tags with the admin/root accounts
 		{
 			"action":      "check",
 			"src":         ["group:privusers"],
 			"dst":         ["tag:ssh"],
-			"users":       ["ka", "root"],
+			"users":       ["${TS_SSH_USER}", "root"],
 			"checkPeriod": "24h",
 		},
 		{
 			"action": "accept",
 			"src":    ["tag:trusted"],
 			"dst":    ["tag:ssh"],
-			"users":  ["ka", "root"],
+			"users":  ["${TS_SSH_USER}", "root"],
 		},
 	],
 
@@ -68,15 +65,20 @@
 
 	"grants": [
 		{
-			"src": ["tag:trusted"],
+			"src": ["tag:trusted", "group:privusers"],
 			"dst": ["tag:ssh"],
 			"ip":  ["tcp:22"],
 		},
-		{
-			"src": ["tag:trusted"],
-			"dst": ["*"],
-			"ip":  ["tcp:*"],
-		},
+
+		// !!! BREAK-GLASS ONLY -- TEST RULE, DISABLED !!!
+		// Full TCP from trusted devices/privusers to everything. Uncomment only in a
+		// break-the-glass scenario, via PR, and re-comment once resolved.
+		//{
+		//	"src": ["tag:trusted", "group:privusers"],
+		//	"dst": ["*"],
+		//	"ip":  ["tcp:*"],
+		//},
+
 		{
 			"src": ["tag:security", "tag:monitoring"],
 			"dst": ["*"],
@@ -88,17 +90,12 @@
 			"ip":  ["tcp:*"],
 		},
 		{
-			"src": ["tag:proxy"],
-			"dst": ["tag:service"],
-			"ip":  ["tcp:*"],
-		},
-		{
-			"src": ["tag:trusted"],
+			"src": ["tag:trusted", "group:privusers"],
 			"dst": ["tag:proxy"],
 			"ip":  ["tcp:*"],
 		},
 		{
-			"src": ["tag:trusted"],
+			"src": ["tag:trusted", "group:privusers"],
 			"dst": ["tag:storage"],
 			"ip":  ["tcp:*"],
 		},

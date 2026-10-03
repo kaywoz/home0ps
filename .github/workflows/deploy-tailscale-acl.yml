@@ -27,12 +27,14 @@ jobs:
         env:
           TS_PRIVUSER: ${{ secrets.TS_PRIVUSER }}
           TS_GUEST: ${{ secrets.TS_GUEST }}
+          TS_SSH_USER: ${{ secrets.TS_SSH_USER }}
         run: |
           set -euo pipefail
           : "${TS_PRIVUSER:?TS_PRIVUSER secret is empty}"
           : "${TS_GUEST:?TS_GUEST secret is empty}"
+          : "${TS_SSH_USER:?TS_SSH_USER secret is empty}"
           command -v envsubst >/dev/null || sudo apt-get install -y -qq gettext-base
-          envsubst '$TS_PRIVUSER $TS_GUEST' < iac/tailscale/policy.hujson > "$RUNNER_TEMP/policy.hujson"
+          envsubst '$TS_PRIVUSER $TS_GUEST $TS_SSH_USER' < iac/tailscale/policy.hujson > "$RUNNER_TEMP/policy.hujson"
           if grep -qF '${TS_' "$RUNNER_TEMP/policy.hujson"; then
             echo "::error::unrendered \${TS_...} placeholder left in policy"
             exit 1
