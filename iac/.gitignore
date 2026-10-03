@@ -13,9 +13,6 @@ crash.*.log
 # Local working directory
 .terraform/
 
-# never apply zones automatically
-zone_*.tf
-
 # Lock file (optional — keep if you want reproducible provider versions)
 # If you prefer not to commit it, uncomment the line below:
 # .terraform.lock.hcl
