@@ -36,18 +36,29 @@
 	},
 
 	"ssh": [
-		// privusers and trusted devices can access ssh tags with the admin/root accounts
+		// privusers and trusted devices can tailscale-ssh to all devices with the admin/root accounts.
+		// ssh dst can't be "*": every tag is listed -- add new tags here too.
 		{
 			"action":      "check",
 			"src":         ["group:privusers"],
-			"dst":         ["tag:ssh"],
+			"dst": [
+				"autogroup:self",
+				"tag:hypervisor", "tag:storage", "tag:service", "tag:docker", "tag:oob",
+				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests", "tag:trusted",
+				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test",
+			],
 			"users":       ["${LOCAL_UNIX_ACCOUNT}", "root"],
 			"checkPeriod": "24h",
 		},
 		{
+			// tagged sources can't ssh into user-owned devices, so tags only
 			"action": "accept",
 			"src":    ["tag:trusted"],
-			"dst":    ["tag:ssh"],
+			"dst": [
+				"tag:hypervisor", "tag:storage", "tag:service", "tag:docker", "tag:oob",
+				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests", "tag:trusted",
+				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test",
+			],
 			"users":  ["${LOCAL_UNIX_ACCOUNT}", "root"],
 		},
 	],
@@ -65,8 +76,9 @@
 
 	"grants": [
 		{
+			// ssh (tailscale ssh + regular sshd) to all devices
 			"src": ["tag:trusted", "group:privusers"],
-			"dst": ["tag:ssh"],
+			"dst": ["*"],
 			"ip":  ["tcp:22"],
 		},
 
