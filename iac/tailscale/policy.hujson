@@ -23,6 +23,7 @@
 		"tag:auto":       ["group:privusers"], //deployed via pipeline
 		"tag:ssh":        ["group:privusers"], //tailscale ssh access
 		"tag:test":       ["group:privusers"], //just a test tag
+		"tag:mgmt":       ["group:privusers"], //mgmt ui still exposed directly on 80/443, not yet behind proxy
 
 		///////////////////////////////////////////////////////////////////
 		//"tag:app-golink":       ["group:privusers"], //golink container access
@@ -45,7 +46,7 @@
 				"autogroup:self",
 				"tag:hypervisor", "tag:storage", "tag:service", "tag:docker", "tag:oob",
 				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests", "tag:trusted",
-				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test",
+				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt",
 			],
 			"users":       ["${LOCAL_UNIX_ACCOUNT}", "root"],
 			"checkPeriod": "24h",
@@ -57,7 +58,7 @@
 			"dst": [
 				"tag:hypervisor", "tag:storage", "tag:service", "tag:docker", "tag:oob",
 				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests", "tag:trusted",
-				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test",
+				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt",
 			],
 			"users":  ["${LOCAL_UNIX_ACCOUNT}", "root"],
 		},
@@ -80,6 +81,12 @@
 			"src": ["tag:trusted", "group:privusers"],
 			"dst": ["*"],
 			"ip":  ["tcp:22"],
+		},
+		{
+			// mgmt ports (80/443) on all devices -- mgmt uis should end up behind the proxy
+			"src": ["tag:trusted", "group:privusers"],
+			"dst": ["*"],
+			"ip":  ["tcp:80", "tcp:443"],
 		},
 
 		// !!! BREAK-GLASS ONLY -- TEST RULE, DISABLED !!!
