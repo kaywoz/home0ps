@@ -25,7 +25,7 @@ Personal home-lab and home-ops repo: Docker Compose service stacks, infrastructu
 | Path              | What's in it                                                                                           |
 |-------------------|---------------------------------------------------------------------------------------------------------|
 | `docker-compose/` | One subfolder per service stack, each with its own `compose.yaml`                                       |
-| `iac/`            | OpenTofu -- Cloudflare DNS (`iac/cloudflare/`), plus Hetzner Cloud / NetBird config (`main.tf`, `netbird.tf`, `server_vm.tf`) |
+| `iac/`            | OpenTofu, one folder per area: `iac/hetzner/`, `iac/cloudflare/`, `iac/tailscale/`                     |
 | `config-files/`   | Bootstrap/setup scripts and dotfiles for `linux`, `rpi`, and `win` hosts                                 |
 | `files/scripts/`  | Standalone install/maintenance scripts (Docker install, rclone backup, Time Machine snapshot purge, Windows bootstrap) |
 | `files/pix/`, `images/` | Logo and image assets used in this README and in diagrams                                         |
@@ -73,7 +73,7 @@ Two XCP-ng hypervisors (Hypervisor1: 24t/128GB/6TB nvme/2TB ssd, Hypervisor2: 24
 ## Infrastructure as code (`iac/`)
 
 - **`iac/cloudflare/`** -- manages Cloudflare DNS records for `krypi.net`, `m41w423mu572un.xyz`, and `obviousphish.com` via OpenTofu (zones are created manually in the dashboard; Terraform only looks them up and manages records). Applied by `.github/workflows/deploy-cloudflare-dns.yml` -- plan on PR, apply on push to `main`.
-- **`iac/main.tf`, `iac/netbird.tf`, `iac/server_vm.tf`** -- Hetzner Cloud and NetBird provider config; `server_vm.tf` currently has its server resource commented out. Applied by `.github/workflows/deploy-iac.yml`.
+- **`iac/hetzner/`** -- Hetzner Cloud provider config; `server_vm.tf` currently has its server resource commented out. Applied by `.github/workflows/deploy-hetzner.yml` -- plan on PR, apply on push to `main`. NetBird config was retired to `archive/netbird/`.
 
 ## Not yet documented
 

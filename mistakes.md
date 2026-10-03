@@ -1,0 +1,76 @@
+# mistakes.md
+
+A running log of mistakes made while planning/building/PR'ing changes to this
+repo — wrong assumptions, misread requirements, failed CI, broken applies,
+anything kaywoz had to correct. Read this file in full before starting new
+work. Add a new entry any time something turns out to have been based on a
+misunderstanding.
+
+## Entry format
+
+```markdown
+### YYYY-MM-DD — <area/slug>
+
+- **Trigger:** wrong assumption / CI failed / apply broke something / misunderstood request / PR rejected
+- **What happened:** one or two sentences, factual, no editorializing
+- **Root cause:** why it happened — bad assumption, didn't read the source, wrong field, etc.
+- **Fix applied:** what was changed to correct it
+- **Rule going forward:** one concrete, checkable rule to add to CLAUDE.md
+  (or a pointer to the CLAUDE.md section it was added to)
+```
+
+Keep entries short and specific. The goal is a checklist that prevents repeat
+mistakes, not a diary.
+
+---
+
+### 2026-10-03 — tailscale-acl (migration plan)
+
+- **Trigger:** wrong assumption
+- **What happened:** the first migration plan told kaywoz to "switch from an
+  API key to an OAuth client" and to port a healthcheck ping. The old
+  `kaywoz/tailscale` workflow already authenticates with an OAuth client
+  (`TS_OAUTH_CLIENT_ID` / `TS_OAUTH_SECRET` / `TS_TAILNET`) and notifies via a
+  Slack webhook, not a healthcheck.
+- **Root cause:** described the old pipeline from how such pipelines usually
+  look instead of reading `.github/workflows/tailscale.yml` first; the
+  healthcheck detail was carried over from the unrelated `terraform-cloudflare`
+  repo.
+- **Fix applied:** read the actual workflow; task list corrected to reuse the
+  existing secret names, replace the old OAuth client with a fresh
+  policy-file-scoped one, and port the Slack notification.
+- **Rule going forward:** CLAUDE.md §2 — read the actual current
+  pipeline/config file before describing or planning around it; never borrow
+  details from a different repo.
+
+### 2026-10-03 — tailscale-acl (workflow names)
+
+- **Trigger:** wrong assumption
+- **What happened:** the Tailscale plan said to add an exclusion to
+  `deploy-iac.yml`. No such workflow exists; the main IaC pipeline is
+  `deploy-s3.yml`, which runs on every push to `main` with no path filter.
+- **Root cause:** took the workflow name from the earlier Cloudflare planning
+  doc instead of listing `.github/workflows/` first — the same failure as the
+  entry above, repeated within the same task.
+- **Fix applied:** listed the real workflows, added `paths-ignore` to
+  `deploy-s3.yml`, corrected CLAUDE.md §1.
+- **Rule going forward:** CLAUDE.md §1/§2 — list `.github/workflows/` and the
+  target directory from the live repo before naming any file in a plan;
+  planning docs are not a source of truth for file names.
+
+### 2026-10-03 — hetzner-restructure (backend key)
+
+- **Trigger:** wrong assumption
+- **What happened:** the restructure plan said "same bucket + same state key →
+  no state migration". The old `iac/backend.tf` state `key` was not a path but
+  a string that looks like an S3 access key ID, committed to a public repo.
+  I didn't see it because my own inspection command pattern-redacted anything
+  named `key`, so I planned around a value I never looked at.
+- **Root cause:** redacted on the way *in* (when reading files to plan)
+  instead of only on the way *out* (when quoting into chat).
+- **Fix applied:** read the file unredacted; moved Hetzner to a fresh key
+  `hetzner/terraform.tfstate`; flagged the value for kaywoz to verify and
+  rotate if it is a real access key ID.
+- **Rule going forward:** CLAUDE.md §4 — read config files in full when
+  planning; redact only what gets echoed back. Never claim "same/unchanged
+  value" for something not actually viewed.
