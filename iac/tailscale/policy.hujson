@@ -1,0 +1,119 @@
+// This tailnet's ACLs are maintained in https://github.com/kaywoz/home0ps (iac/tailscale/policy.hujson)
+//teststring
+{
+	"groups": {
+		"group:privusers": ["${TS_PRIVUSER}"],
+		"group:guests":    ["${TS_GUEST}"],
+	},
+
+	"tagOwners": {
+		//tags for types of devices and machines etc
+		"tag:hypervisor": ["group:privusers"], //xcp-ng nodes
+
+		"tag:storage":    ["group:privusers"], //all storage nodes
+		"tag:service":    ["group:privusers"], //all services
+		"tag:docker":     ["group:privusers"], //all docker nodes
+		"tag:oob":        ["group:privusers"], //all oob-devices
+		"tag:security":   ["group:privusers"], //all security devices and infra
+		"tag:monitoring": ["group:privusers"], //all monitoring devices and infra
+		"tag:proxy":      ["group:privusers"], //all monitoring devices and infra
+		"tag:guests":     ["group:privusers"], //guest assets
+		"tag:trusted":    ["group:privusers"], //natively trusted assets
+		"tag:ha":         ["group:privusers"], //all home automation
+		"tag:exit-node":  ["group:privusers"], //all exit-nodes
+		"tag:auto":       ["group:privusers"], //deployed via pipeline
+		"tag:ssh":        ["group:privusers"], //tailscale ssh access
+		"tag:test":       ["group:privusers"], //just a test tag
+
+		///////////////////////////////////////////////////////////////////
+		//"tag:app-golink":       ["group:privusers"], //golink container access
+		//"tag:app-docker-socket-proxy":       ["group:privusers"], //docker-socket-proxy container access
+		//"tag:app-dockge":       ["group:privusers"], //dockge container access
+		//"tag:app-beszel-agent":       ["group:privusers"], //dockge container access
+	},
+
+	"hosts": {
+		// "some subnet": "192.168.199.0/24" //sample net not in use
+	},
+
+	//randomizeClientPort": true, //previously used when opnsense was edge gw
+	"ssh": [
+		// privusers and trusted devices can access ssh tags with ka/root accounts
+		{
+			"action":      "check",
+			"src":         ["group:privusers"],
+			"dst":         ["tag:ssh"],
+			"users":       ["ka", "root"],
+			"checkPeriod": "24h",
+		},
+		{
+			"action": "accept",
+			"src":    ["tag:trusted"],
+			"dst":    ["tag:ssh"],
+			"users":  ["ka", "root"],
+		},
+	],
+
+	"nodeAttrs": [
+		{
+			"target": ["autogroup:member", "tag:test"],
+			"attr":   ["funnel"],
+		},
+	],
+
+	//****************************************************
+	//************************GRANTs************************
+	//****************************************************
+
+	"grants": [
+		{
+			"src": ["tag:trusted"],
+			"dst": ["tag:ssh"],
+			"ip":  ["tcp:22"],
+		},
+		{
+			"src": ["tag:trusted"],
+			"dst": ["*"],
+			"ip":  ["tcp:*"],
+		},
+		{
+			"src": ["tag:security", "tag:monitoring"],
+			"dst": ["*"],
+			"ip":  ["icmp:*"],
+		},
+		{
+			"src": ["tag:proxy"],
+			"dst": ["tag:service"],
+			"ip":  ["tcp:*"],
+		},
+		{
+			"src": ["tag:proxy"],
+			"dst": ["tag:service"],
+			"ip":  ["tcp:*"],
+		},
+		{
+			"src": ["tag:trusted"],
+			"dst": ["tag:proxy"],
+			"ip":  ["tcp:*"],
+		},
+		{
+			"src": ["tag:trusted"],
+			"dst": ["tag:storage"],
+			"ip":  ["tcp:*"],
+		},
+		{
+			//ha to synonology dsm portal
+			"src": ["tag:ha"],
+
+			"dst": ["tag:storage"],
+			"ip":  ["tcp:*"],
+		},
+	],
+
+	"tests": [
+		{
+			"src":    "tag:trusted", //test that trusted devices always can access ssh
+			"accept": ["tag:ssh:22"],
+		},
+	],
+}
