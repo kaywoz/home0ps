@@ -106,3 +106,19 @@ mistakes, not a diary.
   committed files are findings; replace with `${LOCAL_UNIX_ACCOUNT}` (or a
   similarly named placeholder for other accounts)
   filled from a GitHub secret.
+
+### 2026-10-03 — tailscale-acl (resource name in PR)
+
+- **Trigger:** misjudgement corrected by kaywoz
+- **What happened:** a Tailscale PR description named a specific device by
+  its hostname. kaywoz ruled that resource and account names must not be
+  mirrored into PRs.
+- **Root cause:** copied the name from the chat request into the PR text
+  instead of describing the resource generically; §4 only covered PII, not
+  infrastructure names.
+- **Fix applied:** PR description edited to generic wording ("the storage
+  resource").
+- **Rule going forward:** CLAUDE.md §4/§5 — PR titles/bodies, commit
+  messages and code comments use generic terms (`targetaccount`, `resource`,
+  `storage`, `hypervisor`, ...), never real hostnames, device or account
+  names.

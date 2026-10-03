@@ -84,6 +84,10 @@ merge pipelines or hand one job another area's credentials.
   name) or a similarly named placeholder + secret. The maintainer is
   `kaywoz` everywhere. If you're about to push and notice PII — stop, redact,
   then proceed. Unsure? Treat it as PII and ask.
+- **No resource or account names in PRs** — PR titles/bodies, commit
+  messages and code comments describe infra generically (`targetaccount`,
+  `resource`, `storage`, `hypervisor`, ...). Never mirror real hostnames,
+  device names or account names from chat or config into them.
 - **No real credentials anywhere** — not in files, plans, chat, or logs. Code
   references `var.*` / `${{ secrets.* }}` only. kaywoz puts secret values into
   GitHub secrets himself; never ask for them to be pasted into chat.
