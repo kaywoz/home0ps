@@ -95,14 +95,14 @@
 			"ip":  ["tcp:8080"],
 		},
 
-		// !!! BREAK-GLASS ONLY -- TEST RULE, DISABLED !!!
-		// Full TCP from trusted devices/privusers to everything. Uncomment only in a
-		// break-the-glass scenario, via PR, and re-comment once resolved.
-		//{
-		//	"src": ["tag:trusted", "group:privusers"],
-		//	"dst": ["*"],
-		//	"ip":  ["tcp:*"],
-		//},
+		// !!! BREAK-GLASS -- TEST RULE, CURRENTLY ENABLED (2026-10-03) !!!
+		// Full TCP from trusted devices/privusers to everything, enabled for testing.
+		// Re-comment this block via PR as soon as testing is done.
+		{
+			"src": ["tag:trusted", "group:privusers"],
+			"dst": ["*"],
+			"ip":  ["tcp:*"],
+		},
 
 		{
 			"src": ["tag:security", "tag:monitoring"],
