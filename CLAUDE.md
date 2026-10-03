@@ -3,7 +3,7 @@
 This file tells Claude (Claude Code, or a claude.ai Project session) how to work
 on this repo consistently, safely, and without repeating past mistakes.
 
-**Before doing anything else in this repo, read `mistakes.md` in full.**
+**Before doing anything else in this repo, read `MISTAKES.md` in full.**
 It contains lessons from past work that was wrong, misread, or had to be
 corrected. Do not repeat an entry from that log.
 
@@ -109,6 +109,8 @@ merge pipelines or hand one job another area's credentials.
   `chore/<slug>`.
 - **Never push to `main` directly. Never merge your own PR.**
 - One area per PR (don't mix Tailscale + Cloudflare + compose changes).
+- After every commit, check `git show --stat HEAD` matches what the PR
+  description claims, and `git status` is clean before switching branches.
 - PR description states: what changed, source of truth used, secrets/env
   needed, assumptions made, anything flagged under §3/§4, and rollback.
 - Before starting anything that adds or edits `.github/workflows/*`, check
@@ -127,6 +129,6 @@ merge pipelines or hand one job another area's credentials.
 
 If a plan turns out to be based on a wrong assumption, a PR is rejected, CI
 fails, something breaks after merge, or kaywoz has to correct a
-misunderstanding — **log it in `mistakes.md`** using the format at the top of
+misunderstanding — **log it in `MISTAKES.md`** using the format at the top of
 that file, before doing anything else. This is part of finishing the task, not
 optional cleanup. Tell kaywoz in the reply that an entry was added.
