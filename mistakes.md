@@ -74,3 +74,19 @@ mistakes, not a diary.
 - **Rule going forward:** CLAUDE.md §4 — read config files in full when
   planning; redact only what gets echoed back. Never claim "same/unchanged
   value" for something not actually viewed.
+
+### 2026-10-03 — cloudflare (provider version drift)
+
+- **Trigger:** wrong assumption — plan showed 40 unexpected in-place changes
+- **What happened:** a PR meant to destroy 3 records planned
+  `0 to add, 40 to change, 3 to destroy`. Every remaining record gained
+  `include_shadow_metadata = false`, because the runner installed Cloudflare
+  provider v5.27.0 while state was written by v5.25.0.
+- **Root cause:** the original Cloudflare plan pinned `~> 5.0` and committed
+  no `.terraform.lock.hcl`, so each run silently took the newest 5.x.
+- **Fix applied:** exact pin `5.25.0` plus a committed lock file
+  (linux_amd64 + darwin_arm64 hashes) in the same PR; the upgrade to 5.27.0
+  becomes its own PR where the 40 cosmetic changes are expected.
+- **Rule going forward:** CLAUDE.md §3 — every root module pins providers
+  exactly and commits `.terraform.lock.hcl`; provider upgrades are separate
+  PRs whose plan is reviewed for schema-only changes.

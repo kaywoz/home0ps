@@ -36,7 +36,10 @@ jobs:
         run: tofu fmt -check
 
       - name: Initialize backend
-        run: tofu init
+        env:
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+        run: tofu init -backend-config="endpoint=$S3_ENDPOINT" -backend-config="bucket=$S3_BUCKET"
 
       - name: Validate configuration
         run: tofu validate
@@ -62,7 +65,10 @@ jobs:
       - uses: opentofu/setup-opentofu@v1
 
       - name: Initialize backend
-        run: tofu init
+        env:
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+        run: tofu init -backend-config="endpoint=$S3_ENDPOINT" -backend-config="bucket=$S3_BUCKET"
 
       - name: Apply changes
         run: tofu apply -auto-approve -no-color
