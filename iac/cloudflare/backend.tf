@@ -1,23 +1,22 @@
 ##############################################################################
 # State backend for the Cloudflare DNS config (iac/cloudflare/).
 #
-# Reuses the same Hetzner Object Storage endpoint/bucket that home0ps/iac/
-# already uses (see ../backend.tf), but a distinct key so this state is
-# isolated from the Hetzner compute + NetBird state — a DNS-only apply here
-# never touches, and is never touched by, that state file.
+# Partial configuration: endpoint and bucket are NOT in this file. They are
+# supplied at init time from the S3_ENDPOINT / S3_BUCKET repo secrets (same
+# bucket as iac/hetzner/, distinct key so the two states stay isolated):
 #
-# Credentials: same HETZNER_ACCESS_KEY_ID / HETZNER_SECRET_ACCESS_KEY repo
-# secrets already used by deploy-iac.yml, mapped to AWS_ACCESS_KEY_ID /
-# AWS_SECRET_ACCESS_KEY env vars (the S3 backend's expected names) in
+#   tofu init -backend-config="endpoint=$S3_ENDPOINT" \
+#             -backend-config="bucket=$S3_BUCKET"
+#
+# Credentials: HETZNER_ACCESS_KEY_ID / HETZNER_SECRET_ACCESS_KEY repo
+# secrets, mapped to AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY in
 # deploy-cloudflare-dns.yml.
 ##############################################################################
 
 terraform {
   backend "s3" {
-    endpoint = "https://hel1.your-objectstorage.com"
-    bucket   = "krypinet-iac"
-    key      = "cloudflare-dns/terraform.tfstate"
-    region   = "us-east-1"
+    key    = "cloudflare-dns/terraform.tfstate"
+    region = "us-east-1"
 
     skip_credentials_validation = true
     skip_region_validation      = true

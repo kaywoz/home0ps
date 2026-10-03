@@ -128,33 +128,6 @@ resource "cloudflare_dns_record" "cname_mta_sts" {
   proxied = false
 }
 
-resource "cloudflare_dns_record" "cname_netbird_sh_internal" {
-  zone_id = data.cloudflare_zone.krypi_net.id
-  name    = "*.sh-internal"
-  type    = "CNAME"
-  content = "eu1.netbird.services"
-  ttl     = 60
-  proxied = false # wildcard — Cloudflare won't proxy this below Enterprise, and NetBird needs the real target anyway
-}
-
-resource "cloudflare_dns_record" "cname_netbird_hl_internal" {
-  zone_id = data.cloudflare_zone.krypi_net.id
-  name    = "*.hl-internal"
-  type    = "CNAME"
-  content = "eu1.netbird.services"
-  ttl     = 60
-  proxied = false
-}
-
-resource "cloudflare_dns_record" "cname_netbird_pub" {
-  zone_id = data.cloudflare_zone.krypi_net.id
-  name    = "*.pub"
-  type    = "CNAME"
-  content = "eu1.netbird.services"
-  ttl     = 60
-  proxied = false
-}
-
 #############################################
 # MX record
 #############################################
