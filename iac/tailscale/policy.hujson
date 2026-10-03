@@ -41,14 +41,14 @@
 			"action":      "check",
 			"src":         ["group:privusers"],
 			"dst":         ["tag:ssh"],
-			"users":       ["${TS_SSH_USER}", "root"],
+			"users":       ["${LOCAL_UNIX_ACCOUNT}", "root"],
 			"checkPeriod": "24h",
 		},
 		{
 			"action": "accept",
 			"src":    ["tag:trusted"],
 			"dst":    ["tag:ssh"],
-			"users":  ["${TS_SSH_USER}", "root"],
+			"users":  ["${LOCAL_UNIX_ACCOUNT}", "root"],
 		},
 	],
 
