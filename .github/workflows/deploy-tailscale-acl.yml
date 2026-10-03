@@ -1,0 +1,83 @@
+name: deploy tailscale acl
+
+on:
+  pull_request:
+    paths: ["iac/tailscale/**", ".github/workflows/deploy-tailscale-acl.yml"]
+  push:
+    branches: [main]
+    paths: ["iac/tailscale/**", ".github/workflows/deploy-tailscale-acl.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tailscale-acl
+  cancel-in-progress: false # never cancel an in-flight apply
+
+jobs:
+  acl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fill identity placeholders from secrets. The rendered file lives only in
+      # RUNNER_TEMP on this ephemeral runner -- never cat it or upload it.
+      - name: Render policy
+        env:
+          TS_PRIVUSER: ${{ secrets.TS_PRIVUSER }}
+          TS_GUEST: ${{ secrets.TS_GUEST }}
+        run: |
+          set -euo pipefail
+          : "${TS_PRIVUSER:?TS_PRIVUSER secret is empty}"
+          : "${TS_GUEST:?TS_GUEST secret is empty}"
+          command -v envsubst >/dev/null || sudo apt-get install -y -qq gettext-base
+          envsubst '$TS_PRIVUSER $TS_GUEST' < iac/tailscale/policy.hujson > "$RUNNER_TEMP/policy.hujson"
+          if grep -qF '${TS_' "$RUNNER_TEMP/policy.hujson"; then
+            echo "::error::unrendered \${TS_...} placeholder left in policy"
+            exit 1
+          fi
+
+      - name: Test ACL
+        if: github.event_name == 'pull_request'
+        uses: tailscale/gitops-acl-action@v1
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tailnet: ${{ secrets.TS_TAILNET }}
+          policy-file: ${{ runner.temp }}/policy.hujson
+          action: test
+
+      - name: Deploy ACL
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: tailscale/gitops-acl-action@v1
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tailnet: ${{ secrets.TS_TAILNET }}
+          policy-file: ${{ runner.temp }}/policy.hujson
+          action: apply
+
+      # PLACEHOLDER: off until a new webhook exists. To enable: put the new URL in
+      # the SLACK_WEBHOOK_URL secret, then add repo variable SLACK_NOTIFY=true.
+      - name: Send Slack notification
+        if: always() && vars.SLACK_NOTIFY == 'true'
+        continue-on-error: true # a broken webhook must never fail the deploy
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "${{ github.actor }} pulled the trigger on \"${{ github.workflow }}\". Fortunately it was a ${{ job.status }}.\n Check the commit for \"${{ github.repository }}\" below.\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ github.actor }} pulled the trigger on \"${{ github.workflow }}\". Fortunately it was a ${{ job.status }}.\n Check the commit for \"${{ github.repository }}\" below.\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
