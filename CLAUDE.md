@@ -78,7 +78,10 @@ merge pipelines or hand one job another area's credentials.
 - **No PII in the repo** — real names, personal emails, login identities,
   phone numbers, addresses. This includes commit messages, PR titles/bodies,
   code comments and filenames. Login identities in policies become
-  placeholders filled from GitHub secrets at runtime. The maintainer is
+  placeholders filled from GitHub secrets at runtime. Local OS/unix account
+  names (e.g. SSH `users`) count too: any found in a committed file is a
+  finding -- replace with `${LOCAL_UNIX_ACCOUNT}` (GitHub secret of the same
+  name) or a similarly named placeholder + secret. The maintainer is
   `kaywoz` everywhere. If you're about to push and notice PII — stop, redact,
   then proceed. Unsure? Treat it as PII and ask.
 - **No real credentials anywhere** — not in files, plans, chat, or logs. Code

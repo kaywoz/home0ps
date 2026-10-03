@@ -90,3 +90,19 @@ mistakes, not a diary.
 - **Rule going forward:** CLAUDE.md §3 — every root module pins providers
   exactly and commits `.terraform.lock.hcl`; provider upgrades are separate
   PRs whose plan is reviewed for schema-only changes.
+
+### 2026-10-03 — tailscale-acl (local account name)
+
+- **Trigger:** misjudgement corrected by kaywoz
+- **What happened:** the policy review called the local unix account in the
+  Tailscale `ssh` rules "acceptable" because it isn't a login identity.
+  kaywoz ruled that such account names are to be treated as PII and moved to
+  GitHub secrets.
+- **Root cause:** applied §4 PII rule narrowly (login identities only)
+  instead of following "Unsure? Treat it as PII".
+- **Fix applied:** account replaced with `${LOCAL_UNIX_ACCOUNT}`, filled from the
+  `LOCAL_UNIX_ACCOUNT` secret by `deploy-tailscale-acl.yml` (kaywoz/home0ps#52).
+- **Rule going forward:** CLAUDE.md §4 — local OS/unix account names in
+  committed files are findings; replace with `${LOCAL_UNIX_ACCOUNT}` (or a
+  similarly named placeholder for other accounts)
+  filled from a GitHub secret.
