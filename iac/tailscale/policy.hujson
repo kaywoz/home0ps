@@ -88,6 +88,12 @@
 			"dst": ["*"],
 			"ip":  ["tcp:80", "tcp:443"],
 		},
+		{
+			// TEST RULE: app on 8080 -- devices tagged tag:test only, remove once the app is sorted
+			"src": ["tag:trusted", "group:privusers"],
+			"dst": ["tag:test"],
+			"ip":  ["tcp:8080"],
+		},
 
 		// !!! BREAK-GLASS ONLY -- TEST RULE, DISABLED !!!
 		// Full TCP from trusted devices/privusers to everything. Uncomment only in a
