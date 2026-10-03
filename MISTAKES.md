@@ -1,4 +1,4 @@
-# mistakes.md
+# MISTAKES.md
 
 A running log of mistakes made while planning/building/PR'ing changes to this
 repo — wrong assumptions, misread requirements, failed CI, broken applies,
@@ -122,3 +122,19 @@ mistakes, not a diary.
   messages and code comments use generic terms (`targetaccount`, `resource`,
   `storage`, `hypervisor`, ...), never real hostnames, device or account
   names.
+
+### 2026-10-03 — docs (MISTAKES.md rename incomplete)
+
+- **Trigger:** something wrong after merge
+- **What happened:** the rename commit in kaywoz/home0ps#56 only contained
+  the file rename. The `CLAUDE.md` reference updates and the file heading
+  stayed uncommitted in the working tree, while the PR description said
+  they were included. `main` pointed at a file name that no longer existed.
+- **Root cause:** committed with `git commit -m` (no `-a`, no explicit
+  paths) after editing tracked files, and didn't check `git show --stat`
+  before pushing; macOS's case-insensitive filesystem then carried the
+  leftover edits into the next branch.
+- **Fix applied:** references and heading committed in a follow-up PR.
+- **Rule going forward:** CLAUDE.md §5 — after every commit, check
+  `git show --stat HEAD` against the PR description, and `git status` must
+  be clean before switching branches.
