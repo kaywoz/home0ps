@@ -1,5 +1,6 @@
 // This tailnet's ACLs are maintained in https://github.com/kaywoz/home0ps (iac/tailscale/policy.hujson)
 //teststring
+// pipeline check 2026-10-03: comment-only change to exercise test (PR) and apply (merge)
 {
 	"groups": {
 		"group:privusers": ["${TS_PRIVUSER}"],
