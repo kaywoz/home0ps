@@ -13,9 +13,9 @@ crash.*.log
 # Local working directory
 .terraform/
 
-# Lock file (optional — keep if you want reproducible provider versions)
-# If you prefer not to commit it, uncomment the line below:
-# .terraform.lock.hcl
+# Lock files ARE committed under iac/ (exact provider versions + hashes).
+# Overrides the repo-root .gitignore, which ignores them everywhere else.
+!.terraform.lock.hcl
 
 #############################################
 # Sensitive variable files

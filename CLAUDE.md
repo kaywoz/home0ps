@@ -63,6 +63,12 @@ merge pipelines or hand one job another area's credentials.
   verbatim as opaque strings; never decode, "clean up", reformat or comment on
   them in code.
 
+- **Providers are pinned exactly** (`version = "x.y.z"`) and every root
+  module commits its `.terraform.lock.hcl`. A provider upgrade is its own PR;
+  never mix it with a content change, or schema noise hides the real diff.
+- **Read the plan's summary line, not the job colour.** Green means it ran;
+  the expected `N to add, N to change, N to destroy` is stated in the PR.
+
 ## 4. Security practices (non-negotiable)
 
 - **State keys are paths, never credentials.** Backend `key` values look like
