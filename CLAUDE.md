@@ -119,7 +119,8 @@ merge pipelines or hand one job another area's credentials.
 - After every commit, check `git show --stat HEAD` matches what the PR
   description claims, and `git status` is clean before switching branches.
 - PR description states: what changed, source of truth used, secrets/env
-  needed, assumptions made, anything flagged under §3/§4, and rollback.
+  needed, assumptions made, anything flagged under §3/§4, project board
+  match (§6, checked last), and rollback.
 - Before starting anything that adds or edits `.github/workflows/*`, check
   that the automation token actually has the `workflow` scope, and flag a
   conflict **before** attempting the push (lesson carried over from
@@ -144,11 +145,15 @@ kaywoz tracks work on the user-owned GitHub Project
 `https://github.com/users/kaywoz/projects/4` (items are mostly issues in
 this repo). Status options: `backlog`, `selected`, `done`, `wont do`.
 
-- **At the start of every task**, list the open items (`backlog`,
-  `selected`, no status) with `gh project item-list 4 --owner kaywoz` and
-  say whether one matches the task. Link it only after kaywoz confirms the
-  match.
-- **While working** on a matched item, set it to `selected`.
+- **The board check is the last step of every PR in this repo**, after the
+  work is committed, pushed and the PR description written. List the open
+  items (`backlog`, `selected`, no status) with
+  `gh project item-list 4 --owner kaywoz` and compare them with what the PR
+  actually does. Say whether one matches. Link it only after kaywoz
+  confirms the match: then add `Closes kaywoz/home0ps#N` to the PR body and
+  set the item to `selected`.
+- Every PR description ends (before rollback) with a **"Project board"**
+  section: the matched item number, or "No matching item".
 - **Closing**: the PR body carries `Closes kaywoz/home0ps#N`, so the issue
   closes when kaywoz merges, and the board's built-in "Item closed" workflow
   sets it to `done`. Don't set `done` by hand for issues. Never close an
