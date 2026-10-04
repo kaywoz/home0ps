@@ -95,14 +95,14 @@
 			"ip":  ["tcp:8080"],
 		},
 
-		// !!! BREAK-GLASS -- TEST RULE, CURRENTLY ENABLED (2026-10-03) !!!
-		// Full TCP from trusted devices/privusers to everything, enabled for testing.
-		// Re-comment this block via PR as soon as testing is done.
-		{
-			"src": ["tag:trusted", "group:privusers"],
-			"dst": ["*"],
-			"ip":  ["tcp:*"],
-		},
+		// !!! BREAK-GLASS ONLY -- TEST RULE, DISABLED !!!
+		// Full TCP from trusted devices/privusers to everything. Uncomment only in a
+		// break-the-glass scenario, via PR, and re-comment once resolved.
+		//{
+		//	"src": ["tag:trusted", "group:privusers"],
+		//	"dst": ["*"],
+		//	"ip":  ["tcp:*"],
+		//},
 
 		{
 			"src": ["tag:security", "tag:monitoring"],
@@ -137,6 +137,26 @@
 		{
 			"src":    "tag:trusted", //test that trusted devices always can access ssh
 			"accept": ["tag:ssh:22"],
+		},
+		{
+			// trusted devices reach the reverse proxies on their ports (http, https, npm admin)
+			"src":    "tag:trusted",
+			"accept": ["tag:proxy:80", "tag:proxy:443", "tag:proxy:81"],
+		},
+		{
+			// privusers reach the reverse proxies on their ports (http, https, npm admin)
+			"src":    "${TS_PRIVUSER}",
+			"accept": ["tag:proxy:80", "tag:proxy:443", "tag:proxy:81"],
+		},
+		{
+			// break-glass must stay off: no catch-all tcp from trusted devices/privusers
+			"src":  "tag:trusted",
+			"deny": ["tag:hypervisor:8080", "tag:docker:3389"],
+		},
+		{
+			// break-glass must stay off: no catch-all tcp from trusted devices/privusers
+			"src":  "${TS_PRIVUSER}",
+			"deny": ["tag:hypervisor:8080", "tag:docker:3389"],
 		},
 	],
 }
