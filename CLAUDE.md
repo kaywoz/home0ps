@@ -92,7 +92,8 @@ merge pipelines or hand one job another area's credentials.
   device names or account names from chat or config into them.
   **Scope exception:** device/host names *may* appear in DNS record data
   and its docs (e.g. `iac/cloudflare/proxies.yaml`, a record's `comment`,
-  `iac/cloudflare/README.md`), because those records describe the services.
+  `iac/cloudflare/README.md`, and archived planning docs for those records
+  under `archive/`), because those records describe the services.
   Everywhere else — branch names, commits, PRs, other areas' code/comments —
   they stay out.
 - **No real credentials anywhere** — not in files, plans, chat, or logs. Code
