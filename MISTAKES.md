@@ -169,3 +169,20 @@ mistakes, not a diary.
 - **Rule going forward:** CLAUDE.md §2 — re-read a user-provided file
   immediately before editing it, and prefer targeted edits over full
   rewrites of drafts kaywoz may still be changing.
+
+### 2026-10-04 — ci (setup steps assumed gh token permissions)
+
+- **Trigger:** wrong assumption — setup command failed for kaywoz
+- **What happened:** the setup steps for the weekly README workflow told
+  kaywoz to run `gh secret set`. It failed with HTTP 403: the local `gh`
+  login is a fine-grained PAT without the Secrets (or Actions settings)
+  permission.
+- **Root cause:** gave a `gh` command that needs a specific token permission
+  without probing for it first; the earlier note "scopes couldn't be read"
+  was not followed through.
+- **Fix applied:** probed `actions/secrets/public-key` and
+  `actions/permissions/workflow` (both 403); gave the web UI path instead and
+  kept the PAT least-privilege.
+- **Rule going forward:** CLAUDE.md §5 — before handing kaywoz a `gh`/API
+  command, probe the endpoint read-only with the current token; if it 403s,
+  give the web UI path, don't suggest widening the token.
