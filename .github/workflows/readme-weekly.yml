@@ -47,6 +47,17 @@ jobs:
             echo "## Files changed since $since"
             git log --since="$since" --no-merges --name-only --format='' origin/main | sort -u
           } > "$RUNNER_TEMP/week.md"
+          # Open project board items, for the PR's "Project board" section
+          # (CLAUDE.md §6). The board is public; if it can't be read with
+          # this token, say so instead of failing the run.
+          gh api graphql -f query='query{user(login:"kaywoz"){projectV2(number:4){items(first:100){nodes{
+              content{... on Issue{number title} ... on DraftIssue{title}}
+              fieldValueByName(name:"Status"){... on ProjectV2ItemFieldSingleSelectValue{name}}}}}}}' \
+            --jq '.data.user.projectV2.items.nodes[]
+              | select(.fieldValueByName.name // "" | IN("", "backlog", "selected"))
+              | "#\(.content.number // "draft") [\(.fieldValueByName.name // "no status")] \(.content.title)"' \
+            > "$RUNNER_TEMP/board.md" 2>/dev/null \
+            || echo "BOARD UNAVAILABLE" > "$RUNNER_TEMP/board.md"
           if [ -z "$(git log --since="$since" --format=%h origin/main)" ]; then
             echo "changes=false" >> "$GITHUB_OUTPUT"
             echo "No changes on main since $since -- nothing to do." >> "$GITHUB_STEP_SUMMARY"
@@ -87,6 +98,15 @@ jobs:
                - "## Source of truth" -- the files you checked.
                - "## Flagged (not fixed)" -- anything out of date or
                  inconsistent outside README.md that you noticed.
+               - "## Project board" -- do this section last, after
+                 everything else is written. Compare the open items in
+                 ${{ runner.temp }}/board.md with what this PR actually
+                 changes. List possible matches as "Possible match:
+                 kaywoz/home0ps#N" for kaywoz to confirm, or write "No
+                 matching item". If the file says BOARD UNAVAILABLE, write
+                 "Board not checked (unavailable)". Never write "Closes",
+                 "Fixes" or "Resolves", and never copy item titles: number
+                 only.
                - "## Rollback" -- "Revert this PR."
                End the file with a blank line and then:
                🤖 Generated with [Claude Code](https://claude.com/claude-code)
