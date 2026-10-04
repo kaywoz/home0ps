@@ -25,12 +25,14 @@ Personal home-lab and home-ops repo: Docker Compose service stacks, infrastructu
 | Path              | What's in it                                                                                           |
 |-------------------|---------------------------------------------------------------------------------------------------------|
 | `docker-compose/` | One subfolder per service stack, each with its own `compose.yaml`                                       |
-| `iac/`            | OpenTofu, one folder per area: `iac/hetzner/`, `iac/cloudflare/`, `iac/tailscale/`                     |
+| `iac/`            | Infrastructure as code, one folder per area: `iac/hetzner/`, `iac/cloudflare/`, `iac/tailscale/` (see below) |
+| `.github/workflows/` | One path-scoped deploy pipeline per `iac/` area                                                     |
 | `config-files/`   | Bootstrap/setup scripts and dotfiles for `linux`, `rpi`, and `win` hosts                                 |
 | `files/scripts/`  | Standalone install/maintenance scripts (Docker install, rclone backup, Time Machine snapshot purge, Windows bootstrap) |
 | `files/pix/`, `images/` | Logo and image assets used in this README and in diagrams                                         |
 | `d2/`             | [d2](https://d2lang.com/)-format architecture, threat-modeling, and SOC-process diagrams                |
-| `archive/`        | Retired docs and diagrams, kept for reference and not actively maintained                                |
+| `archive/`        | Retired docs, diagrams and config (e.g. NetBird), kept for reference and not actively maintained          |
+| `CLAUDE.md`, `MISTAKES.md` | Working rules for AI-assisted changes, and the log of past mistakes those rules come from        |
 
 ## Services (docker-compose stacks)
 
@@ -62,8 +64,6 @@ Personal home-lab and home-ops repo: Docker Compose service stacks, infrastructu
 | `whoami`             | `denga/whoami:latest`                                                                        | Minimal HTTP echo service, useful for testing routing |
 | `xos`                | `ronivay/xen-orchestra:latest`                                                               | Xen Orchestra -- management UI for an XCP-ng hypervisor |
 
-A root-level `compose.yaml` also runs its own `dozzle` instance (fronted with Cloudflare Access auth headers), separate from `docker-compose/dozzle/`. Worth reconciling which one is actually the live deployment.
-
 ## Network & hardware topology
 
 ![Homelab network and hardware topology](d2/homelab-topology.svg)
@@ -72,14 +72,44 @@ Two XCP-ng hypervisors (Hypervisor1: 24t/128GB/6TB nvme/2TB ssd, Hypervisor2: 24
 
 ## Infrastructure as code (`iac/`)
 
-- **`iac/cloudflare/`** -- manages Cloudflare DNS records for `krypi.net`, `m41w423mu572un.xyz`, and `obviousphish.com` via OpenTofu (zones are created manually in the dashboard; Terraform only looks them up and manages records). Applied by `.github/workflows/deploy-cloudflare-dns.yml` -- plan on PR, apply on push to `main`. Also holds the internal reverse-proxy wildcards (`*.<id>.int.krypi.net`) -- see `iac/cloudflare/README.md`.
-- **`iac/hetzner/`** -- Hetzner Cloud provider config; `server_vm.tf` currently has its server resource commented out. Applied by `.github/workflows/deploy-hetzner.yml` -- plan on PR, apply on push to `main`. NetBird config was retired to `archive/netbird/`.
+One folder per area, one workflow per folder. A change under `iac/<area>/` triggers only that area's workflow, and each workflow gets only the secrets it needs.
+
+| Area | What it manages | Workflow | PR | Merge to `main` |
+|------|-----------------|----------|----|-----------------|
+| [`iac/cloudflare/`](iac/cloudflare/README.md) | DNS records (OpenTofu) | `deploy-cloudflare-dns.yml` | fmt, validate, plan | apply, **after a manual approver** (`environment: production`) |
+| `iac/hetzner/` | Hetzner Cloud (OpenTofu) | `deploy-hetzner.yml` | fmt, validate, plan | apply, no approver |
+| `iac/tailscale/` | Tailscale ACL policy (`policy.hujson`) | `deploy-tailscale-acl.yml` | ACL test | apply, **no approver -- merging is deploying** |
+
+- **`iac/cloudflare/`** -- DNS records for `krypi.net`, `m41w423mu572un.xyz`, and `obviousphish.com`. Zones are created manually in the dashboard; OpenTofu only looks them up and manages records. Also holds the internal reverse-proxy wildcards (`*.<id>.int.krypi.net` -> Tailscale IP, DNS-only), driven by `proxies.yaml` -- see [`iac/cloudflare/README.md`](iac/cloudflare/README.md).
+- **`iac/hetzner/`** -- Hetzner Cloud provider config; `server_vm.tf` currently has its server resource commented out.
+- **`iac/tailscale/`** -- the tailnet ACL policy, applied with [`tailscale/gitops-acl-action`](https://github.com/tailscale/gitops-acl-action). Login identities and local account names are `${...}` placeholders in the committed file, filled from GitHub secrets at runtime; the rendered file exists only on the ephemeral runner. The PR test job is the only gate; the policy's `tests` block checks that trusted devices and privusers reach `tag:proxy` on 80/443/81 and are denied unrelated ports elsewhere. The latter fails if the break-glass catch-all grant is left enabled.
+- **Retired:** NetBird -- config in `archive/netbird/`.
+
+### State and providers
+
+- OpenTofu state lives in S3-compatible object storage, one state key per area (e.g. `hetzner/terraform.tfstate`). Backends use partial configuration: only `key` is in `backend.tf`; endpoint and bucket come from secrets at `tofu init`.
+- Providers are pinned to an exact version and each root module commits its `.terraform.lock.hcl`; provider upgrades go in their own PR. (`iac/hetzner/` still uses `~> 1.60` without a lock file -- to be aligned.)
+
+### Secrets
+
+No credentials, bucket names or personal identities are committed. Code only references `var.*` / `${{ secrets.* }}`; values live in GitHub repository secrets. Tokens are least-privilege (Cloudflare: DNS on the named zones; Tailscale: OAuth client scoped to the policy file).
+
+| Workflow | Secrets |
+|----------|---------|
+| `deploy-cloudflare-dns.yml` | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, state: `S3_ENDPOINT`, `S3_BUCKET`, `HETZNER_ACCESS_KEY_ID`, `HETZNER_SECRET_ACCESS_KEY` |
+| `deploy-hetzner.yml` | `HCLOUD_TOKEN`, state: `S3_ENDPOINT`, `S3_BUCKET`, `HETZNER_ACCESS_KEY_ID`, `HETZNER_SECRET_ACCESS_KEY` |
+| `deploy-tailscale-acl.yml` | `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `TS_TAILNET`, placeholders: `TS_PRIVUSER`, `TS_GUEST`, `LOCAL_UNIX_ACCOUNT`; optional `SLACK_WEBHOOK_URL` (only used when repo variable `SLACK_NOTIFY=true`) |
+
+## Contributing / changing things
+
+- One branch and one PR per change and per area (`feat/<area>-<slug>`, `fix/<area>-<slug>`, `chore/<slug>`). Nothing is pushed straight to `main`.
+- Read the plan's summary line (`N to add, N to change, N to destroy`), not the job colour; the PR states what's expected.
+- AI-assisted work follows [`CLAUDE.md`](CLAUDE.md); lessons from past mistakes are logged in [`MISTAKES.md`](MISTAKES.md).
 
 ## Not yet documented
 
 - Detailed IP addressing / VLAN assignment (the topology diagram above shows link speeds and physical layout, not the addressing scheme)
 - Backup and disaster-recovery plan
-- Secrets management approach
 
 ## Acknowledgments
 
