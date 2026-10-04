@@ -26,7 +26,7 @@ Personal home-lab and home-ops repo: Docker Compose service stacks, infrastructu
 |-------------------|---------------------------------------------------------------------------------------------------------|
 | `docker-compose/` | One subfolder per service stack, each with its own `compose.yaml`                                       |
 | `iac/`            | Infrastructure as code, one folder per area: `iac/hetzner/`, `iac/cloudflare/`, `iac/tailscale/` (see below) |
-| `.github/workflows/` | One path-scoped deploy pipeline per `iac/` area                                                     |
+| `.github/workflows/` | One path-scoped deploy pipeline per `iac/` area, plus `readme-weekly.yml` (weekly README refresh)     |
 | `config-files/`   | Bootstrap/setup scripts and dotfiles for `linux`, `rpi`, and `win` hosts                                 |
 | `files/scripts/`  | Standalone install/maintenance scripts (Docker install, rclone backup, Time Machine snapshot purge, Windows bootstrap) |
 | `files/pix/`, `images/` | Logo and image assets used in this README and in diagrams                                         |
@@ -84,6 +84,7 @@ One folder per area, one workflow per folder. A change under `iac/<area>/` trigg
 - **`iac/hetzner/`** -- Hetzner Cloud provider config; `server_vm.tf` currently has its server resource commented out.
 - **`iac/tailscale/`** -- the tailnet ACL policy, applied with [`tailscale/gitops-acl-action`](https://github.com/tailscale/gitops-acl-action). Login identities and local account names are `${...}` placeholders in the committed file, filled from GitHub secrets at runtime; the rendered file exists only on the ephemeral runner. The PR test job is the only gate; the policy's `tests` block checks that trusted devices and privusers reach `tag:proxy` on 80/443/81 and are denied unrelated ports elsewhere. The latter fails if the break-glass catch-all grant is left enabled.
 - **Retired:** NetBird -- config in `archive/netbird/`.
+- **README refresh:** `readme-weekly.yml` runs Mondays (and on manual dispatch). If anything landed on `main` in the last 7 days, Claude checks this README against the repo and opens a draft PR with a summary of the week; the run fails if anything other than `README.md` was touched.
 
 ### State and providers
 
@@ -99,6 +100,7 @@ No credentials, bucket names or personal identities are committed. Code only ref
 | `deploy-cloudflare-dns.yml` | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, state: `S3_ENDPOINT`, `S3_BUCKET`, `HETZNER_ACCESS_KEY_ID`, `HETZNER_SECRET_ACCESS_KEY` |
 | `deploy-hetzner.yml` | `HCLOUD_TOKEN`, state: `S3_ENDPOINT`, `S3_BUCKET`, `HETZNER_ACCESS_KEY_ID`, `HETZNER_SECRET_ACCESS_KEY` |
 | `deploy-tailscale-acl.yml` | `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `TS_TAILNET`, placeholders: `TS_PRIVUSER`, `TS_GUEST`, `LOCAL_UNIX_ACCOUNT`; optional `SLACK_WEBHOOK_URL` (only used when repo variable `SLACK_NOTIFY=true`) |
+| `readme-weekly.yml` | `CLAUDE_CODE_OAUTH_TOKEN` (plus the built-in `github.token`) |
 
 ## Contributing / changing things
 
