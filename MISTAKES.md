@@ -186,3 +186,22 @@ mistakes, not a diary.
 - **Rule going forward:** CLAUDE.md §5 — before handing kaywoz a `gh`/API
   command, probe the endpoint read-only with the current token; if it 403s,
   give the web UI path, don't suggest widening the token.
+
+### 2026-10-04 — docs (project board token scopes)
+
+- **Trigger:** wrong assumption, plus a misjudgement corrected by kaywoz
+- **What happened:** told kaywoz a classic token with only `project` would
+  let Claude write to the board. `gh project` refused it client-side,
+  wanting `read:org` + `read:discussion` too, so kaywoz had to edit the
+  token a second time. Earlier, I had also hedged about widening the token
+  at all, citing the previous entry. kaywoz ruled that a task that needs
+  more access is a reason to widen it.
+- **Root cause:** read the API's scope requirements, not the CLI's own scope
+  check; treated "don't suggest widening" as absolute. The §5 rule from the
+  previous entry had also never been added to CLAUDE.md.
+- **Fix applied:** scopes added by kaywoz; writes go through
+  `.claude/gh-project.sh` (Keychain token); the §5 rule added with the
+  corrected wording.
+- **Rule going forward:** CLAUDE.md §5 — probe a command with the real
+  client before relying on it; when access is missing and needed, state the
+  smallest working set and let kaywoz decide.

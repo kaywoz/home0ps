@@ -119,11 +119,18 @@ merge pipelines or hand one job another area's credentials.
 - After every commit, check `git show --stat HEAD` matches what the PR
   description claims, and `git status` is clean before switching branches.
 - PR description states: what changed, source of truth used, secrets/env
-  needed, assumptions made, anything flagged under §3/§4, and rollback.
+  needed, assumptions made, anything flagged under §3/§4, project board
+  match (§6, checked last), and rollback.
 - Before starting anything that adds or edits `.github/workflows/*`, check
   that the automation token actually has the `workflow` scope, and flag a
   conflict **before** attempting the push (lesson carried over from
   mos-templates).
+- Before handing kaywoz a `gh`/API command, or relying on one, probe it with
+  the current token, including the client's own scope checks (`gh project`
+  wants `read:org` + `read:discussion` on top of `project`). If access is
+  missing and the task needs it, tell kaywoz the smallest scope/permission
+  set that works and let him decide. Don't refuse to widen; don't
+  over-widen either.
 
 ## 6. Plans and task lists
 
@@ -131,6 +138,39 @@ merge pipelines or hand one job another area's credentials.
 - Task lists separate **what kaywoz must do** (admin consoles, secrets,
   approvals, revocations) from **what Claude does** (drafting files, PRs).
 - Deferred ideas are parked and listed as such, not slipped into the build.
+
+### Project board
+
+kaywoz tracks work on the user-owned GitHub Project
+`https://github.com/users/kaywoz/projects/4` (items are mostly issues in
+this repo). Status options: `backlog`, `selected`, `done`, `wont do`.
+
+- **The board check is the last step of every PR in this repo**, after the
+  work is committed, pushed and the PR description written. List the open
+  items (`backlog`, `selected`, no status) with
+  `gh project item-list 4 --owner kaywoz` and compare them with what the PR
+  actually does. Say whether one matches. Link it only after kaywoz
+  confirms the match: then add `Closes kaywoz/home0ps#N` to the PR body and
+  set the item to `selected`.
+- Every PR description ends (before rollback) with a **"Project board"**
+  section: the matched item number, or "No matching item".
+- **Closing**: the PR body carries `Closes kaywoz/home0ps#N`, so the issue
+  closes when kaywoz merges, and the board's built-in "Item closed" workflow
+  sets it to `done`. Don't set `done` by hand for issues. Never close an
+  item before its PR is merged. Draft items (no issue) are set to `done` by
+  hand after merge.
+- **No match**: offer to open an issue and add it to the board; don't do it
+  unasked.
+- Status has two options named `done`; use option id `98236657` (the one
+  in use) until the duplicate is removed.
+- The board is public and some item titles name devices. Refer to items by
+  number only in branches, commits and PRs (§4) — never copy titles.
+- **Reads** use the normal `gh` login (`gh project item-list|view|field-list`).
+  **Writes** go through `.claude/gh-project.sh <gh project args>`, which uses
+  a classic token (scopes `project`, `read:org`, `read:discussion`) from the
+  macOS Keychain service `gh-project-token`. Fine-grained tokens can't write
+  to user-owned projects. Never print the token or pass it on the command
+  line.
 
 ## 7. When something goes wrong
 
