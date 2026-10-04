@@ -132,6 +132,31 @@ merge pipelines or hand one job another area's credentials.
   approvals, revocations) from **what Claude does** (drafting files, PRs).
 - Deferred ideas are parked and listed as such, not slipped into the build.
 
+### Project board
+
+kaywoz tracks work on the user-owned GitHub Project
+`https://github.com/users/kaywoz/projects/4` (items are mostly issues in
+this repo). Status options: `backlog`, `selected`, `done`, `wont do`.
+
+- **At the start of every task**, list the open items (`backlog`,
+  `selected`, no status) with `gh project item-list 4 --owner kaywoz` and
+  say whether one matches the task. Link it only after kaywoz confirms the
+  match.
+- **While working** on a matched item, set it to `selected`.
+- **Closing**: the PR body carries `Closes kaywoz/home0ps#N`, so the issue
+  closes when kaywoz merges. Never close an item or set it to `done` before
+  its PR is merged. Draft items (no issue) are set to `done` by hand after
+  merge.
+- **No match**: offer to open an issue and add it to the board; don't do it
+  unasked.
+- Status has two options named `done`; use option id `98236657` (the one
+  in use) until the duplicate is removed.
+- The board is public and some item titles name devices. Refer to items by
+  number only in branches, commits and PRs (§4) — never copy titles.
+- Board writes need a token with project access. If a write is refused,
+  say so and give kaywoz the web UI step instead (see MISTAKES.md
+  2026-10-04 — ci).
+
 ## 7. When something goes wrong
 
 If a plan turns out to be based on a wrong assumption, a PR is rejected, CI
