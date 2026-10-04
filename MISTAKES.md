@@ -138,3 +138,34 @@ mistakes, not a diary.
 - **Rule going forward:** CLAUDE.md §5 — after every commit, check
   `git show --stat HEAD` against the PR description, and `git status` must
   be clean before switching branches.
+
+### 2026-10-04 — cloudflare (device names in DNS data)
+
+- **Trigger:** misjudgement corrected by kaywoz
+- **What happened:** while implementing the internal-proxy wildcard records,
+  device names were stripped from `proxies.yaml`, the record `comment` and
+  the README table. kaywoz ruled that naming the host is fine inside DNS
+  record data/docs, because the records describe those services; the ban
+  applies everywhere outside that scope.
+- **Root cause:** applied the §4 "no resource names" rule to all committed
+  content without checking its scope; the rule only listed PRs, commit
+  messages and code comments, and did not say where names are allowed.
+- **Fix applied:** host names restored in the DNS data files; still kept out
+  of the branch name, commit message and PR text.
+- **Rule going forward:** CLAUDE.md §4 — device/host names are allowed only
+  in DNS record definitions and their docs (`iac/cloudflare/`); nowhere else.
+
+### 2026-10-04 — cloudflare (possible overwrite of an uncommitted edit)
+
+- **Trigger:** misunderstood request / lost work
+- **What happened:** an untracked draft (`proxies.yaml`) was rewritten in full
+  with Write after it had been read via `cat` some minutes earlier. kaywoz
+  reported editing the ID scheme in the meantime; that edit is not in any file
+  on disk.
+- **Root cause:** full-file rewrite of a user-owned draft based on a stale
+  read, with no check that the file hadn't changed in between.
+- **Fix applied:** stopped before commit; kaywoz re-applied the ID scheme,
+  which was then re-read and copied verbatim into the README.
+- **Rule going forward:** CLAUDE.md §2 — re-read a user-provided file
+  immediately before editing it, and prefer targeted edits over full
+  rewrites of drafts kaywoz may still be changing.

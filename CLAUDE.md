@@ -49,6 +49,8 @@ merge pipelines or hand one job another area's credentials.
 - When porting from a retired repo (`terraform-cloudflare`, `tailscale`), port
   from the **current** source of truth, not the stale copy — and say which one
   was used.
+- Re-read a file kaywoz provided **immediately before** editing it, and
+  prefer targeted edits over full rewrites of drafts he may still be changing.
 - If something couldn't be checked (no credentials, rate limit, private repo),
   say so explicitly in the plan instead of filling the gap with a guess.
 
@@ -88,6 +90,11 @@ merge pipelines or hand one job another area's credentials.
   messages and code comments describe infra generically (`targetaccount`,
   `resource`, `storage`, `hypervisor`, ...). Never mirror real hostnames,
   device names or account names from chat or config into them.
+  **Scope exception:** device/host names *may* appear in DNS record data
+  and its docs (e.g. `iac/cloudflare/proxies.yaml`, a record's `comment`,
+  `iac/cloudflare/README.md`), because those records describe the services.
+  Everywhere else — branch names, commits, PRs, other areas' code/comments —
+  they stay out.
 - **No real credentials anywhere** — not in files, plans, chat, or logs. Code
   references `var.*` / `${{ secrets.* }}` only. kaywoz puts secret values into
   GitHub secrets himself; never ask for them to be pasted into chat.
