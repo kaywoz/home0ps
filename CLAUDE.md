@@ -124,6 +124,12 @@ merge pipelines or hand one job another area's credentials.
   that the automation token actually has the `workflow` scope, and flag a
   conflict **before** attempting the push (lesson carried over from
   mos-templates).
+- Before handing kaywoz a `gh`/API command, or relying on one, probe it with
+  the current token, including the client's own scope checks (`gh project`
+  wants `read:org` + `read:discussion` on top of `project`). If access is
+  missing and the task needs it, tell kaywoz the smallest scope/permission
+  set that works and let him decide. Don't refuse to widen; don't
+  over-widen either.
 
 ## 6. Plans and task lists
 
@@ -154,9 +160,12 @@ this repo). Status options: `backlog`, `selected`, `done`, `wont do`.
   in use) until the duplicate is removed.
 - The board is public and some item titles name devices. Refer to items by
   number only in branches, commits and PRs (§4) — never copy titles.
-- Board writes need a token with project access. If a write is refused,
-  say so and give kaywoz the web UI step instead (see MISTAKES.md
-  2026-10-04 — ci).
+- **Reads** use the normal `gh` login (`gh project item-list|view|field-list`).
+  **Writes** go through `.claude/gh-project.sh <gh project args>`, which uses
+  a classic token (scopes `project`, `read:org`, `read:discussion`) from the
+  macOS Keychain service `gh-project-token`. Fine-grained tokens can't write
+  to user-owned projects. Never print the token or pass it on the command
+  line.
 
 ## 7. When something goes wrong
 
