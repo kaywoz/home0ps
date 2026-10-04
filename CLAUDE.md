@@ -144,9 +144,10 @@ this repo). Status options: `backlog`, `selected`, `done`, `wont do`.
   match.
 - **While working** on a matched item, set it to `selected`.
 - **Closing**: the PR body carries `Closes kaywoz/home0ps#N`, so the issue
-  closes when kaywoz merges. Never close an item or set it to `done` before
-  its PR is merged. Draft items (no issue) are set to `done` by hand after
-  merge.
+  closes when kaywoz merges, and the board's built-in "Item closed" workflow
+  sets it to `done`. Don't set `done` by hand for issues. Never close an
+  item before its PR is merged. Draft items (no issue) are set to `done` by
+  hand after merge.
 - **No match**: offer to open an issue and add it to the board; don't do it
   unasked.
 - Status has two options named `done`; use option id `98236657` (the one
