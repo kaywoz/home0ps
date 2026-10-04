@@ -72,7 +72,7 @@ Two XCP-ng hypervisors (Hypervisor1: 24t/128GB/6TB nvme/2TB ssd, Hypervisor2: 24
 
 ## Infrastructure as code (`iac/`)
 
-- **`iac/cloudflare/`** -- manages Cloudflare DNS records for `krypi.net`, `m41w423mu572un.xyz`, and `obviousphish.com` via OpenTofu (zones are created manually in the dashboard; Terraform only looks them up and manages records). Applied by `.github/workflows/deploy-cloudflare-dns.yml` -- plan on PR, apply on push to `main`.
+- **`iac/cloudflare/`** -- manages Cloudflare DNS records for `krypi.net`, `m41w423mu572un.xyz`, and `obviousphish.com` via OpenTofu (zones are created manually in the dashboard; Terraform only looks them up and manages records). Applied by `.github/workflows/deploy-cloudflare-dns.yml` -- plan on PR, apply on push to `main`. Also holds the internal reverse-proxy wildcards (`*.<id>.int.krypi.net`) -- see `iac/cloudflare/README.md`.
 - **`iac/hetzner/`** -- Hetzner Cloud provider config; `server_vm.tf` currently has its server resource commented out. Applied by `.github/workflows/deploy-hetzner.yml` -- plan on PR, apply on push to `main`. NetBird config was retired to `archive/netbird/`.
 
 ## Not yet documented

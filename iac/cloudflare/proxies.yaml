@@ -1,0 +1,16 @@
+# Reverse-proxy installations. One wildcard A record per entry:
+#   *.<id>.int.krypi.net -> tailscale_ip
+#
+# ID scheme: First 2 numbers are member numbers, last 2 numbers are group numbers for groups/clusters etc.
+# Adding an installation = add one entry here, open a PR, apply.
+
+proxies:
+  "0101":
+    host: nasty
+    tailscale_ip: 100.90.154.45
+    description: NPM on nasty - local docker containers
+  # 0201 stays disabled until its host is online.
+  #"0201":
+  #  host: sexy
+  #  tailscale_ip: 100.64.0.2   # TODO: replace with sexy's Tailscale IP
+  #  description: NPM on sexy - main docker host
