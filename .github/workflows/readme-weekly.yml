@@ -1,0 +1,136 @@
+name: weekly readme refresh
+
+# Every Monday: if anything landed on main in the last 7 days, Claude checks
+# README.md against the repo and writes a summary of the week. If the README
+# needed changes, a draft PR is opened with the summary as its description.
+# Claude only edits files; git and PR steps below are plain shell, and the run
+# fails if anything other than README.md was touched.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write # push the refresh branch
+  pull-requests: write # open the draft PR
+
+concurrency:
+  group: readme-weekly
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for the weekly log
+
+      - name: Collect last week's changes
+        id: week
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          since=$(date -u -d '7 days ago' +%F)
+          echo "since=$since" >> "$GITHUB_OUTPUT"
+          echo "today=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Merged PRs since $since"
+            gh pr list --state merged --base main --search "merged:>=$since" \
+              --json number,title,mergedAt --jq '.[] | "#\(.number) \(.title) (\(.mergedAt[:10]))"'
+            echo
+            echo "## Commits on main since $since"
+            git log --since="$since" --no-merges --format='%h %s' origin/main
+            echo
+            echo "## Files changed since $since"
+            git log --since="$since" --no-merges --name-only --format='' origin/main | sort -u
+          } > "$RUNNER_TEMP/week.md"
+          if [ -z "$(git log --since="$since" --format=%h origin/main)" ]; then
+            echo "changes=false" >> "$GITHUB_OUTPUT"
+            echo "No changes on main since $since -- nothing to do." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Refresh README and summarise the week
+        if: steps.week.outputs.changes == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          claude_args: |
+            --max-turns 40
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(ls:*)"
+          prompt: |
+            You are doing the weekly README refresh for this repository.
+
+            1. Read CLAUDE.md and MISTAKES.md in full first and follow them.
+            2. Read ${{ runner.temp }}/week.md: everything merged to main since
+               ${{ steps.week.outputs.since }}.
+            3. Compare README.md against the actual current files (workflows,
+               iac/, docker-compose/, archive/, CLAUDE.md). Verify every claim
+               against a file before writing it. Make targeted edits to
+               README.md only where it is out of date. Do not edit any other
+               file in the repository. Do not restyle or reword sections that
+               are still correct.
+            4. Write a pull request description to
+               ${{ runner.temp }}/pr-body.md (outside the repo) with these
+               sections, in this order:
+               - "## Summary of the week" -- what changed on main since
+                 ${{ steps.week.outputs.since }}, grouped by area (tailscale,
+                 cloudflare, hetzner, compose, docs/ci), one line per item,
+                 referencing PR numbers as kaywoz/home0ps#N.
+               - "## README changes" -- what you changed and why, or
+                 "None needed" if README.md was already correct.
+               - "## Source of truth" -- the files you checked.
+               - "## Flagged (not fixed)" -- anything out of date or
+                 inconsistent outside README.md that you noticed.
+               - "## Rollback" -- "Revert this PR."
+               End the file with a blank line and then:
+               🤖 Generated with [Claude Code](https://claude.com/claude-code)
+            5. Rules for both files: no personal names, emails, login
+               identities or local account names (the maintainer is "kaywoz");
+               no commit authors; no hostnames, device or account names outside
+               what README.md already allows; never copy secret values;
+               honeypot/training domains are copied verbatim and not discussed.
+            6. Do not run git commit, git push or gh -- later steps handle that.
+
+      - name: Check only README.md changed
+        if: steps.week.outputs.changes == 'true'
+        id: diff
+        run: |
+          set -euo pipefail
+          changed=$(git status --porcelain | awk '{print $2}')
+          if [ -n "$changed" ] && [ "$changed" != "README.md" ]; then
+            echo "::error::files other than README.md were modified: $changed"
+            exit 1
+          fi
+          if [ "$changed" = "README.md" ]; then
+            echo "readme=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "readme=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -f "$RUNNER_TEMP/pr-body.md" ]; then
+            cat "$RUNNER_TEMP/pr-body.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Open draft PR
+        if: steps.diff.outputs.readme == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TODAY: ${{ steps.week.outputs.today }}
+        run: |
+          set -euo pipefail
+          test -s "$RUNNER_TEMP/pr-body.md" || { echo "::error::no PR description written"; exit 1; }
+          branch="chore/readme-weekly-$TODAY"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add README.md
+          git commit -m "docs: weekly README refresh ($TODAY)"
+          git push -u origin "$branch"
+          gh pr create --draft --base main --head "$branch" \
+            --title "docs: weekly README refresh ($TODAY)" \
+            --body-file "$RUNNER_TEMP/pr-body.md"
