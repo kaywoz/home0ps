@@ -91,8 +91,8 @@
 		{
 			// TEST RULE: app on 8080 -- devices tagged tag:test only, remove once the app is sorted
 			"src": ["tag:trusted", "group:privusers"],
-			"dst": ["tag:test"],
-			"ip":  ["tcp:8080"],
+			"dst": ["tag:proxy"],
+			"ip":  ["tcp:8080", "tcp:81"],
 		},
 
 		// !!! BREAK-GLASS ONLY -- TEST RULE, DISABLED !!!
