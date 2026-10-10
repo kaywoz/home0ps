@@ -119,11 +119,6 @@
 			"ip":  ["icmp:*"],
 		},
 		{
-			"src": ["autogroup:admin"],
-			"dst": ["tag:monitoring"],
-			"ip":  ["tcp:9090", "tcp:8443"],
-		},
-		{
 			// admins -> admin UIs by service name (not by node/port)
 			"src": ["autogroup:admin"],
 			"dst": ["svc:gatus", "svc:cockpit"],
@@ -177,6 +172,11 @@
 			// break-glass must stay off: no catch-all tcp from trusted devices/privusers
 			"src":  "${TS_PRIVUSER}",
 			"deny": ["tag:hypervisor:8080", "tag:docker:3389"],
+		},
+		{
+			// admin UIs are reached via Tailscale Services only; old per-port paths stay closed
+			"src":  "${TS_PRIVUSER}",
+			"deny": ["tag:monitoring:9090", "tag:monitoring:8443"],
 		},
 	],
 }
