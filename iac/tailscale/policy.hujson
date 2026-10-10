@@ -112,7 +112,7 @@
 		{
 			"src": ["autogroup:admin"],
 			"dst": ["tag:monitoring"],
-			"ip":  ["tcp:9090"],
+			"ip":  ["tcp:9090", "tcp:8443"],
 		},
 		{
 			"src": ["tag:proxy"],
@@ -135,11 +135,6 @@
 
 			"dst": ["tag:storage"],
 			"ip":  ["tcp:*"],
-		},
-		{
-			"src": ["autogroup:admin"],
-			"dst": ["tag:monitoring"],
-			"ip":  ["tcp:8443"],
 		},
 	],
 
