@@ -4,7 +4,7 @@ vars: {
     layout-engine: elk
   }
 }
-title: org-domain home0ps {
+title: krypi.net home0ps {
   near: top-center
   shape: text
   style: {
@@ -87,9 +87,9 @@ Storage.Cloud."Put.io": {
 
 # DNS and tailnet layer
 Edge."Cloudflare DNS": {
-  "org-domain"
-  "hacking-domain"
-  "phish-domain"
+  "krypi.net"
+  "m41w423mu572un.xyz"
+  "obviousphish.com"
 }
 Edge.Tailnet."Tailscale Services": {
   explanation: |md
@@ -98,10 +98,10 @@ Edge.Tailnet."Tailscale Services": {
 }
 Edge.Tailnet."NPM 0101": {
   explanation: |md
-    *.0101.int.org-domain
+    *.0101.int.krypi.net
   |
 }
-Edge."Cloudflare DNS"."org-domain" -> Edge.Tailnet."NPM 0101": "wildcard -> tailscale ip"
+Edge."Cloudflare DNS"."krypi.net" -> Edge.Tailnet."NPM 0101": "wildcard -> tailscale ip"
 Edge.Tailnet."NPM 0101" -> Network.Nas: runs on
 Edge.Tailnet."Tailscale Services" -> Network.Pi5: monitoring
 IaC."GitHub Actions" -> Edge."Cloudflare DNS": dns records
