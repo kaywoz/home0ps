@@ -24,7 +24,7 @@ Personal home-lab and home-ops repo: Docker Compose service stacks, infrastructu
 
 | Path              | What's in it                                                                                           |
 |-------------------|---------------------------------------------------------------------------------------------------------|
-| `docker-compose/` | One subfolder per service stack, each with its own `compose.yaml`                                       |
+| `docker-compose/` | Active service stacks, one subfolder per stack with its own `compose.yaml`; retired stacks are in `archive/docker-compose/` |
 | `iac/`            | Infrastructure as code, one folder per area: `iac/hetzner/`, `iac/cloudflare/`, `iac/tailscale/`, `iac/tailscale-services/` (see below) |
 | `.github/workflows/` | One path-scoped deploy pipeline per `iac/` area, plus `readme-weekly.yml` (weekly README refresh)     |
 | `config-files/`   | Bootstrap/setup scripts and dotfiles for `linux`, `rpi`, and `win` hosts                                 |
@@ -36,33 +36,11 @@ Personal home-lab and home-ops repo: Docker Compose service stacks, infrastructu
 
 ## Services (docker-compose stacks)
 
-| Stack                | Image(s)                                                                                   | What it is |
-|-----------------------|---------------------------------------------------------------------------------------------|------------|
-| `archiveteamwarrior` | `atdr.meo.ws/archiveteam/warrior-dockerfile`                                                | ArchiveTeam Warrior -- distributed web-archiving client |
-| `atuin`              | `ghcr.io/atuinsh/atuin`, `postgres:14`                                                       | Synced, searchable shell history |
-| `base`               | `fnsys/dockhand:latest`                                                                      | Dockhand -- Docker management UI |
-| `cloudflare`         | `cloudflare/cloudflared:latest`                                                              | Cloudflare Tunnel client (config incomplete -- see TODO in the compose file) |
-| `docker-socket-proxy`| `tecnativa/docker-socket-proxy`                                                              | Restricts what talks to the Docker socket, for containers that only need read-only API access |
-| `dockge`             | `louislam/dockge:1`                                                                          | Docker Compose stack manager UI |
-| `dozzle`             | `amir20/dozzle:latest`                                                                       | Real-time Docker log viewer |
-| `fahgpu`             | `yurinnick/folding-at-home:latest-nvidia`                                                    | Folding@home, GPU-accelerated |
-| `gatus`              | `twinproduction/gatus:latest`                                                                | Status page / synthetic monitoring (ICMP, TCP, DNS, SSH checks) |
-| `glances`            | `joweisberg/glances:latest`                                                                  | System resource monitoring |
-| `golink`             | `ghcr.io/tailscale/golink:main`                                                              | Short, memorable `go/` links |
-| `healthchecks`       | `lscr.io/linuxserver/healthchecks:latest`                                                    | Self-hosted [healthchecks.io](https://healthchecks.io/) -- cron/job dead-man's-switch monitoring |
-| `homeassistant`      | `ghcr.io/home-assistant/home-assistant:stable`                                               | Home Assistant |
-| `homepage`           | `ghcr.io/gethomepage/homepage:latest`                                                        | Dashboard / service homepage |
-| `infra`              | `docker-socket-proxy`, `dozzle`, `atuin` + `postgres`, `healthchecks`                        | Combined stack bundling several of the above -- check which of this or the standalone folders is the one actually deployed |
-| `iot`                | `ghcr.io/athombv/homey-shs`                                                                  | Homey smart-home hub server |
-| `librespeed`         | `ghcr.io/linuxserver/librespeed`                                                             | Self-hosted internet speed test |
-| `pocketid`           | `ghcr.io/pocket-id/pocket-id:v2`                                                             | Pocket ID -- passkey-based OIDC identity provider |
-| `shields`            | `shieldsio/shields:server-2024-03-01`                                                        | Self-hosted Shields.io badge server |
-| `test-macvlan`       | `nginx:latest`                                                                               | Scratch stack for testing macvlan networking |
-| `unifi-controller`   | `jacobalberty/unifi`, `mongo:3.6`                                                            | UniFi network controller |
-| `uptime-kuma`        | `louislam/uptime-kuma:1.23.11`                                                               | Uptime/status monitoring |
-| `vikunja`            | `vikunja/vikunja`, `mariadb:10`                                                              | To-do / task management |
-| `whoami`             | `denga/whoami:latest`                                                                        | Minimal HTTP echo service, useful for testing routing |
-| `xos`                | `ronivay/xen-orchestra:latest`                                                               | Xen Orchestra -- management UI for an XCP-ng hypervisor |
+| Stack        | Image(s) | What it is |
+|--------------|----------|------------|
+| `monitoring` | `twinproduction/gatus`, `henrygd/beszel`, `henrygd/beszel-agent`, `amir20/dozzle`, `tecnativa/docker-socket-proxy` | Hardened monitoring stack: Gatus status page, Beszel hub + local agent, Dozzle log viewer, read-only Docker socket proxy. UIs bind to `127.0.0.1` and are published as Tailscale Services (`svc:gatus`, `svc:beszel`, `svc:dozzle`). Host-specific values come from `.env` (see `.env.example`). |
+
+Earlier stacks were retired to [`archive/docker-compose/`](archive/docker-compose/README.md).
 
 ## Network & hardware topology
 
