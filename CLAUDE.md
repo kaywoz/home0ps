@@ -27,6 +27,12 @@ Homelab IaC / GitOps for kaywoz. Relevant areas:
     `${TS_*}` placeholders), applied by `deploy-tailscale-acl.yml` via
     `tailscale/gitops-acl-action`. Straight to production on merge, no
     approver — kaywoz's choice. The PR `test` job is the only gate.
+  - `iac/tailscale-services/` — Tailscale Services (`tailscale_service`,
+    one map entry per service). Own state key
+    `tailscale-services/terraform.tfstate` and its own Services-only OAuth
+    client (`TS_SERVICES_OAUTH_*`). Applied by
+    `deploy-tailscale-services.yml` on merge, no approver. Who may reach a
+    service and auto-approval live in `iac/tailscale/policy.hujson`.
   - Nothing lives directly in `iac/` except `.gitignore`.
   - OpenTofu backends use **partial configuration**: `endpoint` and `bucket`
     come from the `S3_ENDPOINT` / `S3_BUCKET` secrets via `-backend-config` at
