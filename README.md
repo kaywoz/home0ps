@@ -25,7 +25,7 @@ Personal home-lab and home-ops repo: Docker Compose service stacks, infrastructu
 | Path              | What's in it                                                                                           |
 |-------------------|---------------------------------------------------------------------------------------------------------|
 | `docker-compose/` | Active service stacks, one subfolder per stack with its own `compose.yaml`; retired stacks are in `archive/docker-compose/` |
-| `iac/`            | Infrastructure as code, one folder per area: `iac/hetzner/`, `iac/cloudflare/`, `iac/tailscale/` (see below) |
+| `iac/`            | Infrastructure as code, one folder per area: `iac/hetzner/`, `iac/cloudflare/`, `iac/tailscale/`, `iac/tailscale-services/` (see below) |
 | `.github/workflows/` | One path-scoped deploy pipeline per `iac/` area, plus `readme-weekly.yml` (weekly README refresh)     |
 | `config-files/`   | Bootstrap/setup scripts and dotfiles for `linux`, `rpi`, and `win` hosts                                 |
 | `files/scripts/`  | Standalone install/maintenance scripts (Docker install, rclone backup, Time Machine snapshot purge, Windows bootstrap) |
@@ -46,7 +46,7 @@ Earlier stacks were retired to [`archive/docker-compose/`](archive/docker-compos
 
 ![Homelab network and hardware topology](d2/homelab-topology.svg)
 
-Two XCP-ng hypervisors (Hypervisor1: 24t/128GB/6TB nvme/2TB ssd, Hypervisor2: 24t/112GB/6TB nvme/2TB ssd), a NAS running MOS, and cloud storage spread across OneDrive (1TB), Filen (200GB), Storadera S3 (1TB), Hetzner S3 (1TB), Hetzner Storagebox (5TB), and Put.io (100GB). Source diagram: [`d2/homelab-topology.d2`](d2/homelab-topology.d2).
+Two XCP-ng hypervisors (Hypervisor1: 24t/128GB/6TB nvme/2TB ssd, Hypervisor2: 24t/112GB/6TB nvme/2TB ssd), a NAS running MOS, a Raspberry Pi 5 monitoring node (Pi5: 8GB/128GB nvme; Gatus, Beszel hub, Healthchecks, Dozzle; hardened with [`config-files/rpi/harden-rpi5.sh`](config-files/rpi/harden-rpi5.sh)), and cloud storage spread across OneDrive (1TB), Filen (200GB), Storadera S3 (1TB), Hetzner S3 (1TB), Hetzner Storagebox (5TB), and Put.io (100GB). Source diagram: [`d2/homelab-topology.d2`](d2/homelab-topology.d2).
 
 ## Infrastructure as code (`iac/`)
 
@@ -57,10 +57,12 @@ One folder per area, one workflow per folder. A change under `iac/<area>/` trigg
 | [`iac/cloudflare/`](iac/cloudflare/README.md) | DNS records (OpenTofu) | `deploy-cloudflare-dns.yml` | fmt, validate, plan | apply, **after a manual approver** (`environment: production`) |
 | `iac/hetzner/` | Hetzner Cloud (OpenTofu) | `deploy-hetzner.yml` | fmt, validate, plan | apply, no approver |
 | `iac/tailscale/` | Tailscale ACL policy (`policy.hujson`) | `deploy-tailscale-acl.yml` | ACL test | apply, **no approver -- merging is deploying** |
+| `iac/tailscale-services/` | Tailscale Services (`tailscale_service`, OpenTofu) | `deploy-tailscale-services.yml` | fmt, validate, plan | apply, **no approver -- merging is deploying** |
 
 - **`iac/cloudflare/`** -- DNS records for `krypi.net`, `m41w423mu572un.xyz`, and `obviousphish.com`. Zones are created manually in the dashboard; OpenTofu only looks them up and manages records. Also holds the internal reverse-proxy wildcards (`*.<id>.int.krypi.net` -> Tailscale IP, DNS-only), driven by `proxies.yaml` -- see [`iac/cloudflare/README.md`](iac/cloudflare/README.md).
 - **`iac/hetzner/`** -- Hetzner Cloud provider config; `server_vm.tf` currently has its server resource commented out.
 - **`iac/tailscale/`** -- the tailnet ACL policy, applied with [`tailscale/gitops-acl-action`](https://github.com/tailscale/gitops-acl-action). Login identities and local account names are `${...}` placeholders in the committed file, filled from GitHub secrets at runtime; the rendered file exists only on the ephemeral runner. The PR test job is the only gate; the policy's `tests` block checks that trusted devices and privusers reach `tag:proxy` on 80/443/81 and are denied unrelated ports elsewhere. The latter fails if the break-glass catch-all grant is left enabled.
+- **`iac/tailscale-services/`** -- Tailscale Services, one map entry per service in `services.tf` (currently gatus, cockpit, beszel, dozzle), each served at `https://<name>.<tailnet>.ts.net`. The host still advertises the service with `tailscale serve --service=svc:<name>`; who may reach it and auto-approval live in `iac/tailscale/policy.hujson`. Uses its own Services-only OAuth client.
 - **Retired:** NetBird -- config in `archive/netbird/`.
 - **README refresh:** `readme-weekly.yml` runs Mondays (and on manual dispatch). If anything landed on `main` in the last 7 days, Claude checks this README against the repo and opens a draft PR with a summary of the week; the run fails if anything other than `README.md` was touched.
 
@@ -71,13 +73,14 @@ One folder per area, one workflow per folder. A change under `iac/<area>/` trigg
 
 ### Secrets
 
-No credentials, bucket names or personal identities are committed. Code only references `var.*` / `${{ secrets.* }}`; values live in GitHub repository secrets. Tokens are least-privilege (Cloudflare: DNS on the named zones; Tailscale: OAuth client scoped to the policy file).
+No credentials, bucket names or personal identities are committed. Code only references `var.*` / `${{ secrets.* }}`; values live in GitHub repository secrets. Tokens are least-privilege (Cloudflare: DNS on the named zones; Tailscale: one OAuth client scoped to the policy file, a separate one scoped to Services).
 
 | Workflow | Secrets |
 |----------|---------|
 | `deploy-cloudflare-dns.yml` | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, state: `S3_ENDPOINT`, `S3_BUCKET`, `HETZNER_ACCESS_KEY_ID`, `HETZNER_SECRET_ACCESS_KEY` |
 | `deploy-hetzner.yml` | `HCLOUD_TOKEN`, state: `S3_ENDPOINT`, `S3_BUCKET`, `HETZNER_ACCESS_KEY_ID`, `HETZNER_SECRET_ACCESS_KEY` |
 | `deploy-tailscale-acl.yml` | `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `TS_TAILNET`, placeholders: `TS_PRIVUSER`, `TS_GUEST`, `LOCAL_UNIX_ACCOUNT`; optional `SLACK_WEBHOOK_URL` (only used when repo variable `SLACK_NOTIFY=true`) |
+| `deploy-tailscale-services.yml` | `TS_SERVICES_OAUTH_CLIENT_ID`, `TS_SERVICES_OAUTH_SECRET`, state: `S3_ENDPOINT`, `S3_BUCKET`, `HETZNER_ACCESS_KEY_ID`, `HETZNER_SECRET_ACCESS_KEY` |
 | `readme-weekly.yml` | `CLAUDE_CODE_OAUTH_TOKEN` (plus the built-in `github.token`) |
 
 ## Contributing / changing things
