@@ -205,3 +205,19 @@ mistakes, not a diary.
 - **Rule going forward:** CLAUDE.md §5 — probe a command with the real
   client before relying on it; when access is missing and needed, state the
   smallest working set and let kaywoz decide.
+
+### 2026-10-10 — tailscale-acl (generic alias treated as device name)
+
+- **Trigger:** misjudgement corrected by kaywoz
+- **What happened:** a requested policy snippet used a `hosts` alias and a
+  Tailscale IP. I flagged the alias as a device name and the IP as
+  sensitive, and proposed a secret-backed placeholder. kaywoz clarified the
+  alias is generic (real device names end in `-y`) and Tailscale IPs are
+  not secrets.
+- **Root cause:** applied the §4 "no device names" rule without a way to
+  tell real device names from generic aliases, and extended the PII/secret
+  rules to Tailscale IPs without basis.
+- **Fix applied:** snippet committed verbatim (kaywoz/home0ps#81).
+- **Rule going forward:** CLAUDE.md §4 — real device names end in `-y`;
+  generic aliases and Tailscale IPs may be committed. If a name fits
+  neither pattern, ask.

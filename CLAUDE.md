@@ -101,6 +101,13 @@ merge pipelines or hand one job another area's credentials.
   `iac/cloudflare/README.md`), because those records describe the services.
   Everywhere else — branch names, commits, PRs, other areas' code/comments —
   they stay out.
+  **How to tell:** real device names end in `-y` and never go into git
+  (outside the DNS scope above). Generic aliases kaywoz chooses (e.g. a
+  model name like `macmini` in policy `hosts`) are fine. Don't guess — if a
+  name doesn't fit either pattern, ask.
+- **Tailscale IPs are not secrets** (abusing one needs several auth steps),
+  so `100.x` addresses may be committed, e.g. in policy `hosts`. No
+  placeholder or GitHub secret needed for them.
 - **No real credentials anywhere** — not in files, plans, chat, or logs. Code
   references `var.*` / `${{ secrets.* }}` only. kaywoz puts secret values into
   GitHub secrets himself; never ask for them to be pasted into chat.
