@@ -1,0 +1,5 @@
+# Host-local config and runtime data
+.env
+gatus/data/
+beszel/
+dozzle/

@@ -40,7 +40,8 @@ Homelab IaC / GitOps for kaywoz. Relevant areas:
     stays in `backend.tf`. Never put credentials or bucket names in code.
 - NetBird is retired: config in `archive/netbird/`, token revoked. Don't
   reintroduce it without asking.
-- `docker-compose/` — service stacks.
+- `docker-compose/` — active service stacks only. Retired stacks live in
+  `archive/docker-compose/`.
 - `archive/` — retired docs/config. Archive rather than delete.
 
 Each pipeline is **path-scoped** and gets **only the secrets it needs**. Never
