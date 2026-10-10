@@ -77,6 +77,7 @@
 		"services": {
 			"svc:gatus":   ["tag:monitoring"],
 			"svc:cockpit": ["tag:monitoring"],
+			"svc:beszel":  ["tag:monitoring"],
 		},
 	},
 
@@ -121,7 +122,7 @@
 		{
 			// admins -> admin UIs by service name (not by node/port)
 			"src": ["autogroup:admin"],
-			"dst": ["svc:gatus", "svc:cockpit"],
+			"dst": ["svc:gatus", "svc:cockpit", "svc:beszel"],
 			"ip":  ["tcp:443"],
 		},
 		{
