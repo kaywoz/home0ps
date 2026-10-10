@@ -14,7 +14,7 @@ title: krypi.net home0ps {
   }
 }
 Network.Internet <-> Network."ISP router": 2x600/60Mbps
-Network."ISP router" <-> Network.ucg: bridged
+Network."ISP router" <-> Network.UCG: bridged
 Network.UCG <-> Network.Pro max switch
 Network.Pro max switch <-> Network.Pro AP: 1gbe poe
 Network.Pro max switch <-> Network.Jetkvm1: 1gbe
@@ -46,7 +46,7 @@ Compute.Pi5.Docker: {
 }
 Compute.Pi5.Monitoring: {
   explanation: |md
-    gatus, beszel hub, healthchecks, dozzle
+    docker-compose/monitoring: gatus, beszel hub + agent, dozzle, docker socket proxy
   |
 }
 Storage.Nas.MOS: {
@@ -145,7 +145,6 @@ Storage.Cloud.Onedrive.icon: https://raw.githubusercontent.com/loganmarchione/ho
 Storage.Cloud."Storadera S3".icon: https://storadera.com/wp-content/themes/storadera1.1/assets/images/logo_full_storadera.svg
 Storage.Cloud."Hetzner S3".icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/hetzner.svg
 Storage.Cloud."Hetzner Storagebox".icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/hetzner.svg
-Storage.Cloud."Put.io".icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/hetzner.svg
 
 Network.Pi5.icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/raspberrypi.svg
 Compute.Pi5.Docker.icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/raspberrypi.svg

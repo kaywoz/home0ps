@@ -46,7 +46,7 @@ Earlier stacks were retired to [`archive/docker-compose/`](archive/docker-compos
 
 ![Homelab network and hardware topology](d2/homelab-topology.svg)
 
-Two XCP-ng hypervisors (Hypervisor1: 24t/128GB/6TB nvme/2TB ssd, Hypervisor2: 24t/112GB/6TB nvme/2TB ssd), a NAS running MOS, a Raspberry Pi 5 monitoring node (Pi5: 8GB/128GB nvme; Gatus, Beszel hub, Healthchecks, Dozzle; hardened with [`config-files/rpi/harden-rpi5.sh`](config-files/rpi/harden-rpi5.sh)), and cloud storage spread across OneDrive (1TB), Filen (200GB), Storadera S3 (1TB), Hetzner S3 (1TB), Hetzner Storagebox (5TB), and Put.io (100GB). Source diagram: [`d2/homelab-topology.d2`](d2/homelab-topology.d2).
+Two XCP-ng hypervisors (Hypervisor1: 24t/128GB/6TB nvme/2TB ssd, Hypervisor2: 24t/112GB/6TB nvme/2TB ssd), a NAS running MOS, a Raspberry Pi 5 monitoring node (Pi5: 8GB/128GB nvme; Gatus, Beszel hub + agent, Dozzle, Docker socket proxy from `docker-compose/monitoring`; hardened with [`config-files/rpi/harden-rpi5.sh`](config-files/rpi/harden-rpi5.sh)), and cloud storage spread across OneDrive (1TB), Filen (200GB), Storadera S3 (1TB), Hetzner S3 (1TB), Hetzner Storagebox (5TB), and Put.io (100GB). Source diagram: [`d2/homelab-topology.d2`](d2/homelab-topology.d2).
 
 ## Infrastructure as code (`iac/`)
 
