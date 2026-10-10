@@ -34,6 +34,7 @@
 
 	"hosts": {
 		// "some subnet": "192.168.199.0/24" //sample net not in use
+		"macmini": "100.75.202.14",
 	},
 
 	"ssh": [
@@ -147,6 +148,11 @@
 			"dst": ["tag:storage"],
 			"ip":  ["tcp:*"],
 		},
+		{
+			"src": ["tag:monitoring"],
+			"dst": ["macmini"],
+			"ip":  ["tcp:45876"],
+		},
 	],
 
 	"tests": [
@@ -179,5 +185,6 @@
 			"src":  "${TS_PRIVUSER}",
 			"deny": ["tag:monitoring:9090", "tag:monitoring:8443"],
 		},
+		{"src": "tag:monitoring", "accept": ["macmini:45876"], "deny": ["macmini:22"]},
 	],
 }
