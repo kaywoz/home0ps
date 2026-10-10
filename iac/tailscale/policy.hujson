@@ -110,6 +110,11 @@
 			"ip":  ["icmp:*"],
 		},
 		{
+			"src": ["autogroup:admin"],
+			"dst": ["tag:monitoring"],
+			"ip":  ["tcp:9090"],
+		},
+		{
 			"src": ["tag:proxy"],
 			"dst": ["tag:service"],
 			"ip":  ["tcp:*"],
