@@ -7,7 +7,7 @@ locals {
   services = {
     gatus   = "Status page"
     cockpit = "Host admin UI"
-    # beszel  = "Monitoring hub"
+    beszel  = "Monitoring hub"
     # dozzle  = "Container log viewer"
     # logtide = "Log management"
   }
