@@ -71,6 +71,15 @@
 		},
 	],
 
+	// Tailscale Services (defined in iac/tailscale-services/): hosts tagged
+	// tag:monitoring may advertise these without manual approval.
+	"autoApprovers": {
+		"services": {
+			"svc:gatus":   ["tag:monitoring"],
+			"svc:cockpit": ["tag:monitoring"],
+		},
+	},
+
 	//****************************************************
 	//************************GRANTs************************
 	//****************************************************
@@ -113,6 +122,12 @@
 			"src": ["autogroup:admin"],
 			"dst": ["tag:monitoring"],
 			"ip":  ["tcp:9090", "tcp:8443"],
+		},
+		{
+			// admins -> admin UIs by service name (not by node/port)
+			"src": ["autogroup:admin"],
+			"dst": ["svc:gatus", "svc:cockpit"],
+			"ip":  ["tcp:443"],
 		},
 		{
 			"src": ["tag:proxy"],
