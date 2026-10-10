@@ -165,8 +165,10 @@ this repo). Status options: `backlog`, `selected`, `done`, `wont do`.
   sets it to `done`. Don't set `done` by hand for issues. Never close an
   item before its PR is merged. Draft items (no issue) are set to `done` by
   hand after merge.
-- **No match**: offer to open an issue and add it to the board; don't do it
-  unasked.
+- **No match**: every task is tracked as an issue. Open one (generic title,
+  no device names), add it to the board, set it to `selected`, and link it
+  from the PR(s): `Closes kaywoz/home0ps#N` on the PR that finishes the task,
+  `Part of kaywoz/home0ps#N` on earlier ones. No need to ask first.
 - Status has two options named `done`; use option id `98236657` (the one
   in use) until the duplicate is removed.
 - The board is public and some item titles name devices. Refer to items by
