@@ -1,0 +1,70 @@
+name: deploy tailscale services via OpenTofu
+
+on:
+  pull_request:
+    paths: ["iac/tailscale-services/**", ".github/workflows/deploy-tailscale-services.yml"]
+  push:
+    branches: [main]
+    paths: ["iac/tailscale-services/**", ".github/workflows/deploy-tailscale-services.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tailscale-services-iac
+  cancel-in-progress: false # never cancel an in-flight apply
+
+# Own OAuth client, scoped to Services only -- never the ACL pipeline's client.
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.HETZNER_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_SECRET_ACCESS_KEY }}
+  TF_VAR_tailscale_oauth_client_id: ${{ secrets.TS_SERVICES_OAUTH_CLIENT_ID }}
+  TF_VAR_tailscale_oauth_client_secret: ${{ secrets.TS_SERVICES_OAUTH_SECRET }}
+
+jobs:
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: iac/tailscale-services
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: opentofu/setup-opentofu@v1
+
+      - name: Check formatting
+        run: tofu fmt -check
+
+      - name: Initialize backend
+        env:
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+        run: tofu init -backend-config="endpoint=$S3_ENDPOINT" -backend-config="bucket=$S3_BUCKET"
+
+      - name: Validate configuration
+        run: tofu validate
+
+      - name: Plan changes
+        run: tofu plan -no-color
+
+  apply:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: iac/tailscale-services
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: opentofu/setup-opentofu@v1
+
+      - name: Initialize backend
+        env:
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+        run: tofu init -backend-config="endpoint=$S3_ENDPOINT" -backend-config="bucket=$S3_BUCKET"
+
+      - name: Apply changes
+        run: tofu apply -auto-approve -no-color
