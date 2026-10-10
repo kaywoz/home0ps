@@ -1,6 +1,7 @@
+# Render: d2 d2/homelab-topology.d2 d2/homelab-topology.svg  (layout: elk, set below)
 vars: {
   d2-config: {
-    layout-engine: tala
+    layout-engine: elk
   }
 }
 title: krypi.net home0ps {
@@ -25,6 +26,7 @@ Network.Pro max switch <-> Network.Macmini: 2.5gbe
 Network.Pro max switch <-> Network.Hypervisor1: 2.5gbe
 Network.Pro max switch <-> Network.Hypervisor2: 2.5gbe
 Network.Pro max switch <-> Network.Nas: 2.5gbe
+Network.Pro max switch <-> Network.Pi5: 1gbe
 Network.Pro AP <-> Network.Lite AP: mesh {style.animated: true}
 
 Compute.Hypervisor1.XCP-ng: {
@@ -35,6 +37,16 @@ Compute.Hypervisor1.XCP-ng: {
 Compute.Hypervisor2.XCP-ng: {
   explanation: |md
     24t/112gb/6tb nvme/2tb ssd/1x2.5gbe
+  |
+}
+Compute.Pi5.Docker: {
+  explanation: |md
+    4t/8gb/128gb nvme/1x1gbe
+  |
+}
+Compute.Pi5.Monitoring: {
+  explanation: |md
+    gatus, beszel hub, healthchecks, dozzle
   |
 }
 Storage.Nas.MOS: {
@@ -73,6 +85,29 @@ Storage.Cloud."Put.io": {
   |
 }
 
+# DNS and tailnet layer
+Edge."Cloudflare DNS": {
+  "krypi.net"
+  "m41w423mu572un.xyz"
+  "obviousphish.com"
+}
+Edge.Tailnet."Tailscale Services": {
+  explanation: |md
+    gatus, cockpit, beszel, dozzle
+  |
+}
+Edge.Tailnet."NPM 0101": {
+  explanation: |md
+    *.0101.int.krypi.net
+  |
+}
+Edge."Cloudflare DNS"."krypi.net" -> Edge.Tailnet."NPM 0101": "wildcard -> tailscale ip"
+Edge.Tailnet."NPM 0101" -> Network.Nas: runs on
+Edge.Tailnet."Tailscale Services" -> Network.Pi5: monitoring
+IaC."GitHub Actions" -> Edge."Cloudflare DNS": dns records
+IaC."GitHub Actions" -> Edge.Tailnet: acl + services
+IaC."GitHub Actions" -> Storage.Cloud."Hetzner S3": tofu state
+
 Services.selfhosted.example: {
   explanation: |md
     samplename
@@ -106,9 +141,16 @@ Network.Hypervisor1.icon: https://www.svgrepo.com/show/513345/server.svg
 Network.Hypervisor2.icon: https://www.svgrepo.com/show/513345/server.svg
 Network.Macmini.icon: https://www.svgrepo.com/show/288589/mac-mini.svg
 
-Storage.Cloud.Onedrive.icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/hetzner.svg
-Storage.Cloud.Filen.icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/hetzner.svg
+Storage.Cloud.Onedrive.icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/microsoft.svg
 Storage.Cloud."Storadera S3".icon: https://storadera.com/wp-content/themes/storadera1.1/assets/images/logo_full_storadera.svg
 Storage.Cloud."Hetzner S3".icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/hetzner.svg
 Storage.Cloud."Hetzner Storagebox".icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/hetzner.svg
 Storage.Cloud."Put.io".icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/hetzner.svg
+
+Network.Pi5.icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/raspberrypi.svg
+Compute.Pi5.Docker.icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/raspberrypi.svg
+Edge."Cloudflare DNS".icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/cloudflare.svg
+Edge."Cloudflare DNS".style.fill: orange
+Edge.Tailnet.icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/tailscale.svg
+Edge.Tailnet."NPM 0101".icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/nginxproxymanager.svg
+IaC."GitHub Actions".icon: https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/refs/heads/main/assets/github-octocat.svg
