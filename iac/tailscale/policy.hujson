@@ -24,6 +24,7 @@
 		"tag:ssh":        ["group:privusers"], //tailscale ssh access
 		"tag:test":       ["group:privusers"], //just a test tag
 		"tag:mgmt":       ["group:privusers"], //mgmt ui still exposed directly on 80/443, not yet behind proxy
+		"tag:monitored":  ["group:privusers"], //devices/collectors shipping logs or metrics to monitoring
 
 		///////////////////////////////////////////////////////////////////
 		//"tag:app-golink":       ["group:privusers"], //golink container access
@@ -47,7 +48,7 @@
 				"autogroup:self",
 				"tag:hypervisor", "tag:storage", "tag:service", "tag:docker", "tag:oob",
 				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests", "tag:trusted",
-				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt",
+				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt", "tag:monitored",
 			],
 			"users":       ["${LOCAL_UNIX_ACCOUNT}", "root"],
 			"checkPeriod": "24h",
@@ -59,7 +60,7 @@
 			"dst": [
 				"tag:hypervisor", "tag:storage", "tag:service", "tag:docker", "tag:oob",
 				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests", "tag:trusted",
-				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt",
+				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt", "tag:monitored",
 			],
 			"users":  ["${LOCAL_UNIX_ACCOUNT}", "root"],
 		},
@@ -80,6 +81,8 @@
 			"svc:cockpit": ["tag:monitoring"],
 			"svc:beszel":  ["tag:monitoring"],
 			"svc:dozzle":  ["tag:monitoring"],
+			"svc:logtide":     ["tag:monitoring"],
+			"svc:logtide-api": ["tag:monitoring"],
 		},
 	},
 
@@ -124,7 +127,13 @@
 		{
 			// admins -> admin UIs by service name (not by node/port)
 			"src": ["autogroup:admin"],
-			"dst": ["svc:gatus", "svc:cockpit", "svc:beszel", "svc:dozzle"],
+			"dst": ["svc:gatus", "svc:cockpit", "svc:beszel", "svc:dozzle", "svc:logtide", "svc:logtide-api"],
+			"ip":  ["tcp:443"],
+		},
+		{
+			// log shippers (tailscale devices, remote syslog collectors) -> log ingest
+			"src": ["tag:monitored"],
+			"dst": ["svc:logtide-api"],
 			"ip":  ["tcp:443"],
 		},
 		{
@@ -187,5 +196,11 @@
 			"deny": ["tag:monitoring:9090", "tag:monitoring:8443"],
 		},
 		{"src": "tag:monitoring", "accept": ["macmini:45876"], "deny": ["macmini:22"]},
+		{
+			// log shippers reach log ingest only, nothing else on the monitoring host
+			"src":    "tag:monitored",
+			"accept": ["svc:logtide-api:443"],
+			"deny":   ["tag:monitoring:22", "tag:monitoring:443"],
+		},
 	],
 }
