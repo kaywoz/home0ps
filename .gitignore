@@ -58,3 +58,11 @@ venv/
 # -----------------------------
 .env
 
+*.env
+!*.env.example
+
+# -----------------------------
+# Keys and certificates (private keys never committed; public certs allowed)
+# -----------------------------
+*.pem
+!*cert.pem
