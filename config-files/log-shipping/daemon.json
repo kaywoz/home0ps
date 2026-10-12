@@ -1,0 +1,9 @@
+{
+  "userns-remap": "default",
+  "no-new-privileges": true,
+  "icc": false,
+  "userland-proxy": false,
+  "live-restore": true,
+  "log-driver": "journald",
+  "log-opts": { "tag": "{{.Name}}" }
+}
