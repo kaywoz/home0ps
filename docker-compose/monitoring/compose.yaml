@@ -152,6 +152,189 @@ services:
       timeout: 3s
       retries: 3
 
+  # ---------------- LogTide (TimescaleDB backend), adapted from upstream ----------------
+  # No host ports except UI/API on 127.0.0.1; Postgres/Redis on an internal network only.
+  logtide-postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: kr-ccp-logtidedb-0101
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 300
+    mem_limit: 1536m
+    environment:
+      POSTGRES_DB: ${LOGTIDE_DB_NAME}
+      POSTGRES_USER: ${LOGTIDE_DB_USER}
+      POSTGRES_PASSWORD: ${LOGTIDE_DB_PASSWORD}
+    volumes:
+      - logtide_pg:/var/lib/postgresql/data
+    command:
+      - postgres
+      - -c
+      - max_connections=50
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - max_parallel_workers_per_gather=2   # Pi 5 has 4 cores
+      - -c
+      - max_parallel_workers=4
+      - -c
+      - wal_buffers=16MB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - log_min_duration_statement=500
+    networks:
+      - logtide-db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LOGTIDE_DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  logtide-redis:
+    image: redis:7-alpine
+    container_name: kr-ccp-logtideredis-0101
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    mem_limit: 256m
+    command: ["redis-server", "--requirepass", "${LOGTIDE_REDIS_PASSWORD}", "--maxmemory", "192mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - logtide_redis:/data
+    networks:
+      - logtide-db
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PW}\" --no-auth-warning ping | grep -q PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    environment:
+      REDIS_PW: ${LOGTIDE_REDIS_PASSWORD}
+
+  logtide-backend:
+    image: logtide/backend:latest
+    container_name: kr-ccp-logtideapi-0101
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 200
+    mem_limit: 768m
+    environment: &logtide-env
+      NODE_ENV: production
+      TRUST_PROXY: "true"                          # behind tailscale serve
+      FRONTEND_URL: https://logtide.${TS_TAILNET_DOMAIN}
+      DATABASE_URL: postgresql://${LOGTIDE_DB_USER}:${LOGTIDE_DB_PASSWORD}@logtide-postgres:5432/${LOGTIDE_DB_NAME}
+      DATABASE_HOST: logtide-postgres
+      DB_USER: ${LOGTIDE_DB_USER}
+      REDIS_URL: redis://:${LOGTIDE_REDIS_PASSWORD}@logtide-redis:6379
+      API_KEY_SECRET: ${LOGTIDE_API_KEY_SECRET}
+      PORT: 8080
+      HOST: 0.0.0.0
+      DOCKER_CONTAINER: "true"
+      SERVICE_NAME: logtide-backend
+      STORAGE_ENGINE: timescale
+      INTERNAL_LOGGING_ENABLED: "false"
+    ports:
+      - "127.0.0.1:8083:8080"                      # svc:logtide-api (UI calls + ingest)
+    depends_on:
+      logtide-postgres:
+        condition: service_healthy
+      logtide-redis:
+        condition: service_healthy
+    networks:
+      - logtide-db
+      - proxy-logtide
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  logtide-worker:
+    image: logtide/backend:latest
+    container_name: kr-ccp-logtideworker-0101
+    restart: unless-stopped
+    command: ["worker"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 200
+    mem_limit: 512m
+    environment:
+      <<: *logtide-env
+      SERVICE_NAME: logtide-worker
+    depends_on:
+      logtide-backend:
+        condition: service_healthy
+      logtide-redis:
+        condition: service_healthy
+    networks:
+      - logtide-db
+      - proxy-logtide                              # egress for alert notifications
+    healthcheck:
+      disable: true
+
+  logtide-frontend:
+    image: logtide/frontend:latest
+    container_name: kr-ccp-logtideui-0101
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 100
+    mem_limit: 256m
+    environment:
+      NODE_ENV: production
+      PUBLIC_API_URL: https://logtide-api.${TS_TAILNET_DOMAIN}
+    ports:
+      - "127.0.0.1:8084:3000"                      # svc:logtide
+    depends_on:
+      - logtide-backend
+    networks:
+      - proxy-logtide
+
+  # ---------------- Healthchecks (self-hosted cron/job heartbeats) ----------------
+  healthchecks:
+    image: healthchecks/healthchecks:latest
+    container_name: kr-ccp-healthchecks-0101
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 100
+    mem_limit: 384m
+    environment:
+      SITE_ROOT: https://healthchecks.${TS_TAILNET_DOMAIN}
+      SITE_NAME: Healthchecks
+      ALLOWED_HOSTS: healthchecks.${TS_TAILNET_DOMAIN},localhost,127.0.0.1
+      SECRET_KEY: ${HC_SECRET_KEY}
+      DEBUG: "False"
+      DB: sqlite
+      DB_NAME: /data/hc.sqlite
+      REGISTRATION_OPEN: "False"           # accounts only via createsuperuser
+    ports:
+      - "127.0.0.1:8085:8000"              # svc:healthchecks
+    networks:
+      - proxy-healthchecks                 # egress to Slack + tailnet
+    volumes:
+      - healthchecks_data:/data            # named volume: image's own uid, remap-safe
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v3/status/', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
 networks:
   proxy-gatus:
     name: proxy-gatus
@@ -160,6 +343,11 @@ networks:
   # Hub: egress to internet + tailnet via the host's tag:monitoring identity
   proxy-beszel:
     name: proxy-beszel
+    driver: bridge
+
+  # Dozzle main UI: egress to remote agents over the tailnet
+  proxy-dozzle:
+    name: proxy-dozzle
     driver: bridge
 
   # Hub -> local agent (agent listens on this bridge's gateway, 172.31.250.1)
@@ -171,12 +359,28 @@ networks:
         - subnet: 172.31.250.0/29
           gateway: 172.31.250.1
 
-  # Socket proxy's own network, no egress; the agent reaches it via 127.0.0.1:2375
+  # Socket proxy + its readers (Dozzle). Not internal: Docker won't publish
+  # 127.0.0.1:2375 for the host-network agent on an internal-only network.
   socketproxy:
     name: socketproxy
     driver: bridge
 
- # Dozzle main UI: egress to remote agents over the tailnet
-  proxy-dozzle:
-    name: proxy-dozzle
+  # Postgres + Redis + backend/worker only, no egress
+  logtide-db:
+    name: logtide-db
     driver: bridge
+    internal: true
+  # UI/API published on localhost, egress for notifications
+  proxy-logtide:
+    name: proxy-logtide
+    driver: bridge
+
+  # Healthchecks: published UI/pings, egress for Slack notifications
+  proxy-healthchecks:
+    name: proxy-healthchecks
+    driver: bridge
+
+volumes:
+  logtide_pg:
+  logtide_redis:
+  healthchecks_data:

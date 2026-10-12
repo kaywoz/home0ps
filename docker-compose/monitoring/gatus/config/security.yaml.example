@@ -1,0 +1,5 @@
+# Copy to security.yaml (gitignored, chmod 600, owned 165534). Gatus merges every *.yaml in /config.
+security:
+  basic:
+    username: "kaywoz"
+    password-bcrypt-base64: "REPLACE-WITH-BASE64-OF-BCRYPT-HASH"

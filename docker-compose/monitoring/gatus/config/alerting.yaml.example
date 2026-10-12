@@ -1,0 +1,12 @@
+# Copy to alerting.yaml (gitignored, chmod 600, owned 165534). Gatus merges every *.yaml in /config.
+# The webhook URL is a secret: anyone holding it can post to the channel.
+alerting:
+  slack:
+    webhook-url: "https://hooks.slack.com/services/REPLACE/ME/TOKEN"
+    default-alert:
+      failure-threshold: 3
+      success-threshold: 2
+      send-on-resolved: true
+# Then add to any endpoint:
+#   alerts:
+#     - type: slack
