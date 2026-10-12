@@ -42,6 +42,21 @@ Personal home-lab and home-ops repo: Docker Compose service stacks, infrastructu
 
 Earlier stacks were retired to [`archive/docker-compose/`](archive/docker-compose/README.md).
 
+## Architecture
+
+| Role | Hardware | Purpose | Network | Status |
+|------|----------|---------|---------|--------|
+| Monitoring host | Raspberry Pi 5 (8 GB, 128 GB NVMe) | Observation-only: metrics, logs, health; changes nothing elsewhere | Monitoring VLAN (access port, tagged VLANs blocked) | Built |
+| Apps host | Intel N305, 4× 2.5GbE, dual NVMe | Docker apps, trusted well-known apps only | VLAN 31 native + VLAN 13 tagged (macvlan for IoT-facing apps) | Next phase |
+| Storage host | MOS NAS | Storage only; pulls backups | VLAN 31 | Later |
+| Lab (not home0ps) | 2× XCP-ng hosts | Risky / experimental / `privileged` workloads as VMs | — | Separate |
+
+- **Access, two planes:** admin UIs are Tailscale Services (`svc:<app>` on 443, `ts.net` certs) behind per-service ACL grants; user-facing apps go through Cloudflare Tunnel + Access (outbound-only connectors). The planes are independent; Tailscale is break-glass.
+- **Network:** UniFi with a zone-based firewall; every network is its own zone with internet-only egress, admin stations reach all. VLAN 13 IoT (Tailscale subnet routers planned), VLAN 31 Docker hosts, VLAN 51 former DMZ (being retired), a dedicated monitoring VLAN. DNS via Cloudflare + ControlD, no self-hosted DNS.
+- **Logs:** journald on every host (Docker `journald` driver) → native, sandboxed Fluent Bit → LogTide on the monitoring host ([`config-files/log-shipping/`](config-files/log-shipping/)); non-Tailscale LAN devices send syslog to it directly.
+- **Alerting:** Slack, so delivery doesn't depend on the monitoring host; Healthchecks.io watches the monitor itself.
+- **Security:** global baseline in [`SECURITY.md`](SECURITY.md), one summary per host role in [`security/`](security/).
+
 ## Network & hardware topology
 
 ![Homelab network and hardware topology](d2/homelab-topology.svg)
