@@ -83,6 +83,7 @@
 			"svc:dozzle":  ["tag:monitoring"],
 			"svc:logtide":     ["tag:monitoring"],
 			"svc:logtide-api": ["tag:monitoring"],
+			"svc:healthchecks": ["tag:monitoring"],
 		},
 	},
 
@@ -127,7 +128,7 @@
 		{
 			// admins -> admin UIs by service name (not by node/port)
 			"src": ["autogroup:admin"],
-			"dst": ["svc:gatus", "svc:cockpit", "svc:beszel", "svc:dozzle", "svc:logtide", "svc:logtide-api"],
+			"dst": ["svc:gatus", "svc:cockpit", "svc:beszel", "svc:dozzle", "svc:logtide", "svc:logtide-api", "svc:healthchecks"],
 			"ip":  ["tcp:443"],
 		},
 		{
