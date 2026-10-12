@@ -195,3 +195,43 @@ fails, something breaks after merge, or kaywoz has to correct a
 misunderstanding — **log it in `MISTAKES.md`** using the format at the top of
 that file, before doing anything else. This is part of finishing the task, not
 optional cleanup. Tell kaywoz in the reply that an entry was added.
+
+## 8. Homelab conventions
+
+Design decisions from the planning handoff. Don't re-decide them; propose a
+change explicitly if one no longer fits.
+
+- **Host roles** (real device names never in git, §4): monitoring host
+  (Raspberry Pi 5, observation-only: reads everything, changes nothing
+  elsewhere), apps host (Intel N305, trusted well-known apps only), storage
+  host (MOS NAS, storage only, pulls backups). Risky or `privileged`
+  workloads go to the separate XCP-ng lab, not home0ps.
+- **Two access planes:** admin UIs as Tailscale Services
+  (`svc:<app>` on 443); user-facing apps via Cloudflare Tunnel + Access.
+  Tailscale is break-glass. No certificates to manage, no DNS API tokens on
+  hosts.
+- **Container names:** `<location>-<class>-<service>-<GGMM>`, e.g.
+  `kr-ccp-gatus-0101` (kr = Krypinet, ccp = Custom Container Production).
+- **Host layout:** `/srv/docker/compose.yaml` — one file, all services
+  inline, no `include:` — plus one data subfolder per service. Host-level
+  config lives in this repo (`config-files/`), not in `/srv/docker`.
+- **Networks:** one bridge per app, `proxy-<app>`; `internal: true` only when
+  the container needs no egress **and** publishes no ports.
+- **Container standard:** non-root `user`, `read_only` + `tmpfs`,
+  `cap_drop: [ALL]`, `no-new-privileges`, `mem_limit`, `pids_limit`,
+  healthcheck where the image allows, ports on `127.0.0.1` only, secrets as
+  files (`600`, owned by the container's remapped host UID), never in git.
+- **Docker socket:** only `tecnativa/docker-socket-proxy` mounts it
+  (`POST=0`); consumers use `DOCKER_HOST=tcp://…:2375`.
+- **Images on `:latest`**, no digest/version pinning — decided, don't
+  propose it. (OpenTofu providers are different: exact pins, §3.)
+- **Monitoring pulls** from the monitoring host outward over the tailnet,
+  one explicit grant per flow; agents listen on tailnet IPs only.
+- **Logs:** journald everywhere (Docker `journald` driver) → native,
+  sandboxed Fluent Bit → LogTide (`config-files/log-shipping/`). One shared
+  ingest key; attribution via `metadata.host`.
+- **Alerting → Slack** (cloud, so delivery doesn't depend on the monitoring
+  host). No ntfy, no Discord.
+- **Security summaries:** global [`SECURITY.md`](SECURITY.md) plus
+  `security/<role>.md` per host role. Update them in the same change as the
+  system they describe.
