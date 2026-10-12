@@ -123,3 +123,6 @@ Raspberry Pi 5 (8 GB, 128 GB NVMe), Raspberry Pi OS Lite 64-bit. Observational-o
 - Pasting multi-line commands that start with `read` swallows the next line as input
 - Docker's `max-size` log option is invalid with the journald driver and stops dockerd from starting
 - journald and Fluent Bit classic configs don't allow comments on the same line as a setting
+- Tailscale Services auto-approval is evaluated when a host advertises the service: merge the policy PR (`autoApprovers.services`) **before** `tailscale serve --service=…`; otherwise toggle the service off and on, or approve it in the console. The "approval from an admin is required" message from `serve` is printed regardless; check the console or `tailscale status --json` (`CapMap."service-host"`)
+- Fluent Bit treats HTTP `401` as permanent ("chunk will not be retried"): a wrong or rotated LogTide key **drops** logs instead of queueing them. Rotate senders before revoking the old key
+- Shoutrrr URLs (Beszel notifications): Slack `slack://hook:A-B-C@webhook`, generic webhook `generic://host/path` (HTTPS by default)
