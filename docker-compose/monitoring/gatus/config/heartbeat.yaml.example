@@ -1,0 +1,8 @@
+# Copy to heartbeat.yaml (gitignored, chmod 600, owned 165534). Holds the ping UUID = a bearer secret.
+endpoints:
+  - name: gatus-heartbeat
+    group: meta
+    url: "https://hc-ping.com/REPLACE-WITH-YOUR-CHECK-UUID"
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"

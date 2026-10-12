@@ -1,5 +1,8 @@
-# Host-local config and runtime data
+# Host-local config, secrets and runtime data: never commit
 .env
 gatus/data/
+gatus/config/heartbeat.yaml
+gatus/config/security.yaml
+gatus/config/alerting.yaml
 beszel/
 dozzle/

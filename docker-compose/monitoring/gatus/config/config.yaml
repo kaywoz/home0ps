@@ -1,0 +1,29 @@
+storage:
+  type: sqlite
+  path: /data/data.db
+
+ui:
+  title: monitoring
+
+endpoints:
+  # --- External checks (internet) ---
+  # Cloudflare Access apps: expect the redirect to Access; a 200 means auth is gone.
+  # - name: app-via-access
+  #   group: public
+  #   url: "https://app.krypi.net"
+  #   interval: 5m
+  #   client:
+  #     ignore-redirect: true
+  #   conditions:
+  #     - "[STATUS] == 302"
+  #     - "[CERTIFICATE_EXPIRATION] > 168h"
+
+  # --- Tailnet checks (each needs a matching ACL grant from tag:monitoring) ---
+  # - name: <host>-beszel-agent
+  #   group: hosts
+  #   url: "tcp://<host>.<tailnet>.ts.net:45876"
+  #   interval: 1m
+  #   client:
+  #     dns-resolver: "udp://100.100.100.100:53"   # only if MagicDNS names don't resolve
+  #   conditions:
+  #     - "[CONNECTED] == true"
