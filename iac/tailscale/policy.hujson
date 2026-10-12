@@ -14,7 +14,7 @@
 		"tag:docker":     ["group:privusers"], //all docker nodes
 		"tag:oob":        ["group:privusers"], //all oob-devices
 		"tag:security":   ["group:privusers"], //all security devices and infra
-		"tag:monitoring": ["group:privusers"], //all monitoring devices and infra
+		"tag:monitoring": ["group:privusers"], //RENAMING to tag:monitor -- remove once devices are retagged
 		"tag:proxy":      ["group:privusers"], //TODO: description
 		"tag:guests":     ["group:privusers"], //guest assets
 		"tag:trusted":    ["group:privusers"], //natively trusted assets
@@ -24,7 +24,9 @@
 		"tag:ssh":        ["group:privusers"], //tailscale ssh access
 		"tag:test":       ["group:privusers"], //just a test tag
 		"tag:mgmt":       ["group:privusers"], //mgmt ui still exposed directly on 80/443, not yet behind proxy
-		"tag:monitored":  ["group:privusers"], //devices/collectors shipping logs or metrics to monitoring
+		"tag:monitored":  ["group:privusers"], //RENAMING to tag:observed -- remove once devices are retagged
+		"tag:monitor":    ["group:privusers"], //monitoring host(s): observation-only, pulls from observed hosts
+		"tag:observed":   ["group:privusers"], //hosts/collectors shipping logs, pinging healthchecks, pulled by the monitor
 
 		///////////////////////////////////////////////////////////////////
 		//"tag:app-golink":       ["group:privusers"], //golink container access
@@ -48,7 +50,7 @@
 				"autogroup:self",
 				"tag:hypervisor", "tag:storage", "tag:service", "tag:docker", "tag:oob",
 				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests", "tag:trusted",
-				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt", "tag:monitored",
+				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt", "tag:monitored", "tag:monitor", "tag:observed",
 			],
 			"users":       ["${LOCAL_UNIX_ACCOUNT}", "root"],
 			"checkPeriod": "24h",
@@ -60,7 +62,7 @@
 			"dst": [
 				"tag:hypervisor", "tag:storage", "tag:service", "tag:docker", "tag:oob",
 				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests", "tag:trusted",
-				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt", "tag:monitored",
+				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt", "tag:monitored", "tag:monitor", "tag:observed",
 			],
 			"users":  ["${LOCAL_UNIX_ACCOUNT}", "root"],
 		},
@@ -74,16 +76,16 @@
 	],
 
 	// Tailscale Services (defined in iac/tailscale-services/): hosts tagged
-	// tag:monitoring may advertise these without manual approval.
+	// tag:monitor (and tag:monitoring during the rename) may advertise these without manual approval.
 	"autoApprovers": {
 		"services": {
-			"svc:gatus":   ["tag:monitoring"],
-			"svc:cockpit": ["tag:monitoring"],
-			"svc:beszel":  ["tag:monitoring"],
-			"svc:dozzle":  ["tag:monitoring"],
-			"svc:logtide":     ["tag:monitoring"],
-			"svc:logtide-api": ["tag:monitoring"],
-			"svc:healthchecks": ["tag:monitoring"],
+			"svc:gatus":   ["tag:monitoring", "tag:monitor"],
+			"svc:cockpit": ["tag:monitoring", "tag:monitor"],
+			"svc:beszel":  ["tag:monitoring", "tag:monitor"],
+			"svc:dozzle":  ["tag:monitoring", "tag:monitor"],
+			"svc:logtide":     ["tag:monitoring", "tag:monitor"],
+			"svc:logtide-api": ["tag:monitoring", "tag:monitor"],
+			"svc:healthchecks": ["tag:monitoring", "tag:monitor"],
 		},
 	},
 
@@ -121,7 +123,7 @@
 		//},
 
 		{
-			"src": ["tag:security", "tag:monitoring"],
+			"src": ["tag:security", "tag:monitoring", "tag:monitor"],
 			"dst": ["*"],
 			"ip":  ["icmp:*"],
 		},
@@ -133,7 +135,7 @@
 		},
 		{
 			// log shippers (tailscale devices, remote syslog collectors) -> log ingest
-			"src": ["tag:monitored"],
+			"src": ["tag:monitored", "tag:observed"],
 			"dst": ["svc:logtide-api"],
 			"ip":  ["tcp:443"],
 		},
@@ -160,9 +162,21 @@
 			"ip":  ["tcp:*"],
 		},
 		{
-			"src": ["tag:monitoring"],
+			"src": ["tag:monitoring", "tag:monitor"],
 			"dst": ["macmini"],
 			"ip":  ["tcp:45876"],
+		},
+		{
+			// observed hosts ping job heartbeats (tailnet only; healthchecks isn't published elsewhere)
+			"src": ["tag:observed"],
+			"dst": ["svc:healthchecks"],
+			"ip":  ["tcp:443"],
+		},
+		{
+			// monitor pulls agents on observed hosts: beszel agent, dozzle agent
+			"src": ["tag:monitor"],
+			"dst": ["tag:observed"],
+			"ip":  ["tcp:45876", "tcp:7007"],
 		},
 	],
 
@@ -202,6 +216,23 @@
 			"src":    "tag:monitored",
 			"accept": ["svc:logtide-api:443"],
 			"deny":   ["tag:monitoring:22", "tag:monitoring:443"],
+		},
+		{
+			// new tag names: log shippers reach ingest + heartbeats only
+			"src":    "tag:observed",
+			"accept": ["svc:logtide-api:443", "svc:healthchecks:443"],
+			"deny":   ["tag:monitor:22", "tag:monitor:443", "tag:observed:45876"],
+		},
+		{
+			// new tag names: the monitor pulls agents, nothing else
+			"src":    "tag:monitor",
+			"accept": ["tag:observed:45876", "tag:observed:7007", "macmini:45876"],
+			"deny":   ["tag:observed:22", "macmini:22"],
+		},
+		{
+			// old per-port admin UI paths stay closed under the new tag too
+			"src":  "${TS_PRIVUSER}",
+			"deny": ["tag:monitor:9090", "tag:monitor:8443"],
 		},
 	],
 }
