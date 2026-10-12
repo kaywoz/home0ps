@@ -27,7 +27,7 @@ Personal home-lab and home-ops repo: Docker Compose service stacks, infrastructu
 | `docker-compose/` | Active service stacks, one subfolder per stack with its own `compose.yaml`; retired stacks are in `archive/docker-compose/` |
 | `iac/`            | Infrastructure as code, one folder per area: `iac/hetzner/`, `iac/cloudflare/`, `iac/tailscale/`, `iac/tailscale-services/` (see below) |
 | `.github/workflows/` | One path-scoped deploy pipeline per `iac/` area, plus `readme-weekly.yml` (weekly README refresh)     |
-| `config-files/`   | Bootstrap/setup scripts and dotfiles for `linux`, `rpi`, and `win` hosts                                 |
+| `config-files/`   | Bootstrap/setup scripts and dotfiles for `linux`, `rpi` (incl. `HARDENING.md` rebuild checklist) and `win` hosts; `log-shipping/` (journald + Fluent Bit → LogTide, same on every host) |
 | `files/scripts/`  | Standalone install/maintenance scripts (Docker install, rclone backup, Time Machine snapshot purge, Windows bootstrap) |
 | `files/pix/`, `images/` | Logo and image assets used in this README and in diagrams                                         |
 | `d2/`             | [d2](https://d2lang.com/)-format architecture, threat-modeling, and SOC-process diagrams                |
@@ -38,7 +38,7 @@ Personal home-lab and home-ops repo: Docker Compose service stacks, infrastructu
 
 | Stack        | Image(s) | What it is |
 |--------------|----------|------------|
-| `monitoring` | `twinproduction/gatus`, `henrygd/beszel`, `henrygd/beszel-agent`, `amir20/dozzle`, `tecnativa/docker-socket-proxy` | Hardened monitoring stack: Gatus status page, Beszel hub + local agent, Dozzle log viewer, read-only Docker socket proxy. UIs bind to `127.0.0.1` and are published as Tailscale Services (`svc:gatus`, `svc:beszel`, `svc:dozzle`). Host-specific values come from `.env` (see `.env.example`). |
+| `monitoring` | `twinproduction/gatus`, `henrygd/beszel`, `henrygd/beszel-agent`, `amir20/dozzle`, `tecnativa/docker-socket-proxy`, `logtide/backend`, `logtide/frontend`, `timescale/timescaledb`, `redis`, `healthchecks/healthchecks` | Hardened monitoring stack: Gatus status page, Beszel hub + local agent, Dozzle log viewer, LogTide log management (TimescaleDB + Redis, DB on an internal network), Healthchecks job heartbeats, read-only Docker socket proxy. UIs bind to `127.0.0.1` and are published as Tailscale Services (`svc:gatus`, `svc:beszel`, `svc:dozzle`, `svc:logtide`, `svc:logtide-api`, `svc:healthchecks`). Host-specific values and generated secrets live in `.env` (see `.env.example`); one-time `*-setup.sh` scripts create them. |
 
 Earlier stacks were retired to [`archive/docker-compose/`](archive/docker-compose/README.md).
 
