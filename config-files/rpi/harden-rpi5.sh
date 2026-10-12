@@ -27,9 +27,11 @@ step() { printf '\n\e[1m== %s\e[0m\n' "$*"; }
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo." >&2; exit 1; }
 
 apply() {
-  step "Firmware: radios and UART off (Pi 5 overlay names)"
+  step "Firmware: radios and UART off (Pi 5 overlay names), 4K-page kernel"
   grep -q '^\[all\]' "$CFG" || printf '\n[all]\n' >> "$CFG"
-  for line in "dtoverlay=disable-wifi-pi5" "dtoverlay=disable-bt-pi5" "enable_uart=0"; do
+  # kernel8.img = 4K pages. The Pi 5 default (kernel_2712, 16K pages) breaks software
+  # bundling jemalloc built for 4K pages, e.g. Fluent Bit's arm64 packages.
+  for line in "dtoverlay=disable-wifi-pi5" "dtoverlay=disable-bt-pi5" "enable_uart=0" "kernel=kernel8.img"; do
     grep -qxF "$line" "$CFG" || { echo "$line" >> "$CFG"; NEED_REBOOT=1; echo "  added $line"; }
   done
 
@@ -114,8 +116,8 @@ CONF
   "icc": false,
   "userland-proxy": false,
   "live-restore": true,
-  "log-driver": "local",
-  "log-opts": { "max-size": "10m" }
+  "log-driver": "journald",
+  "log-opts": { "tag": "{{.Name}}" }
 }
 CONF
   systemctl restart docker
@@ -145,12 +147,16 @@ verify() {
   ! ip link show wlan0 >/dev/null 2>&1                      && ok "no wlan0"            || bad "wlan0 present (overlay/reboot?)"
   [ -z "$(ls /sys/class/bluetooth 2>/dev/null)" ]           && ok "no Bluetooth"        || bad "Bluetooth present"
   grep -q cgroup_enable=memory /proc/cmdline                && ok "memory cgroup on"    || bad "memory cgroup off (reboot?)"
+  [ "$(getconf PAGESIZE)" = 4096 ]                          && ok "4K-page kernel"      || bad "page size $(getconf PAGESIZE) (kernel=kernel8.img + reboot?)"
   [ "$(sysctl -n kernel.kptr_restrict)" = 2 ]               && ok "kptr_restrict=2"     || bad "kptr_restrict"
   [ "$(sysctl -n kernel.unprivileged_bpf_disabled)" -ge 1 ] && ok "unpriv BPF disabled" || bad "unprivileged_bpf_disabled"
   sshd -T | grep -qx 'permitrootlogin no'                   && ok "SSH root login off"  || bad "PermitRootLogin"
   sshd -T | grep -qx 'passwordauthentication no'            && ok "SSH passwords off"   || bad "PasswordAuthentication"
   docker info 2>/dev/null | grep -q 'userns'                && ok "Docker userns-remap" || bad "userns-remap not active"
   docker info 2>&1 | grep -qi 'no memory limit support'     && bad "Docker memory limits unsupported" || ok "Docker memory limits"
+  [ "$(docker info --format '{{.LoggingDriver}}' 2>/dev/null)" = journald ] && ok "Docker log driver journald" || bad "Docker log driver not journald"
+  grep -qs '^Storage=persistent' /etc/systemd/journald.conf.d/*.conf && ok "journal persistent" || bad "journal not persistent (run log-shipping setup)"
+  systemctl is-active --quiet fluent-bit                    && ok "fluent-bit running"  || bad "fluent-bit not running"
   if command -v tailscale >/dev/null; then
     tailscale status --self --json 2>/dev/null | grep -q "\"${TS_TAG}\"" && ok "tailnet tag ${TS_TAG}" || bad "tag ${TS_TAG} missing"
     tailscale debug prefs 2>/dev/null | grep -q '"RunSSH": false' && ok "Tailscale SSH off" || bad "Tailscale SSH on?"
