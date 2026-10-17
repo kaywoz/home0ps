@@ -14,7 +14,6 @@ locals {
     healthchecks  = "Job heartbeats (UI + ping endpoint)"
 
     # storage host (tag:storage)
-    "dozzle-nas"   = "Container log viewer (storage host)"
     archivebox     = "Web archive"
     archivewarrior = "ArchiveTeam Warrior"
     scrutiny       = "Disk SMART health"
