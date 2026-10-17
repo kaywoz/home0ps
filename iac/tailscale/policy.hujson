@@ -87,7 +87,6 @@
 			"svc:logtide-api": ["tag:monitoring", "tag:monitor"],
 			"svc:healthchecks": ["tag:monitoring", "tag:monitor"],
 			// storage host app UIs
-			"svc:dozzle-nas":      ["tag:storage"],
 			"svc:archivebox":      ["tag:storage"],
 			"svc:archivewarrior":  ["tag:storage"],
 			"svc:scrutiny":        ["tag:storage"],
@@ -143,8 +142,14 @@
 		{
 			// admins -> storage host app UIs (same sources as full access to tag:storage)
 			"src": ["autogroup:admin", "group:privusers", "tag:trusted", "macmini"],
-			"dst": ["svc:dozzle-nas", "svc:archivebox", "svc:archivewarrior", "svc:scrutiny", "svc:kopia", "svc:rustfs"],
+			"dst": ["svc:archivebox", "svc:archivewarrior", "svc:scrutiny", "svc:kopia", "svc:rustfs"],
 			"ip":  ["tcp:443"],
+		},
+		{
+			// monitoring host's Dozzle pulls the Dozzle agent on the storage host
+			"src": ["tag:monitoring", "tag:monitor"],
+			"dst": ["tag:storage"],
+			"ip":  ["tcp:7007"],
 		},
 		{
 			// log shippers (tailscale devices, remote syslog collectors) -> log ingest
@@ -260,8 +265,9 @@
 		{
 			// storage host app UIs reachable as services
 			"src":    "${TS_PRIVUSER}",
-			"accept": ["svc:dozzle-nas:443", "svc:archivebox:443", "svc:archivewarrior:443", "svc:scrutiny:443", "svc:kopia:443", "svc:rustfs:443"],
+			"accept": ["svc:archivebox:443", "svc:archivewarrior:443", "svc:scrutiny:443", "svc:kopia:443", "svc:rustfs:443"],
 		},
 		{"src": "macmini", "accept": ["svc:archivebox:443", "svc:kopia:443"]},
+		{"src": "tag:monitor", "accept": ["tag:storage:7007"], "deny": ["tag:storage:22", "tag:storage:445"]},
 	],
 }
