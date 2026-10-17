@@ -12,6 +12,13 @@ locals {
     logtide       = "Log management UI"
     "logtide-api" = "Log management API (UI calls + log ingest)"
     healthchecks  = "Job heartbeats (UI + ping endpoint)"
+
+    # storage host (tag:storage)
+    archivebox     = "Web archive"
+    archivewarrior = "ArchiveTeam Warrior"
+    scrutiny       = "Disk SMART health"
+    kopia          = "Backup server UI"
+    rustfs         = "S3 storage console"
   }
 }
 
