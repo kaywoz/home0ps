@@ -150,9 +150,10 @@
 			"ip":  ["tcp:*"],
 		},
 		{
-			"src": ["tag:trusted", "group:privusers"],
+			// admins (privusers, trusted devices, the Mac mini) reach everything on the storage host
+			"src": ["tag:trusted", "group:privusers", "macmini"],
 			"dst": ["tag:storage"],
-			"ip":  ["tcp:*"],
+			"ip":  ["*"],
 		},
 		{
 			//ha to synonology dsm portal
@@ -234,5 +235,14 @@
 			"src":  "${TS_PRIVUSER}",
 			"deny": ["tag:monitor:9090", "tag:monitor:8443"],
 		},
+		{
+			// admins reach everything on the storage host: tcp (smb, nfs), udp, icmp
+			"src":    "${TS_PRIVUSER}",
+			"accept": ["tag:storage:445", "tag:storage:2049", "tag:storage:5000"],
+		},
+		{"src": "${TS_PRIVUSER}", "proto": "udp", "accept": ["tag:storage:2049", "tag:storage:137"]},
+		{"src": "${TS_PRIVUSER}", "proto": "icmp", "accept": ["tag:storage:0"]},
+		{"src": "macmini", "accept": ["tag:storage:445", "tag:storage:2049"]},
+		{"src": "tag:trusted", "accept": ["tag:storage:445"]},
 	],
 }
