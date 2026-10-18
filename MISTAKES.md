@@ -241,3 +241,18 @@ mistakes, not a diary.
   connects or authenticates, read the app's own docs for that mode and say
   which page was used. Never present `:ro` on `docker.sock` as a
   restriction; only a socket proxy with `POST=0` limits the API.
+
+### 2026-10-18 — tailscale-services (Kopia serve target)
+
+- **Trigger:** wrong assumption — `svc:kopia` returned 502
+- **What happened:** the storage-host `tailscale serve` commands pointed
+  Kopia at `https+insecure://127.0.0.1:51515`, assuming Kopia's server uses
+  its own TLS. A probe showed it speaks plain HTTP (401 on `http://`, no
+  answer on `https://`).
+- **Root cause:** guessed the backend protocol instead of probing the port
+  before writing the command — the same "read/verify the app first" gap as
+  the entry above.
+- **Fix applied:** target changed to `http://127.0.0.1:51515`.
+- **Rule going forward:** CLAUDE.md §2 (app-docs rule) — before giving a
+  proxy/serve target, check the backend's protocol (`curl http://` vs
+  `https://`) when the port is reachable, or say it's unverified.
