@@ -60,6 +60,14 @@ merge pipelines or hand one job another area's credentials.
   prefer targeted edits over full rewrites of drafts he may still be changing.
 - If something couldn't be checked (no credentials, rate limit, private repo),
   say so explicitly in the plan instead of filling the gap with a guess.
+- Before recommending how an app connects or authenticates (agents, remote
+  APIs, sockets, TLS), read the app's own docs for that mode and name the
+  page used. `:ro` on a `docker.sock` bind mount restricts nothing; only a
+  socket proxy with `POST=0` limits the Docker API.
+- Merged is not deployed. Before host steps that depend on a repo change,
+  confirm the host runs the repo version (`diff`/`grep` the changed line).
+  For compose checks use `docker compose config --quiet` or a grep for empty
+  values; plain `docker compose config` prints rendered secrets.
 
 ## 3. Content that must not change
 

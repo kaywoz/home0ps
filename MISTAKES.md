@@ -221,3 +221,58 @@ mistakes, not a diary.
 - **Rule going forward:** CLAUDE.md §4 — real device names end in `-y`;
   generic aliases and Tailscale IPs may be committed. If a name fits
   neither pattern, ask.
+
+### 2026-10-18 — tailscale-acl (Dozzle agent advice for the storage host)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** recommended a Dozzle **agent** on the storage host,
+  suggested reading Docker through a socket proxy "if MOS makes it easy",
+  and gave an example mounting `docker.sock:ro`. A grant for the agent port
+  (7007) was merged. Dozzle's docs say agents can't be used with a socket
+  proxy in the agent stack; the socket-proxy pattern kaywoz already uses is
+  Dozzle's *remote host* mode. And `:ro` on a socket bind mount doesn't
+  restrict the Docker API at all.
+- **Root cause:** answered from general knowledge of Dozzle instead of
+  reading its agent and remote-host guides first; treated `:ro` on a socket
+  as a permission control.
+- **Fix applied:** read both guides; laid out agent vs. socket proxy (remote
+  host) for kaywoz to choose; any grant change follows that choice.
+- **Rule going forward:** CLAUDE.md §2 — before recommending how an app
+  connects or authenticates, read the app's own docs for that mode and say
+  which page was used. Never present `:ro` on `docker.sock` as a
+  restriction; only a socket proxy with `POST=0` limits the API.
+
+### 2026-10-18 — tailscale-services (Kopia serve target)
+
+- **Trigger:** wrong assumption — `svc:kopia` returned 502
+- **What happened:** the storage-host `tailscale serve` commands pointed
+  Kopia at `https+insecure://127.0.0.1:51515`, assuming Kopia's server uses
+  its own TLS. A probe showed it speaks plain HTTP (401 on `http://`, no
+  answer on `https://`).
+- **Root cause:** guessed the backend protocol instead of probing the port
+  before writing the command — the same "read/verify the app first" gap as
+  the entry above.
+- **Fix applied:** target changed to `http://127.0.0.1:51515`.
+- **Rule going forward:** CLAUDE.md §2 (app-docs rule) — before giving a
+  proxy/serve target, check the backend's protocol (`curl http://` vs
+  `https://`) when the port is reachable, or say it's unverified.
+
+### 2026-10-18 — monitoring (live compose assumed to match the repo)
+
+- **Trigger:** wrong assumption — kaywoz hit a YAML error and empty values
+- **What happened:** after merging the `DOZZLE_REMOTE_AGENT` change, I told
+  kaywoz to set the variable in `.env` and recreate Dozzle. The live
+  `/srv/docker/compose.yaml` was an older hand-edited copy (host name
+  hard-coded, no `${DOZZLE_REMOTE_AGENT}`), so the value had to be typed
+  into the file (wrong `=` syntax → YAML error). Once the repo file was
+  copied in, four `.env` variables turned out to be missing, and the
+  debugging output put rendered secrets into the conversation.
+- **Root cause:** treated "merged in the repo" as "deployed on the host";
+  issue #98 already said the two had drifted.
+- **Fix applied:** live compose replaced with the repo version, `.env`
+  completed, stack recreated; exposed secrets added to #114.
+- **Rule going forward:** CLAUDE.md §2 — before giving host steps that rely
+  on a repo change, have kaywoz confirm the host runs the repo version
+  (e.g. `diff` or `grep` for the changed line), and give the
+  empty-value check (`docker compose config 2>/dev/null | grep -nE ': ""$'`)
+  rather than plain `docker compose config`, which prints secrets.
