@@ -60,6 +60,10 @@ merge pipelines or hand one job another area's credentials.
   prefer targeted edits over full rewrites of drafts he may still be changing.
 - If something couldn't be checked (no credentials, rate limit, private repo),
   say so explicitly in the plan instead of filling the gap with a guess.
+- Before recommending how an app connects or authenticates (agents, remote
+  APIs, sockets, TLS), read the app's own docs for that mode and name the
+  page used. `:ro` on a `docker.sock` bind mount restricts nothing; only a
+  socket proxy with `POST=0` limits the Docker API.
 
 ## 3. Content that must not change
 
