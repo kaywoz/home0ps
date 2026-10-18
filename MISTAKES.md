@@ -256,3 +256,23 @@ mistakes, not a diary.
 - **Rule going forward:** CLAUDE.md §2 (app-docs rule) — before giving a
   proxy/serve target, check the backend's protocol (`curl http://` vs
   `https://`) when the port is reachable, or say it's unverified.
+
+### 2026-10-18 — monitoring (live compose assumed to match the repo)
+
+- **Trigger:** wrong assumption — kaywoz hit a YAML error and empty values
+- **What happened:** after merging the `DOZZLE_REMOTE_AGENT` change, I told
+  kaywoz to set the variable in `.env` and recreate Dozzle. The live
+  `/srv/docker/compose.yaml` was an older hand-edited copy (host name
+  hard-coded, no `${DOZZLE_REMOTE_AGENT}`), so the value had to be typed
+  into the file (wrong `=` syntax → YAML error). Once the repo file was
+  copied in, four `.env` variables turned out to be missing, and the
+  debugging output put rendered secrets into the conversation.
+- **Root cause:** treated "merged in the repo" as "deployed on the host";
+  issue #98 already said the two had drifted.
+- **Fix applied:** live compose replaced with the repo version, `.env`
+  completed, stack recreated; exposed secrets added to #114.
+- **Rule going forward:** CLAUDE.md §2 — before giving host steps that rely
+  on a repo change, have kaywoz confirm the host runs the repo version
+  (e.g. `diff` or `grep` for the changed line), and give the
+  empty-value check (`docker compose config 2>/dev/null | grep -nE ': ""$'`)
+  rather than plain `docker compose config`, which prints secrets.
