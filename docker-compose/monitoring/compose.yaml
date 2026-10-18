@@ -105,8 +105,8 @@ services:
       DOZZLE_AUTH_TTL: 48h
       DOZZLE_ENABLE_ACTIONS: "false"
       DOZZLE_NO_ANALYTICS: "true"
-      # Remote agents (later), reached over the tailnet:
-      # DOZZLE_REMOTE_AGENT: 100.a.b.c:7007,100.d.e.f:7007
+      # Remote agents over the tailnet (grant tag:monitor -> agent hosts tcp:7007); same mTLS pair as below
+      DOZZLE_REMOTE_AGENT: ${DOZZLE_REMOTE_AGENT}
     ports:
       - "127.0.0.1:8082:8080"        # svc:dozzle via tailscale serve
     networks:
