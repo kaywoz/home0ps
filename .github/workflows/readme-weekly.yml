@@ -2,7 +2,8 @@ name: weekly readme refresh
 
 # Every Monday: if anything landed on main in the last 7 days, Claude checks
 # README.md against the repo and writes a summary of the week. If the README
-# needed changes, a draft PR is opened with the summary as its description.
+# needed changes, a PR is opened with the summary as its description and
+# merged right away (README.md only; anything else stops the run).
 # Claude only edits files; git and PR steps below are plain shell, and the run
 # fails if anything other than README.md was touched.
 
@@ -13,7 +14,7 @@ on:
 
 permissions:
   contents: write # push the refresh branch
-  pull-requests: write # open the draft PR
+  pull-requests: write # open and merge the PR
 
 concurrency:
   group: readme-weekly
@@ -136,7 +137,7 @@ jobs:
             cat "$RUNNER_TEMP/pr-body.md" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Open draft PR
+      - name: Open and merge PR
         if: steps.diff.outputs.readme == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -151,6 +152,12 @@ jobs:
           git add README.md
           git commit -m "docs: weekly README refresh ($TODAY)"
           git push -u origin "$branch"
-          gh pr create --draft --base main --head "$branch" \
+          url=$(gh pr create --base main --head "$branch" \
             --title "docs: weekly README refresh ($TODAY)" \
-            --body-file "$RUNNER_TEMP/pr-body.md"
+            --body-file "$RUNNER_TEMP/pr-body.md")
+          # Guard: merge only a PR that touches README.md and nothing else.
+          files=$(gh pr diff "$url" --name-only)
+          [ "$files" = "README.md" ] || { echo "::error::PR touches more than README.md: $files"; exit 1; }
+          # Merge commit like every other PR; GitHub deletes the branch on merge.
+          # If main ever requires reviews/checks this fails and the PR stays open.
+          gh pr merge "$url" --merge
