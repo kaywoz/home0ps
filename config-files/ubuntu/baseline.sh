@@ -21,6 +21,8 @@
 #
 # Docker hosts: run docker-host.sh after this.
 set -euo pipefail
+# Command output is parsed below (apt-cache policy, sshd -T, docker info): force English.
+export LC_ALL=C LANG=C
 
 SECTIONS="snap updates ssh sysctl purge packages tailscale"
 REBOOT_TIME="${REBOOT_TIME:-04:00}"

@@ -311,3 +311,19 @@ mistakes, not a diary.
   check the specific release's package page (or `apt-cache policy` on the
   host) and say which releases were checked; scripts installing packages on
   more than one release must tolerate a missing one.
+
+### 2026-10-19 — config (parsed command output assumed English)
+
+- **Trigger:** wrong assumption — `baseline.sh` reported `unzip` (and
+  `tealdeer|tldr`) as "no installable package" on a host
+- **What happened:** the candidate check greps `apt-cache policy` for
+  `Candidate:`. The host runs a non-English locale, so apt printed a
+  translated label, the grep never matched, and every package that still
+  needed installing was reported missing.
+- **Root cause:** parsed human-readable command output without forcing the
+  C locale; the stub tests used English stub output, so they couldn't catch it.
+- **Fix applied:** `export LC_ALL=C LANG=C` at the top of `baseline.sh` and
+  `docker-host.sh`.
+- **Rule going forward:** CLAUDE.md §2 — any script that greps command output
+  sets `LC_ALL=C` first; prefer exit codes over parsed text where a command
+  offers one.

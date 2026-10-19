@@ -18,6 +18,8 @@
 # Settings (environment, optional):
 #   REPO_RAW=https://raw.githubusercontent.com/kaywoz/home0ps/main   where `logs` fetches its files
 set -euo pipefail
+# Command output is parsed below (apt-cache policy, sshd -T, docker info): force English.
+export LC_ALL=C LANG=C
 
 SECTIONS="docker daemon layout logs"
 DOCKER_ROOT="/srv/docker"
