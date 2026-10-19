@@ -292,3 +292,22 @@ mistakes, not a diary.
 - **Rule going forward:** CLAUDE.md §2 — state what a repo/GitHub setting
   does only after checking it applies to the actor in question (user, PAT,
   `GITHUB_TOKEN`, app); otherwise make the behaviour explicit in the code.
+
+### 2026-10-19 — config (package availability claimed from a loose check)
+
+- **Trigger:** wrong assumption — `apt-get install tldr` failed on a host
+  ("no installation candidate")
+- **What happened:** I told kaywoz `htop` and `tldr` "are in Ubuntu's
+  repositories" and put `tldr` in `baseline.sh`. The check behind that was a
+  grep over packages.ubuntu.com search results that only showed the name
+  appeared somewhere, not that the package is installable on the host's
+  release. On the host, `tldr` had no candidate, and the whole run aborted.
+- **Root cause:** a check that couldn't fail was treated as verification;
+  no allowance for the package set differing between Ubuntu releases.
+- **Fix applied:** `baseline.sh` now takes alternatives (`tealdeer|tldr`,
+  first installable wins), checks `apt-cache policy` for a candidate, and
+  reports a missing package instead of aborting.
+- **Rule going forward:** CLAUDE.md §2 — before stating a package exists,
+  check the specific release's package page (or `apt-cache policy` on the
+  host) and say which releases were checked; scripts installing packages on
+  more than one release must tolerate a missing one.

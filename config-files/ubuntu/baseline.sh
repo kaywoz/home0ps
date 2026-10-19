@@ -14,7 +14,9 @@
 #   REBOOT_TIME=04:00     automatic reboot time for unattended upgrades
 #   AUTO_REBOOT=true      false = never reboot automatically
 #   TS_TAG=tag:observed   tag printed in the `tailscale up` hint
-#   PACKAGES="htop ncdu git tldr unzip curl ca-certificates"   (apt packages)
+#   PACKAGES="htop ncdu git tealdeer|tldr unzip curl ca-certificates"
+#            apt packages; "a|b" = first one installable on this release.
+#            A package with no install candidate is reported, not fatal.
 #   dysk is not in Ubuntu's repos: installed from its GitHub release, checksum-verified
 #
 # Docker hosts: run docker-host.sh after this.
@@ -24,7 +26,7 @@ SECTIONS="snap updates ssh sysctl purge packages tailscale"
 REBOOT_TIME="${REBOOT_TIME:-04:00}"
 AUTO_REBOOT="${AUTO_REBOOT:-true}"
 TS_TAG="${TS_TAG:-tag:observed}"
-PACKAGES="${PACKAGES:-htop ncdu git tldr unzip curl ca-certificates}"
+PACKAGES="${PACKAGES:-htop ncdu git tealdeer|tldr unzip curl ca-certificates}"
 PURGE="avahi-daemon cups cups-browsed bluez modemmanager triggerhappy popularity-contest"
 ADMIN_USER="${SUDO_USER:-${LOCAL_UNIX_ACCOUNT:-}}"
 
@@ -69,11 +71,20 @@ wanted() {
 }
 installed() { dpkg -s "$1" >/dev/null 2>&1; }
 APT_UPDATED=0
+has_candidate() { apt-cache policy "$1" 2>/dev/null | grep -q 'Candidate: [^(]'; }
+# apt_install <pkg|alt1|alt2>... : skips installed ones, picks the first installable
+# alternative, reports (doesn't abort on) names with no candidate on this release
 apt_install() {
-  local missing=""
-  for p in "$@"; do if ! installed "$p"; then missing="$missing $p"; fi; done
-  if [ -z "$missing" ]; then return 0; fi
+  local item alt pick missing=""
   if [ "$APT_UPDATED" = 0 ] && [ "$MODE" != dry ]; then apt-get update -q; APT_UPDATED=1; fi
+  for item in "$@"; do
+    pick=""
+    for alt in ${item//|/ }; do if installed "$alt"; then pick=installed; break; fi; done
+    [ "$pick" = installed ] && continue
+    for alt in ${item//|/ }; do if has_candidate "$alt"; then pick="$alt"; break; fi; done
+    if [ -n "$pick" ]; then missing="$missing $pick"; else bad "no installable package for '$item' on this release"; fi
+  done
+  if [ -z "$missing" ]; then return 0; fi
   # shellcheck disable=SC2086
   run env DEBIAN_FRONTEND=noninteractive apt-get install -y -q $missing
 }
@@ -231,6 +242,10 @@ apply_packages() {
   # shellcheck disable=SC2086
   apt_install $PACKAGES
   install_dysk
+  # tealdeer needs its page cache once per user
+  if installed tealdeer && [ -n "$ADMIN_USER" ] && [ "$MODE" != dry ]; then
+    sudo -u "$ADMIN_USER" -H tldr --update >/dev/null 2>&1 && echo "  tldr pages downloaded for $ADMIN_USER" || echo "  WARN: tldr --update failed (run it as $ADMIN_USER)"
+  fi
 }
 # dysk (disk usage overview) isn't packaged for Ubuntu: latest GitHub release, static musl
 # binary, SHA-256 from the GitHub API checked before extracting. Installed once; re-run
@@ -256,8 +271,12 @@ install_dysk() {
   echo "  installed dysk $tag"
 }
 verify_packages() {
-  local p missing=""
-  for p in $PACKAGES; do if ! installed "$p"; then missing="$missing $p"; fi; done
+  local item alt hit missing=""
+  for item in $PACKAGES; do
+    hit=""
+    for alt in ${item//|/ }; do if installed "$alt"; then hit=1; fi; done
+    [ -n "$hit" ] || missing="$missing $item"
+  done
   [ -z "$missing" ] && ok "admin packages installed" || bad "missing:$missing"
   command -v dysk >/dev/null 2>&1 && ok "dysk installed" || bad "dysk missing"
 }
