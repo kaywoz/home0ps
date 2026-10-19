@@ -184,6 +184,13 @@
 			"ip":  ["tcp:443"],
 		},
 		{
+			// Beszel agents on observed hosts push to the hub (WebSocket /api/beszel/agent-connect);
+			// exception to "monitoring pulls" (CLAUDE.md §8). SSH pull on 45876 stays as fallback.
+			"src": ["tag:observed"],
+			"dst": ["svc:beszel"],
+			"ip":  ["tcp:443"],
+		},
+		{
 			// monitoring host pulls agents on observed hosts: beszel agent, dozzle agent
 			"src": ["tag:monitoring"],
 			"dst": ["tag:observed"],
@@ -223,9 +230,9 @@
 		},
 		{"src": "tag:monitoring", "accept": ["macmini:45876"], "deny": ["macmini:22"]},
 		{
-			// observed hosts reach log ingest + heartbeats only, nothing else on the monitoring host
+			// observed hosts reach log ingest, heartbeats and the Beszel hub only, nothing else on the monitoring host
 			"src":    "tag:observed",
-			"accept": ["svc:logtide-api:443", "svc:healthchecks:443"],
+			"accept": ["svc:logtide-api:443", "svc:healthchecks:443", "svc:beszel:443"],
 			"deny":   ["tag:monitoring:22", "tag:monitoring:443", "tag:observed:45876"],
 		},
 		{
