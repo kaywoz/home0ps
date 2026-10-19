@@ -158,6 +158,7 @@ jobs:
           # Guard: merge only a PR that touches README.md and nothing else.
           files=$(gh pr diff "$url" --name-only)
           [ "$files" = "README.md" ] || { echo "::error::PR touches more than README.md: $files"; exit 1; }
-          # Merge commit like every other PR; GitHub deletes the branch on merge.
+          # Merge commit like every other PR. --delete-branch: the repo's auto-delete
+          # setting doesn't fire for merges made with the workflow's own token.
           # If main ever requires reviews/checks this fails and the PR stays open.
-          gh pr merge "$url" --merge
+          gh pr merge "$url" --merge --delete-branch
