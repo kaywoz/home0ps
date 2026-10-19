@@ -235,6 +235,11 @@ change explicitly if one no longer fits.
   propose it. (OpenTofu providers are different: exact pins, §3.)
 - **Monitoring pulls** from the monitoring host outward over the tailnet,
   one explicit grant per flow; agents listen on tailnet IPs only.
+  **Exception — pushes to the monitoring host's Services:** observed hosts
+  (`tag:observed`) may open connections to `svc:logtide-api` (logs),
+  `svc:healthchecks` (pings) and `svc:beszel` (Beszel agent WebSocket),
+  nothing else on the monitoring host. Each push flow is its own grant
+  with an ACL test.
 - **Logs:** journald everywhere (Docker `journald` driver) → native,
   sandboxed Fluent Bit → LogTide (`config-files/log-shipping/`). One shared
   ingest key; attribution via `metadata.host`.
