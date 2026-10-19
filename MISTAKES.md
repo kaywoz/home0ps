@@ -312,18 +312,22 @@ mistakes, not a diary.
   host) and say which releases were checked; scripts installing packages on
   more than one release must tolerate a missing one.
 
-### 2026-10-19 — config (parsed command output assumed English)
+### 2026-10-19 — config (`grep -q` after a pipe under `pipefail`)
 
-- **Trigger:** wrong assumption — `baseline.sh` reported `unzip` (and
-  `tealdeer|tldr`) as "no installable package" on a host
-- **What happened:** the candidate check greps `apt-cache policy` for
-  `Candidate:`. The host runs a non-English locale, so apt printed a
-  translated label, the grep never matched, and every package that still
-  needed installing was reported missing.
-- **Root cause:** parsed human-readable command output without forcing the
-  C locale; the stub tests used English stub output, so they couldn't catch it.
-- **Fix applied:** `export LC_ALL=C LANG=C` at the top of `baseline.sh` and
-  `docker-host.sh`.
-- **Rule going forward:** CLAUDE.md §2 — any script that greps command output
-  sets `LC_ALL=C` first; prefer exit codes over parsed text where a command
-  offers one.
+- **Trigger:** CI-less script bug, then a wrong diagnosis — `baseline.sh`
+  reported `unzip` and `tealdeer|tldr` as "no installable package" on a
+  26.04 host where both are installable
+- **What happened:** the candidate check was
+  `apt-cache policy … | grep -q 'Candidate: …'` in a `set -o pipefail`
+  script. `grep -q` exits on the first match, `apt-cache` gets SIGPIPE and
+  exits non-zero, and `pipefail` makes the check false exactly when it
+  matched. I first blamed a non-English locale and logged that; kaywoz's
+  `apt-cache policy` output (English) disproved it.
+- **Root cause:** `grep -q` behind a pipe with `pipefail`; the stub tests
+  printed three lines, too short to trigger SIGPIPE. The locale guess was
+  stated as the cause without checking it on the host first.
+- **Fix applied:** every `… | grep -q` in `config-files/ubuntu/` became
+  `… | grep … >/dev/null` (reads all input); `LC_ALL=C` kept as hygiene.
+- **Rule going forward:** CLAUDE.md §2 — in `pipefail` scripts never pipe
+  into `grep -q`; and before naming a cause, check it on the affected host
+  (one command) rather than reasoning from a hint like a mirror name.

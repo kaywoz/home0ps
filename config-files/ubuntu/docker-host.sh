@@ -102,7 +102,7 @@ CONF
 verify_docker() {
   installed docker-ce && ok "docker-ce installed" || bad "docker-ce missing"
   systemctl is-active --quiet docker && ok "docker running" || bad "docker not running"
-  apt-config dump 2>/dev/null | grep -q 'origin=Docker,label=Docker CE' && ok "Docker CE in unattended upgrades" || bad "Docker CE not in unattended upgrades"
+  apt-config dump 2>/dev/null | grep 'origin=Docker,label=Docker CE' >/dev/null && ok "Docker CE in unattended upgrades" || bad "Docker CE not in unattended upgrades"
 }
 
 # ---- daemon: daemon.json (identical to config-files/log-shipping/daemon.json) -
@@ -123,9 +123,9 @@ CONF
   echo "  Existing containers keep their old settings until recreated: docker compose up -d --force-recreate"
 }
 verify_daemon() {
-  docker info 2>/dev/null | grep -q userns && ok "userns-remap active" || bad "userns-remap not active"
+  docker info 2>/dev/null | grep userns >/dev/null && ok "userns-remap active" || bad "userns-remap not active"
   [ "$(docker info --format '{{.LoggingDriver}}' 2>/dev/null)" = journald ] && ok "log driver journald" || bad "log driver not journald"
-  docker info 2>&1 | grep -qi 'no memory limit support' && bad "memory limits unsupported (cgroup)" || ok "memory limits supported"
+  docker info 2>&1 | grep -i 'no memory limit support' >/dev/null && bad "memory limits unsupported (cgroup)" || ok "memory limits supported"
 }
 
 # ---- layout: /srv/docker -----------------------------------------------------

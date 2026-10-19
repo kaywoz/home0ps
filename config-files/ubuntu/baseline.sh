@@ -73,7 +73,8 @@ wanted() {
 }
 installed() { dpkg -s "$1" >/dev/null 2>&1; }
 APT_UPDATED=0
-has_candidate() { apt-cache policy "$1" 2>/dev/null | grep -q 'Candidate: [^(]'; }
+# no `grep -q` after a pipe: it exits early, the writer gets SIGPIPE and pipefail fails the check
+has_candidate() { apt-cache policy "$1" 2>/dev/null | grep 'Candidate: [^(]' >/dev/null; }
 # apt_install <pkg|alt1|alt2>... : skips installed ones, picks the first installable
 # alternative, reports (doesn't abort on) names with no candidate on this release
 apt_install() {
@@ -131,7 +132,7 @@ PREF
 verify_snap() {
   command -v snap >/dev/null 2>&1 && bad "snap command present" || ok "no snap command"
   installed snapd && bad "snapd installed" || ok "snapd not installed"
-  apt-cache policy snapd 2>/dev/null | grep -q 'Candidate: (none)' && ok "snapd pinned out" || bad "snapd installable"
+  apt-cache policy snapd 2>/dev/null | grep 'Candidate: (none)' >/dev/null && ok "snapd pinned out" || bad "snapd installable"
 }
 
 # ---- updates: unattended upgrades + automatic reboot ------------------------
@@ -165,7 +166,7 @@ CONF
 }
 verify_updates() {
   installed unattended-upgrades && ok "unattended-upgrades installed" || bad "unattended-upgrades missing"
-  apt-config dump 2>/dev/null | grep -q "Unattended-Upgrade::Automatic-Reboot-Time \"$REBOOT_TIME\"" \
+  apt-config dump 2>/dev/null | grep "Unattended-Upgrade::Automatic-Reboot-Time \"$REBOOT_TIME\"" >/dev/null \
     && ok "config active (reboot $AUTO_REBOOT at $REBOOT_TIME)" || bad "unattended config not active"
   local t
   for t in apt-daily.timer apt-daily-upgrade.timer; do
@@ -197,8 +198,8 @@ CONF
   fi
 }
 verify_ssh() {
-  sshd -T 2>/dev/null | grep -qx 'permitrootlogin no' && ok "SSH root login off" || bad "PermitRootLogin"
-  sshd -T 2>/dev/null | grep -qx 'passwordauthentication no' && ok "SSH passwords off" || bad "PasswordAuthentication"
+  sshd -T 2>/dev/null | grep -x 'permitrootlogin no' >/dev/null && ok "SSH root login off" || bad "PermitRootLogin"
+  sshd -T 2>/dev/null | grep -x 'passwordauthentication no' >/dev/null && ok "SSH passwords off" || bad "PasswordAuthentication"
 }
 
 # ---- sysctl: kernel hardening (same values as the Pi) -----------------------
@@ -297,7 +298,7 @@ apply_tailscale() {
 }
 verify_tailscale() {
   command -v tailscale >/dev/null 2>&1 && ok "tailscale installed" || { bad "tailscale missing"; return 0; }
-  tailscale status --self --json 2>/dev/null | grep -q "\"${TS_TAG}\"" && ok "tagged ${TS_TAG}" || bad "not tagged ${TS_TAG} (yet)"
+  tailscale status --self --json 2>/dev/null | grep "\"${TS_TAG}\"" >/dev/null && ok "tagged ${TS_TAG}" || bad "not tagged ${TS_TAG} (yet)"
 }
 
 # ---- main -------------------------------------------------------------------
