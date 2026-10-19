@@ -292,3 +292,42 @@ mistakes, not a diary.
 - **Rule going forward:** CLAUDE.md §2 — state what a repo/GitHub setting
   does only after checking it applies to the actor in question (user, PAT,
   `GITHUB_TOKEN`, app); otherwise make the behaviour explicit in the code.
+
+### 2026-10-19 — config (package availability claimed from a loose check)
+
+- **Trigger:** wrong assumption — `apt-get install tldr` failed on a host
+  ("no installation candidate")
+- **What happened:** I told kaywoz `htop` and `tldr` "are in Ubuntu's
+  repositories" and put `tldr` in `baseline.sh`. The check behind that was a
+  grep over packages.ubuntu.com search results that only showed the name
+  appeared somewhere, not that the package is installable on the host's
+  release. On the host, `tldr` had no candidate, and the whole run aborted.
+- **Root cause:** a check that couldn't fail was treated as verification;
+  no allowance for the package set differing between Ubuntu releases.
+- **Fix applied:** `baseline.sh` now takes alternatives (`tealdeer|tldr`,
+  first installable wins), checks `apt-cache policy` for a candidate, and
+  reports a missing package instead of aborting.
+- **Rule going forward:** CLAUDE.md §2 — before stating a package exists,
+  check the specific release's package page (or `apt-cache policy` on the
+  host) and say which releases were checked; scripts installing packages on
+  more than one release must tolerate a missing one.
+
+### 2026-10-19 — config (`grep -q` after a pipe under `pipefail`)
+
+- **Trigger:** CI-less script bug, then a wrong diagnosis — `baseline.sh`
+  reported `unzip` and `tealdeer|tldr` as "no installable package" on a
+  26.04 host where both are installable
+- **What happened:** the candidate check was
+  `apt-cache policy … | grep -q 'Candidate: …'` in a `set -o pipefail`
+  script. `grep -q` exits on the first match, `apt-cache` gets SIGPIPE and
+  exits non-zero, and `pipefail` makes the check false exactly when it
+  matched. I first blamed a non-English locale and logged that; kaywoz's
+  `apt-cache policy` output (English) disproved it.
+- **Root cause:** `grep -q` behind a pipe with `pipefail`; the stub tests
+  printed three lines, too short to trigger SIGPIPE. The locale guess was
+  stated as the cause without checking it on the host first.
+- **Fix applied:** every `… | grep -q` in `config-files/ubuntu/` became
+  `… | grep … >/dev/null` (reads all input); `LC_ALL=C` kept as hygiene.
+- **Rule going forward:** CLAUDE.md §2 — in `pipefail` scripts never pipe
+  into `grep -q`; and before naming a cause, check it on the affected host
+  (one command) rather than reasoning from a hint like a mirror name.
