@@ -1,4 +1,5 @@
 #!/bin/bash
+# ARCHIVED 2026-10-19: replaced by config-files/ubuntu/baseline.sh --only snap
 # remove-snap.sh — remove snap completely from an Ubuntu host and keep it out.
 #   sudo ./remove-snap.sh            # remove everything (safe to re-run)
 #   sudo ./remove-snap.sh --dry-run  # only show what would be done
