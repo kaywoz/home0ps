@@ -14,7 +14,8 @@
 #   REBOOT_TIME=04:00     automatic reboot time for unattended upgrades
 #   AUTO_REBOOT=true      false = never reboot automatically
 #   TS_TAG=tag:observed   tag printed in the `tailscale up` hint
-#   PACKAGES="btop ncdu git tldr curl ca-certificates"
+#   PACKAGES="htop ncdu git tldr unzip curl ca-certificates"   (apt packages)
+#   dysk is not in Ubuntu's repos: installed from its GitHub release, checksum-verified
 #
 # Docker hosts: run docker-host.sh after this.
 set -euo pipefail
@@ -23,7 +24,7 @@ SECTIONS="snap updates ssh sysctl purge packages tailscale"
 REBOOT_TIME="${REBOOT_TIME:-04:00}"
 AUTO_REBOOT="${AUTO_REBOOT:-true}"
 TS_TAG="${TS_TAG:-tag:observed}"
-PACKAGES="${PACKAGES:-btop ncdu git tldr curl ca-certificates}"
+PACKAGES="${PACKAGES:-htop ncdu git tldr unzip curl ca-certificates}"
 PURGE="avahi-daemon cups cups-browsed bluez modemmanager triggerhappy popularity-contest"
 ADMIN_USER="${SUDO_USER:-${LOCAL_UNIX_ACCOUNT:-}}"
 
@@ -225,12 +226,40 @@ verify_purge() {
 }
 
 # ---- packages: admin tools --------------------------------------------------
-apply_packages() { step "packages: $PACKAGES"; # shellcheck disable=SC2086
-  apt_install $PACKAGES; }
+apply_packages() {
+  step "packages: $PACKAGES + dysk"
+  # shellcheck disable=SC2086
+  apt_install $PACKAGES
+  install_dysk
+}
+# dysk (disk usage overview) isn't packaged for Ubuntu: latest GitHub release, static musl
+# binary, SHA-256 from the GitHub API checked before extracting. Installed once; re-run
+# with the binary removed to upgrade (not covered by unattended upgrades).
+install_dysk() {
+  if command -v dysk >/dev/null 2>&1; then echo "  dysk already installed ($(dysk --version 2>/dev/null | head -1))"; return 0; fi
+  local arch meta tag url sha tmp
+  case "$(uname -m)" in
+    x86_64) arch=x86_64-unknown-linux-musl ;;
+    aarch64|arm64) arch=aarch64-unknown-linux-musl ;;
+    *) echo "  dysk: no build for $(uname -m), skipped"; return 0 ;;
+  esac
+  if [ "$MODE" = dry ]; then echo "  + download latest dysk release, verify sha256, install $arch/dysk -> /usr/local/bin/dysk"; return 0; fi
+  meta=$(curl -fsSL https://api.github.com/repos/Canop/dysk/releases/latest)
+  read -r tag url sha < <(printf '%s' "$meta" | python3 -c 'import json,sys; d=json.load(sys.stdin); a=d["assets"][0]; print(d["tag_name"], a["browser_download_url"], (a.get("digest") or "").replace("sha256:",""))')
+  if [ -z "$sha" ]; then bad "dysk $tag: no checksum published, not installing"; return 0; fi
+  tmp=$(mktemp -d)
+  curl -fsSL "$url" -o "$tmp/dysk.zip"
+  if ! echo "$sha  $tmp/dysk.zip" | sha256sum -c --quiet -; then bad "dysk $tag: checksum mismatch, not installing"; rm -rf "$tmp"; return 0; fi
+  unzip -q -j "$tmp/dysk.zip" "$arch/dysk" -d "$tmp"
+  install -m 755 "$tmp/dysk" /usr/local/bin/dysk
+  rm -rf "$tmp"
+  echo "  installed dysk $tag"
+}
 verify_packages() {
   local p missing=""
   for p in $PACKAGES; do if ! installed "$p"; then missing="$missing $p"; fi; done
   [ -z "$missing" ] && ok "admin packages installed" || bad "missing:$missing"
+  command -v dysk >/dev/null 2>&1 && ok "dysk installed" || bad "dysk missing"
 }
 
 # ---- tailscale: install only; joining is interactive ------------------------
