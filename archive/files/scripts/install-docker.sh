@@ -1,4 +1,5 @@
 #!/bin/bash
+# ARCHIVED 2026-10-19: replaced by config-files/ubuntu/docker-host.sh --only docker
 set -euo pipefail
 
 # Ensure the script is run as root

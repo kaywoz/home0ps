@@ -27,8 +27,8 @@ Personal home-lab and home-ops repo: Docker Compose service stacks, infrastructu
 | `docker-compose/` | Active service stacks, one subfolder per stack with its own `compose.yaml`; retired stacks are in `archive/docker-compose/` |
 | `iac/`            | Infrastructure as code, one folder per area: `iac/hetzner/`, `iac/cloudflare/`, `iac/tailscale/`, `iac/tailscale-services/` (see below) |
 | `.github/workflows/` | One path-scoped deploy pipeline per `iac/` area, plus `readme-weekly.yml` (weekly README refresh)     |
-| `config-files/`   | Bootstrap/setup scripts and dotfiles for `linux`, `rpi` (incl. `HARDENING.md` rebuild checklist) and `win` hosts; `log-shipping/` (journald + Fluent Bit → LogTide, same on every host) |
-| `files/scripts/`  | Standalone install/maintenance scripts (Docker install, rclone backup, Time Machine snapshot purge, Windows bootstrap) |
+| `config-files/`   | Bootstrap/setup scripts and dotfiles for `linux`, `rpi` (incl. `HARDENING.md` rebuild checklist) and `win` hosts; `ubuntu/` (`baseline.sh` for every Ubuntu host, `docker-host.sh` for Docker hosts; curl-able, `--dry-run`/`--verify`/`--only`/`--skip`); `log-shipping/` (journald + Fluent Bit → LogTide, same on every host) |
+| `files/scripts/`  | Standalone install/maintenance scripts (rclone backup, Time Machine snapshot purge, Windows bootstrap); retired ones in `archive/files/scripts/` |
 | `files/pix/`, `images/` | Logo and image assets used in this README and in diagrams                                         |
 | `d2/`             | [d2](https://d2lang.com/)-format architecture, threat-modeling, and SOC-process diagrams                |
 | `archive/`        | Retired docs, diagrams and config (e.g. NetBird), kept for reference and not actively maintained          |
