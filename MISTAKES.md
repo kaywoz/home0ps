@@ -276,3 +276,19 @@ mistakes, not a diary.
   (e.g. `diff` or `grep` for the changed line), and give the
   empty-value check (`docker compose config 2>/dev/null | grep -nE ': ""$'`)
   rather than plain `docker compose config`, which prints secrets.
+
+### 2026-10-19 — ci (weekly README auto-merge left its branch)
+
+- **Trigger:** wrong assumption — branch not deleted after the first auto-merge
+- **What happened:** kaywoz/home0ps#146 made the weekly README workflow merge
+  its own PR and said GitHub would delete the branch because "Automatically
+  delete head branches" is on. The first run (kaywoz/home0ps#147) merged
+  fine but left `chore/readme-weekly-*` behind.
+- **Root cause:** assumed the repo setting applies to every merge; merges
+  made with the workflow's `GITHUB_TOKEN` don't trigger it. Not verified
+  before writing it into the PR.
+- **Fix applied:** `gh pr merge --delete-branch` in the workflow; leftover
+  branch deleted.
+- **Rule going forward:** CLAUDE.md §2 — state what a repo/GitHub setting
+  does only after checking it applies to the actor in question (user, PAT,
+  `GITHUB_TOKEN`, app); otherwise make the behaviour explicit in the code.
