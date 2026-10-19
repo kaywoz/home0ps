@@ -12,7 +12,7 @@ Rebuild: [`config-files/rpi/HARDENING.md`](../config-files/rpi/HARDENING.md) + [
 | Services reachable from LAN/internet | UIs only as Tailscale Services on 443 (`svc:gatus`, `svc:beszel`, `svc:dozzle`, `svc:logtide`, `svc:logtide-api`, `svc:healthchecks`, `svc:cockpit`); all ports on `127.0.0.1`, Beszel agent on `172.31.250.1` (bridge gateway only) |
 | Non-tailnet inbound | Only LAN syslog (UDP/TCP 514), restricted to LAN ranges, not on the Tailscale interface — kaywoz/home0ps#97 |
 | Tailscale feature abuse | `tag:monitoring` only; no `--ssh`, no `--accept-routes`; stale nodes removed |
-| Over-broad tailnet access | Admin grant to the `svc:*` list on 443; explicit outbound grants per flow (e.g. Beszel agents); log shippers reach `svc:logtide-api` only |
+| Over-broad tailnet access | Admin grant to the `svc:*` list on 443; explicit outbound grants per flow (agent pulls on 45876/7007); observed hosts may push only to `svc:logtide-api`, `svc:healthchecks` and `svc:beszel` (Beszel agent WebSocket), each with an ACL test |
 | Wireless / serial attack surface | Wi-Fi, Bluetooth, UART disabled (`-pi5` overlays) |
 
 ## Authentication
@@ -28,7 +28,7 @@ Rebuild: [`config-files/rpi/HARDENING.md`](../config-files/rpi/HARDENING.md) + [
 |---|---|
 | `userns-remap` exemptions | Only the socket proxy (must open `docker.sock`) and the Beszel agent (host networking; runs as real UID 65534) |
 | Docker control via monitoring tools | Dozzle actions off; Beszel agent and Dozzle read through the socket proxy (`POST=0`) |
-| This host controlling others | No write paths outward (no Dockhand/Hawser here); agents are pulled over scoped grants |
+| This host controlling others | No write paths outward (no Dockhand/Hawser here); agents are pulled over scoped grants, or push to the hub's Service; inbound pushes reach only those three Services |
 | Direct DB access | LogTide Postgres/Redis on the internal `logtide-db` network, no published ports |
 | Compromised log shipper | Fluent Bit as `fluentbit` (`systemd-journal`), no capabilities, `ProtectSystem=strict`, `MemoryMax` |
 | Memory limits silently ignored | `cgroup_enable=memory` on the kernel cmdline (off by default on Raspberry Pi OS) |
