@@ -90,6 +90,8 @@
 			"svc:scrutiny":        ["tag:storage"],
 			"svc:kopia":           ["tag:storage"],
 			"svc:rustfs":          ["tag:storage"],
+			// apps host admin UI
+			"svc:cockpit-apps":    ["tag:observed"],
 		},
 	},
 
@@ -134,7 +136,7 @@
 		{
 			// admins -> admin UIs by service name (not by node/port)
 			"src": ["autogroup:admin"],
-			"dst": ["svc:gatus", "svc:cockpit", "svc:beszel", "svc:dozzle", "svc:logtide", "svc:logtide-api", "svc:healthchecks"],
+			"dst": ["svc:gatus", "svc:cockpit", "svc:beszel", "svc:dozzle", "svc:logtide", "svc:logtide-api", "svc:healthchecks", "svc:cockpit-apps"],
 			"ip":  ["tcp:443"],
 		},
 		{
@@ -256,5 +258,10 @@
 			"accept": ["svc:archivebox:443", "svc:archivewarrior:443", "svc:scrutiny:443", "svc:kopia:443", "svc:rustfs:443"],
 		},
 		{"src": "macmini", "accept": ["svc:archivebox:443", "svc:kopia:443"]},
+		{
+			// host admin UIs are for admins only: observed hosts can't reach another host's Cockpit
+			"src":  "tag:observed",
+			"deny": ["svc:cockpit-apps:443", "svc:cockpit:443"],
+		},
 	],
 }
