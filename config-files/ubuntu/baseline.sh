@@ -8,12 +8,16 @@
 #   sudo ./baseline.sh --skip tailscale
 #   curl -fsSL https://raw.githubusercontent.com/kaywoz/home0ps/main/config-files/ubuntu/baseline.sh | sudo bash -s -- --dry-run
 #
-# Sections: snap updates ssh sysctl purge packages tailscale
+# Sections: snap updates ssh sysctl purge packages cockpit tailscale
 #
 # Settings (environment, optional):
 #   REBOOT_TIME=04:00     automatic reboot time for unattended upgrades
 #   AUTO_REBOOT=true      false = never reboot automatically
 #   TS_TAG=tag:observed   tag printed in the `tailscale up` hint
+#   COCKPIT_SVC=          Tailscale Service name for this host's Cockpit, e.g. cockpit-apps
+#                         (svc:cockpit is the monitoring host). Unset = cockpit section skipped.
+#   TS_TAILNET_DNS=       <tailnet>.ts.net, for Cockpit's Origins (needed with COCKPIT_SVC)
+#   COCKPIT_MODULES="cockpit-ws cockpit-system cockpit-bridge cockpit-storaged cockpit-packagekit cockpit-files cockpit-sosreport"
 #   PACKAGES="htop ncdu git tealdeer|tldr unzip curl ca-certificates"
 #            apt packages; "a|b" = first one installable on this release.
 #            A package with no install candidate is reported, not fatal.
@@ -24,11 +28,17 @@ set -euo pipefail
 # Command output is parsed below (apt-cache policy, sshd -T, docker info): force English.
 export LC_ALL=C LANG=C
 
-SECTIONS="snap updates ssh sysctl purge packages tailscale"
+SECTIONS="snap updates ssh sysctl purge packages cockpit tailscale"
 REBOOT_TIME="${REBOOT_TIME:-04:00}"
 AUTO_REBOOT="${AUTO_REBOOT:-true}"
 TS_TAG="${TS_TAG:-tag:observed}"
 PACKAGES="${PACKAGES:-htop ncdu git tealdeer|tldr unzip curl ca-certificates}"
+COCKPIT_SVC="${COCKPIT_SVC:-}"
+TS_TAILNET_DNS="${TS_TAILNET_DNS:-}"
+COCKPIT_PORT=9091
+# no cockpit-networkmanager (would pull NetworkManager onto netplan/networkd servers),
+# no cockpit-pcp (not in 26.04), no machines/podman (Docker hosts, no VMs)
+COCKPIT_MODULES="${COCKPIT_MODULES:-cockpit-ws cockpit-system cockpit-bridge cockpit-storaged cockpit-packagekit cockpit-files cockpit-sosreport}"
 PURGE="avahi-daemon cups cups-browsed bluez modemmanager triggerhappy popularity-contest"
 ADMIN_USER="${SUDO_USER:-${LOCAL_UNIX_ACCOUNT:-}}"
 
@@ -89,7 +99,7 @@ apt_install() {
   done
   if [ -z "$missing" ]; then return 0; fi
   # shellcheck disable=SC2086
-  run env DEBIAN_FRONTEND=noninteractive apt-get install -y -q $missing
+  run env DEBIAN_FRONTEND=noninteractive apt-get install -y -q ${APT_NO_RECOMMENDS:+--no-install-recommends} $missing
 }
 
 # ---- snap: remove completely and pin snapd out ------------------------------
@@ -282,6 +292,50 @@ verify_packages() {
   done
   [ -z "$missing" ] && ok "admin packages installed" || bad "missing:$missing"
   command -v dysk >/dev/null 2>&1 && ok "dysk installed" || bad "dysk missing"
+}
+
+# ---- cockpit: localhost only, published as this host's Tailscale Service ------
+apply_cockpit() {
+  step "cockpit: ${COCKPIT_MODULES}"
+  if [ -z "$COCKPIT_SVC" ] || [ -z "$TS_TAILNET_DNS" ]; then
+    echo "  skipped: set COCKPIT_SVC=<service name, e.g. cockpit-apps> and TS_TAILNET_DNS=<tailnet>.ts.net"
+    return 0
+  fi
+  local host="${COCKPIT_SVC}.${TS_TAILNET_DNS}"
+  # shellcheck disable=SC2086
+  APT_NO_RECOMMENDS=1 apt_install $COCKPIT_MODULES
+  put /etc/systemd/system/cockpit.socket.d/listen.conf 644 <<CONF
+[Socket]
+ListenStream=
+ListenStream=127.0.0.1:${COCKPIT_PORT}
+CONF
+  # TLS ends at tailscale serve; the localhost leg is plain HTTP
+  put /etc/cockpit/cockpit.conf 644 <<CONF
+[WebService]
+Origins = https://${host} wss://${host}
+ProtocolHeader = X-Forwarded-Proto
+AllowUnencrypted = true
+LoginTo = false
+CONF
+  if [ "$MODE" != dry ]; then
+    grep -qx root /etc/cockpit/disallowed-users 2>/dev/null || echo root >> /etc/cockpit/disallowed-users
+    systemctl daemon-reload
+    systemctl enable --now cockpit.socket >/dev/null 2>&1 || true
+    systemctl restart cockpit.socket
+  else
+    echo "  + add root to /etc/cockpit/disallowed-users; restart cockpit.socket"
+  fi
+  echo "  Next (once svc:${COCKPIT_SVC} exists in iac/tailscale-services + policy):"
+  echo "    sudo tailscale serve --service=svc:${COCKPIT_SVC} --https=443 127.0.0.1:${COCKPIT_PORT}"
+}
+verify_cockpit() {
+  if [ -z "$COCKPIT_SVC" ] || [ -z "$TS_TAILNET_DNS" ]; then echo "  cockpit: skipped (COCKPIT_SVC/TS_TAILNET_DNS unset)"; return 0; fi
+  installed cockpit-ws && ok "cockpit installed" || bad "cockpit missing"
+  ss -tln | grep "127.0.0.1:${COCKPIT_PORT} " >/dev/null && ok "cockpit on localhost:${COCKPIT_PORT}" || bad "cockpit not listening on 127.0.0.1:${COCKPIT_PORT}"
+  ss -tln | grep -E '(0\.0\.0\.0|\*|\[::\]):(9090|'"${COCKPIT_PORT}"') ' >/dev/null && bad "cockpit reachable beyond localhost" || ok "cockpit not public"
+  grep -x root /etc/cockpit/disallowed-users >/dev/null 2>&1 && ok "root disallowed in cockpit" || bad "root not disallowed"
+  grep "Origins = https://${COCKPIT_SVC}.${TS_TAILNET_DNS}" /etc/cockpit/cockpit.conf >/dev/null 2>&1 && ok "Origins pinned to svc:${COCKPIT_SVC}" || bad "Origins not set"
+  installed network-manager && bad "NetworkManager got installed (check renderer)" || ok "no NetworkManager pulled in"
 }
 
 # ---- tailscale: install only; joining is interactive ------------------------
