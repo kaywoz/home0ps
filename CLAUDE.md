@@ -218,6 +218,11 @@ change explicitly if one no longer fits.
   (`svc:<app>` on 443); user-facing apps via Cloudflare Tunnel + Access.
   Tailscale is break-glass. No certificates to manage, no DNS API tokens on
   hosts.
+- **Cockpit: one per host** (decided 2026-10-20), each its own Tailscale
+  Service `svc:cockpit-<role>` on `127.0.0.1:9091`, `LoginTo = false`,
+  `AllowMultiHost` off. No multi-host Cockpit hub: it would hold SSH to every
+  host and share one browser origin across them. A central admin point is
+  the planned lab admin station (kaywoz/home0ps#164), not a Cockpit hub.
 - **Container names:** `<location>-<class>-<service>-<GGMM>`, e.g.
   `kr-ccp-gatus-0101` (kr = Krypinet, ccp = Custom Container Production).
 - **Host layout:** `/srv/docker/compose.yaml` — one file, all services
