@@ -7,7 +7,7 @@ Shared controls for every home0ps system. Each host role adds its own summary in
 | Role | Summary |
 |---|---|
 | Monitoring host (Raspberry Pi 5) | [`security/monitoring.md`](security/monitoring.md) |
-| Apps host (Intel N305) | `security/apps.md` — from day one of kaywoz/home0ps#118 |
+| Apps host (Intel N305) | [`security/apps.md`](security/apps.md) |
 | Storage host (MOS NAS) | `security/storage.md` — later |
 | Lab (XCP-ng) | `security/lab.md` — later, not home0ps production |
 
