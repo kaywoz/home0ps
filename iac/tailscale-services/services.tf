@@ -19,6 +19,9 @@ locals {
     scrutiny       = "Disk SMART health"
     kopia          = "Backup server UI"
     rustfs         = "S3 storage console"
+
+    # apps host (tag:observed)
+    "cockpit-apps" = "Host admin UI (apps host)"
   }
 }
 
