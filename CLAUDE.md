@@ -108,6 +108,14 @@ merge pipelines or hand one job another area's credentials.
   **Scope exception:** device/host names *may* appear in DNS record data
   and its docs (e.g. `iac/cloudflare/proxies.yaml`, a record's `comment`,
   `iac/cloudflare/README.md`), because those records describe the services.
+  **Second scope exception — Tailscale Service names:** a Service may be
+  named after the device it runs on, `svc:<app>-<device>` (e.g.
+  `svc:cockpit-<device>`), because a Service name is itself a DNS name
+  (`<name>.<tailnet>.ts.net`) — kaywoz, 2026-10-23. The full Service name may
+  appear wherever that Service is referenced: `iac/tailscale-services/`,
+  `iac/tailscale/policy.hujson`, host scripts/docs that configure or document
+  it, and PR text/commits quoting it. The bare device name on its own still
+  doesn't.
   Everywhere else — branch names, commits, PRs, other areas' code/comments —
   they stay out.
   **How to tell:** real device names end in `-y` and never go into git
@@ -219,7 +227,7 @@ change explicitly if one no longer fits.
   Tailscale is break-glass. No certificates to manage, no DNS API tokens on
   hosts.
 - **Cockpit: one per host** (decided 2026-10-20), each its own Tailscale
-  Service `svc:cockpit-<role>` on `127.0.0.1:9091`, `LoginTo = false`,
+  Service `svc:cockpit-<device>` (§4 Service-name exception) on `127.0.0.1:9091`, `LoginTo = false`,
   `AllowMultiHost` off. No multi-host Cockpit hub: it would hold SSH to every
   host and share one browser origin across them. A central admin point is
   the planned lab admin station (kaywoz/home0ps#164), not a Cockpit hub.
