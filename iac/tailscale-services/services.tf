@@ -6,7 +6,6 @@
 locals {
   services = {
     gatus           = "Status page"
-    cockpit         = "Host admin UI (old name, removed after the switch to cockpit-janky)"
     "cockpit-janky" = "Host admin UI (monitoring host)"
     beszel          = "Monitoring hub"
     dozzle          = "Container log viewer"
@@ -22,7 +21,6 @@ locals {
     rustfs         = "S3 storage console"
 
     # apps host (tag:observed)
-    "cockpit-apps" = "Host admin UI (old name, removed after the switch to cockpit-sexy)"
     "cockpit-sexy" = "Host admin UI (apps host)"
   }
 }
