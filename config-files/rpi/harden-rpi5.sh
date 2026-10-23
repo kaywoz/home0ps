@@ -12,7 +12,8 @@ DOCKER_ROOT="/srv/docker"
 ADMIN_USER="${SUDO_USER:-${LOCAL_UNIX_ACCOUNT:?set LOCAL_UNIX_ACCOUNT or run via sudo}}"
 INSTALL_COCKPIT=1
 COCKPIT_LOCAL_PORT=9091
-COCKPIT_SVC_HOST="cockpit.${TS_TAILNET_DNS:-}" # tailnet DNS name kept out of git; required by apply when INSTALL_COCKPIT=1
+COCKPIT_SVC="${COCKPIT_SVC:-cockpit-janky}"   # this host's Tailscale Service (CLAUDE.md §4 Service-name exception)
+COCKPIT_SVC_HOST="${COCKPIT_SVC}.${TS_TAILNET_DNS:-}" # tailnet DNS name kept out of git; required by apply when INSTALL_COCKPIT=1
 LOCALE="en_US.UTF-8"
 REBOOT_TIME="04:00"
 # ---------------------------------------------------------------------------
@@ -85,7 +86,7 @@ CONF
   sshd -t && systemctl restart ssh
 
   if [ "$INSTALL_COCKPIT" = 1 ]; then
-    step "Cockpit: localhost only, behind svc:cockpit"
+    step "Cockpit: localhost only, behind svc:${COCKPIT_SVC}"
     : "${TS_TAILNET_DNS:?set TS_TAILNET_DNS to the tailnet DNS name (<tailnet>.ts.net)}"
     DEBIAN_FRONTEND=noninteractive apt-get install -y -q cockpit
     mkdir -p /etc/systemd/system/cockpit.socket.d

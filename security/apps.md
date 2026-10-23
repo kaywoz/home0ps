@@ -15,14 +15,14 @@ Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh)
 | IoT-facing apps on VLAN 13 | macvlan on the VLAN 13 sub-interface, no host IP on it *(planned, #118)* — keeps the host itself off the IoT network |
 | Over-broad tailnet access | `tag:observed` only. Inbound from the tailnet: monitoring host → tcp:45876 (Beszel agent) and tcp:7007 (Dozzle agent); privusers / trusted devices → tcp:22, 80, 443 (admin baseline grants). Outbound pushes limited to `svc:logtide-api`, `svc:healthchecks`, `svc:beszel` |
 | User-facing apps exposed | Via Cloudflare Tunnel + Access (outbound-only `cloudflared`, JWT validation on), never published ports *(planned, #118)* |
-| Admin UI exposure | Cockpit on `127.0.0.1:9091` only, published as `svc:cockpit-apps` *(planned: #159 + Services/policy PRs)* |
+| Admin UI exposure | Cockpit on `127.0.0.1:9091` only, published as `svc:cockpit-sexy`; `Origins` pinned, `LoginTo = false`, root disallowed |
 
 ## Authentication
 
 | Risk | Control |
 |---|---|
 | SSH brute force | Keys only, no root, no passwords, no forwarding (`baseline.sh` `ssh`, refuses to apply without an installed key) |
-| Cockpit as pivot | `LoginTo = false`, root disallowed, `Origins` pinned to the service URL *(planned, #159)* |
+| Cockpit as pivot | `LoginTo = false`, root disallowed, `Origins` pinned to the service URL |
 | Beszel agent impersonation | Agent pushes with the hub's `TOKEN`; SSH fallback only accepts the hub's key |
 
 ## Containment
@@ -61,7 +61,6 @@ Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh)
 ## Open issues
 
 - Remaining build-out: trunk port, VLAN 13 macvlan, `DOCKER-USER` rule, cloudflared + Access, Homey / Home Assistant / Jellyfin — kaywoz/home0ps#118
-- Cockpit section + its Tailscale Service — kaywoz/home0ps#159
 - Dozzle / Beszel agent templates — kaywoz/home0ps#138
 - Tailscale onboarding and tooling in `baseline.sh` — kaywoz/home0ps#154
 - Vulnerability scanning feeding this file — kaywoz/home0ps#102
