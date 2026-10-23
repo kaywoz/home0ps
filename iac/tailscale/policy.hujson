@@ -78,7 +78,6 @@
 	"autoApprovers": {
 		"services": {
 			"svc:gatus":   ["tag:monitoring"],
-			"svc:cockpit": ["tag:monitoring"],
 			"svc:cockpit-janky": ["tag:monitoring"],
 			"svc:beszel":  ["tag:monitoring"],
 			"svc:dozzle":  ["tag:monitoring"],
@@ -92,7 +91,6 @@
 			"svc:kopia":           ["tag:storage"],
 			"svc:rustfs":          ["tag:storage"],
 			// apps host admin UI
-			"svc:cockpit-apps":    ["tag:observed"],
 			"svc:cockpit-sexy":    ["tag:observed"],
 		},
 	},
@@ -138,7 +136,7 @@
 		{
 			// admins -> admin UIs by service name (not by node/port)
 			"src": ["autogroup:admin"],
-			"dst": ["svc:gatus", "svc:cockpit", "svc:beszel", "svc:dozzle", "svc:logtide", "svc:logtide-api", "svc:healthchecks", "svc:cockpit-apps", "svc:cockpit-janky", "svc:cockpit-sexy"],
+			"dst": ["svc:gatus", "svc:beszel", "svc:dozzle", "svc:logtide", "svc:logtide-api", "svc:healthchecks", "svc:cockpit-janky", "svc:cockpit-sexy"],
 			"ip":  ["tcp:443"],
 		},
 		{
@@ -263,7 +261,7 @@
 		{
 			// host admin UIs are for admins only: observed hosts can't reach another host's Cockpit
 			"src":  "tag:observed",
-			"deny": ["svc:cockpit-apps:443", "svc:cockpit:443", "svc:cockpit-janky:443", "svc:cockpit-sexy:443"],
+			"deny": ["svc:cockpit-janky:443", "svc:cockpit-sexy:443"],
 		},
 	],
 }
