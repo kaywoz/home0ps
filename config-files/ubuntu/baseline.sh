@@ -14,8 +14,8 @@
 #   REBOOT_TIME=04:00     automatic reboot time for unattended upgrades
 #   AUTO_REBOOT=true      false = never reboot automatically
 #   TS_TAG=tag:observed   tag printed in the `tailscale up` hint
-#   COCKPIT_SVC=          Tailscale Service name for this host's Cockpit, e.g. cockpit-apps
-#                         (svc:cockpit is the monitoring host). Unset = cockpit section skipped.
+#   COCKPIT_SVC=          Tailscale Service name for this host's Cockpit: cockpit-<device>,
+#                         e.g. cockpit-sexy (CLAUDE.md §4 Service-name exception). Unset = section skipped.
 #   TS_TAILNET_DNS=       <tailnet>.ts.net, for Cockpit's Origins (needed with COCKPIT_SVC)
 #   COCKPIT_MODULES="cockpit-ws cockpit-system cockpit-bridge cockpit-storaged cockpit-packagekit cockpit-files cockpit-sosreport"
 #   PACKAGES="htop ncdu git tealdeer|tldr unzip curl ca-certificates"
@@ -298,7 +298,7 @@ verify_packages() {
 apply_cockpit() {
   step "cockpit: ${COCKPIT_MODULES}"
   if [ -z "$COCKPIT_SVC" ] || [ -z "$TS_TAILNET_DNS" ]; then
-    echo "  skipped: set COCKPIT_SVC=<service name, e.g. cockpit-apps> and TS_TAILNET_DNS=<tailnet>.ts.net"
+    echo "  skipped: set COCKPIT_SVC=cockpit-<device> and TS_TAILNET_DNS=<tailnet>.ts.net"
     return 0
   fi
   local host="${COCKPIT_SVC}.${TS_TAILNET_DNS}"

@@ -47,9 +47,9 @@ Raspberry Pi 5 (8 GB, 128 GB NVMe), Raspberry Pi OS Lite 64-bit. Observational-o
 ## 5. Cockpit [script]
 
 - [ ] Socket moved to `127.0.0.1:9091` (systemd drop-in)
-- [ ] `cockpit.conf`: `Origins` for `cockpit.<tailnet>.ts.net`, `ProtocolHeader`, `AllowUnencrypted` (localhost leg only), `LoginTo = false`
+- [ ] `cockpit.conf`: `Origins` for `cockpit-janky.<tailnet>.ts.net`, `ProtocolHeader`, `AllowUnencrypted` (localhost leg only), `LoginTo = false`
 - [ ] `root` in `/etc/cockpit/disallowed-users`; strong, unique password for `${LOCAL_UNIX_ACCOUNT}`
-- [ ] `sudo tailscale serve --service=svc:cockpit --https=443 127.0.0.1:9091`
+- [ ] `sudo tailscale serve --service=svc:cockpit-janky --https=443 127.0.0.1:9091`
 
 ## 6. Docker [script]
 
@@ -77,7 +77,7 @@ Raspberry Pi 5 (8 GB, 128 GB NVMe), Raspberry Pi OS Lite 64-bit. Observational-o
 
 ## 8. Tailscale Services (`iac/tailscale-services/`, OpenTofu) and ACL (`iac/tailscale/policy.hujson`)
 
-- [ ] `tailscale_service` per UI: `svc:gatus`, `svc:beszel`, `svc:cockpit` (later `svc:dozzle`, `svc:logtide`)
+- [ ] `tailscale_service` per UI: `svc:gatus`, `svc:beszel`, `svc:cockpit-janky`, `svc:dozzle`, `svc:logtide`, `svc:logtide-api`, `svc:healthchecks`
 - [ ] `autoApprovers.services` → `tag:monitoring` for each service
 - [ ] Grant `autogroup:admin` → the `svc:*` list on `tcp:443` only
 - [ ] ACL `tests` deny the old per-port paths on the node

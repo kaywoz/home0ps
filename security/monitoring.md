@@ -9,7 +9,7 @@ Rebuild: [`config-files/rpi/HARDENING.md`](../config-files/rpi/HARDENING.md) + [
 | Risk | Control |
 |---|---|
 | Lateral movement from this host | Own zone on the monitoring VLAN, internet-only egress; access port, tagged VLANs blocked |
-| Services reachable from LAN/internet | UIs only as Tailscale Services on 443 (`svc:gatus`, `svc:beszel`, `svc:dozzle`, `svc:logtide`, `svc:logtide-api`, `svc:healthchecks`, `svc:cockpit`); all ports on `127.0.0.1`, Beszel agent on `172.31.250.1` (bridge gateway only) |
+| Services reachable from LAN/internet | UIs only as Tailscale Services on 443 (`svc:gatus`, `svc:beszel`, `svc:dozzle`, `svc:logtide`, `svc:logtide-api`, `svc:healthchecks`, `svc:cockpit-janky`); all ports on `127.0.0.1`, Beszel agent on `172.31.250.1` (bridge gateway only) |
 | Non-tailnet inbound | Only LAN syslog (UDP/TCP 514), restricted to LAN ranges, not on the Tailscale interface — kaywoz/home0ps#97 |
 | Tailscale feature abuse | `tag:monitoring` only; no `--ssh`, no `--accept-routes`; stale nodes removed |
 | Over-broad tailnet access | Admin grant to the `svc:*` list on 443; explicit outbound grants per flow (agent pulls on 45876/7007); observed hosts may push only to `svc:logtide-api`, `svc:healthchecks` and `svc:beszel` (Beszel agent WebSocket), each with an ACL test |
