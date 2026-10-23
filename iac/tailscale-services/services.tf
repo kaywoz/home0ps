@@ -5,13 +5,14 @@
 
 locals {
   services = {
-    gatus         = "Status page"
-    cockpit       = "Host admin UI"
-    beszel        = "Monitoring hub"
-    dozzle        = "Container log viewer"
-    logtide       = "Log management UI"
-    "logtide-api" = "Log management API (UI calls + log ingest)"
-    healthchecks  = "Job heartbeats (UI + ping endpoint)"
+    gatus           = "Status page"
+    cockpit         = "Host admin UI (old name, removed after the switch to cockpit-janky)"
+    "cockpit-janky" = "Host admin UI (monitoring host)"
+    beszel          = "Monitoring hub"
+    dozzle          = "Container log viewer"
+    logtide         = "Log management UI"
+    "logtide-api"   = "Log management API (UI calls + log ingest)"
+    healthchecks    = "Job heartbeats (UI + ping endpoint)"
 
     # storage host (tag:storage)
     archivebox     = "Web archive"
@@ -21,7 +22,8 @@ locals {
     rustfs         = "S3 storage console"
 
     # apps host (tag:observed)
-    "cockpit-apps" = "Host admin UI (apps host)"
+    "cockpit-apps" = "Host admin UI (old name, removed after the switch to cockpit-sexy)"
+    "cockpit-sexy" = "Host admin UI (apps host)"
   }
 }
 
