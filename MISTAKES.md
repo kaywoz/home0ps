@@ -331,3 +331,26 @@ mistakes, not a diary.
 - **Rule going forward:** CLAUDE.md §2 — in `pipefail` scripts never pipe
   into `grep -q`; and before naming a cause, check it on the affected host
   (one command) rather than reasoning from a hint like a mirror name.
+
+### 2026-10-24 — design (media credentials in the exposed guest)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** the storage-consolidation design (kaywoz/home0ps#174)
+  put the media Filen login and the rclone mount inside the Jellyfin/Komga
+  guest, "so the storage host never sees them", and used that as the main
+  reason for an LXC. kaywoz pointed out the storage host should own the
+  cloud connection. Correct threat model: the media apps are the most
+  exposed component; credentials next to them mean a compromised app can
+  delete the whole media account, while a host-side read-only mount gives
+  it read-only files and no credentials.
+- **Root cause:** optimised for "keep secrets off the most important host"
+  instead of "keep secrets away from the most exposed process"; didn't ask
+  what an attacker in each component would get.
+- **Fix applied:** #174 updated: rclone mount on the MOS host
+  (`--read-only`, `--allow-other`), media apps get a read-only bind mount and
+  no credentials; container vs. LXC now hinges only on MOS's Docker user
+  namespacing.
+- **Rule going forward:** for any secret placement, write down per
+  component "if this is compromised, the attacker gets …" and put
+  credentials with the least exposed component that needs them, handing
+  exposed apps only the narrowest artefact (read-only files, scoped token).
