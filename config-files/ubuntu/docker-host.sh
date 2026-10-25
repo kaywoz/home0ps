@@ -51,6 +51,8 @@ if ! grep -qi '^ID=ubuntu' /etc/os-release; then
   exit 1
 fi
 
+CONTAINER=$(systemd-detect-virt -c 2>/dev/null || true); [ "$CONTAINER" = none ] && CONTAINER=""
+
 FAILS=0
 step() { printf '\n\e[1m== %s\e[0m\n' "$*"; }
 ok()   { printf '  \e[32mOK\e[0m   %s\n' "$*"; }
@@ -108,9 +110,11 @@ verify_docker() {
 # ---- daemon: daemon.json (identical to config-files/log-shipping/daemon.json) -
 apply_daemon() {
   step "daemon: userns-remap, no-new-privileges, icc off, journald"
-  put /etc/docker/daemon.json 644 <<'CONF'
-{
-  "userns-remap": "default",
+  # LXC mode: an unprivileged LXC already maps root to an unprivileged host user;
+  # userns-remap inside it is redundant and usually fails
+  local remap='  "userns-remap": "default",'
+  if [ -n "$CONTAINER" ]; then remap=""; echo "  inside a container ($CONTAINER): no userns-remap (the LXC already maps root)"; fi
+  { echo "{"; [ -n "$remap" ] && echo "$remap"; cat <<'CONF'
   "no-new-privileges": true,
   "icc": false,
   "userland-proxy": false,
@@ -119,11 +123,16 @@ apply_daemon() {
   "log-opts": { "tag": "{{.Name}}" }
 }
 CONF
+  } | put /etc/docker/daemon.json 644
   run systemctl restart docker
   echo "  Existing containers keep their old settings until recreated: docker compose up -d --force-recreate"
 }
 verify_daemon() {
-  docker info 2>/dev/null | grep userns >/dev/null && ok "userns-remap active" || bad "userns-remap not active"
+  if [ -n "$CONTAINER" ]; then
+    [ "$(awk 'NR==1{print $2}' /proc/self/uid_map)" != 0 ] && ok "unprivileged LXC (root mapped by the host)" || bad "privileged container — root is host root"
+  else
+    docker info 2>/dev/null | grep userns >/dev/null && ok "userns-remap active" || bad "userns-remap not active"
+  fi
   [ "$(docker info --format '{{.LoggingDriver}}' 2>/dev/null)" = journald ] && ok "log driver journald" || bad "log driver not journald"
   docker info 2>&1 | grep -i 'no memory limit support' >/dev/null && bad "memory limits unsupported (cgroup)" || ok "memory limits supported"
 }
