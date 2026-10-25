@@ -231,6 +231,14 @@ change explicitly if one no longer fits.
   `AllowMultiHost` off. No multi-host Cockpit hub: it would hold SSH to every
   host and share one browser origin across them. A central admin point is
   the planned lab admin station (kaywoz/home0ps#164), not a Cockpit hub.
+- **Exception — Dockhand** *(provisional, part of kaywoz/home0ps#174; may be
+  revisited)*: one central Docker UI is allowed in an infra LXC on the MOS
+  host. It manages **only** the MOS host's Docker (via a socket proxy that
+  must allow `POST`, so Dockhand ≈ root on the MOS host — accepted) and the
+  apps VM (Hawser in Edge mode). **Never the monitoring host**: backup copy 1
+  stays outside any central control point. Dockhand is tier 0: UI only via
+  its Tailscale Service, own auth (prefer OIDC + MFA), logged, own entry in
+  the security summary.
 - **Container names:** `<location>-<class>-<service>-<GGMM>`, e.g.
   `kr-ccp-gatus-0101` (kr = Krypinet, ccp = Custom Container Production).
 - **Host layout:** `/srv/docker/compose.yaml` — one file, all services
