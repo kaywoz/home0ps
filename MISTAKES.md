@@ -351,3 +351,57 @@ mistakes, not a diary.
   the background: check prerequisites first (abort before load), and add a
   `trap` that kills the whole process group on exit/Ctrl-C; give stop
   instructions as one command for the group (`kill -- -<PGID>`).
+
+### 2026-10-24 — design (media credentials in the exposed guest)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** the storage-consolidation design (kaywoz/home0ps#174)
+  put the media Filen login and the rclone mount inside the Jellyfin/Komga
+  guest, "so the storage host never sees them", and used that as the main
+  reason for an LXC. kaywoz pointed out the storage host should own the
+  cloud connection. Correct threat model: the media apps are the most
+  exposed component; credentials next to them mean a compromised app can
+  delete the whole media account, while a host-side read-only mount gives
+  it read-only files and no credentials.
+- **Root cause:** optimised for "keep secrets off the most important host"
+  instead of "keep secrets away from the most exposed process"; didn't ask
+  what an attacker in each component would get.
+- **Fix applied:** #174 updated: rclone mount on the MOS host
+  (`--read-only`, `--allow-other`), media apps get a read-only bind mount and
+  no credentials; container vs. LXC now hinges only on MOS's Docker user
+  namespacing.
+- **Rule going forward:** for any secret placement, write down per
+  component "if this is compromised, the attacker gets …" and put
+  credentials with the least exposed component that needs them, handing
+  exposed apps only the narrowest artefact (read-only files, scoped token).
+
+### 2026-10-25 — design (systemd/journald assumed on the MOS host)
+
+- **Trigger:** wrong assumption — kaywoz: MOS is built on Devuan
+- **What happened:** the consolidation plan (kaywoz/home0ps#174) had the MOS
+  host start the rclone mount "via systemd" and run jobs as systemd timers,
+  and the logging convention ("journald everywhere") was assumed to cover
+  it. Devuan has no systemd, so no journald either.
+- **Root cause:** planned the host from the Ubuntu hosts' conventions
+  without checking which OS/init the appliance OS uses.
+- **Fix applied:** #174 updated: init scripts / MOS mechanisms, cron, syslog
+  files as the log source; the MOS host recorded as an exception to
+  "journald everywhere".
+- **Rule going forward:** CLAUDE.md §2 — before planning services, timers
+  or logging on a host, confirm its base OS and init system
+  (`/etc/os-release`, `cat /proc/1/comm`) and say which was checked.
+
+### 2026-10-25 — design (Xen Orchestra placement misread)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** kaywoz said the infra VM sits on VLAN 21 "(currently
+  only Xen Orchestra is planned there)". I wrote into #174 that VLAN 21
+  *also holds* Xen Orchestra as a separate system, with a firewall rule for
+  it. kaywoz meant the infra VM itself runs Xen Orchestra as a container.
+- **Root cause:** filled an ambiguous half-sentence with an assumption and
+  wrote it into the plan instead of asking.
+- **Fix applied:** #174 corrected: XO runs in the infra VM; new decision
+  item on co-locating XO (lab-facing) with Dockhand (home control).
+- **Rule going forward:** when a placement or ownership detail is
+  ambiguous ("X is planned there"), ask in one line before writing it into
+  an issue or design.
