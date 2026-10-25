@@ -354,3 +354,19 @@ mistakes, not a diary.
   component "if this is compromised, the attacker gets …" and put
   credentials with the least exposed component that needs them, handing
   exposed apps only the narrowest artefact (read-only files, scoped token).
+
+### 2026-10-25 — design (systemd/journald assumed on the MOS host)
+
+- **Trigger:** wrong assumption — kaywoz: MOS is built on Devuan
+- **What happened:** the consolidation plan (kaywoz/home0ps#174) had the MOS
+  host start the rclone mount "via systemd" and run jobs as systemd timers,
+  and the logging convention ("journald everywhere") was assumed to cover
+  it. Devuan has no systemd, so no journald either.
+- **Root cause:** planned the host from the Ubuntu hosts' conventions
+  without checking which OS/init the appliance OS uses.
+- **Fix applied:** #174 updated: init scripts / MOS mechanisms, cron, syslog
+  files as the log source; the MOS host recorded as an exception to
+  "journald everywhere".
+- **Rule going forward:** CLAUDE.md §2 — before planning services, timers
+  or logging on a host, confirm its base OS and init system
+  (`/etc/os-release`, `cat /proc/1/comm`) and say which was checked.
