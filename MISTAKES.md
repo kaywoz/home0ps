@@ -370,3 +370,18 @@ mistakes, not a diary.
 - **Rule going forward:** CLAUDE.md §2 — before planning services, timers
   or logging on a host, confirm its base OS and init system
   (`/etc/os-release`, `cat /proc/1/comm`) and say which was checked.
+
+### 2026-10-25 — design (Xen Orchestra placement misread)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** kaywoz said the infra VM sits on VLAN 21 "(currently
+  only Xen Orchestra is planned there)". I wrote into #174 that VLAN 21
+  *also holds* Xen Orchestra as a separate system, with a firewall rule for
+  it. kaywoz meant the infra VM itself runs Xen Orchestra as a container.
+- **Root cause:** filled an ambiguous half-sentence with an assumption and
+  wrote it into the plan instead of asking.
+- **Fix applied:** #174 corrected: XO runs in the infra VM; new decision
+  item on co-locating XO (lab-facing) with Dockhand (home control).
+- **Rule going forward:** when a placement or ownership detail is
+  ambiguous ("X is planned there"), ask in one line before writing it into
+  an issue or design.
