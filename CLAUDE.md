@@ -217,6 +217,18 @@ optional cleanup. Tell kaywoz in the reply that an entry was added.
 Design decisions from the planning handoff. Don't re-decide them; propose a
 change explicitly if one no longer fits.
 
+- **Proportionality** (kaywoz, 2026-10-25): the home side (UniFi, IoT, the
+  apps/MOS box, the monitoring host) is a homelab and gets **homelab-grade
+  controls** — Tailscale as the access path, grants per flow, one admin UI
+  per host, phishing-resistant MFA on tier-0 accounts — passkeys in
+  1Password first, physical YubiKeys second (kaywoz/home0ps#184). **No PAW,
+  no tier model, no extra boxes** for security's sake; fewer boxes is a goal.
+  Don't propose enterprise-grade controls for home unless asked.
+- **Zones:** the **XCP-ng lab is untrusted**. It never administers the home
+  side and gets no grants into it; protection runs from home against the
+  lab. A stricter admin setup (PAW-style) is fine *inside* the lab
+  (kaywoz/home0ps#164, lab-only).
+
 - **Host roles** (real device names never in git, §4): monitoring host
   (Raspberry Pi 5, observation-only: reads everything, changes nothing
   elsewhere), apps host (Intel N305, trusted well-known apps only), storage
@@ -229,12 +241,12 @@ change explicitly if one no longer fits.
 - **Cockpit: one per host** (decided 2026-10-20), each its own Tailscale
   Service `svc:cockpit-<device>` (§4 Service-name exception) on `127.0.0.1:9091`, `LoginTo = false`,
   `AllowMultiHost` off. No multi-host Cockpit hub: it would hold SSH to every
-  host and share one browser origin across them. A central admin point is
-  the planned lab admin station (kaywoz/home0ps#164), not a Cockpit hub.
+  host and share one browser origin across them. The home side has no
+  central admin point; the Mac mini is the home admin workstation.
 - **Exception — Dockhand** *(provisional, part of kaywoz/home0ps#174; may be
   revisited)*: one central Docker UI per zone.
   - **Dockhand-home** runs in the infra LXC (VLAN 24, tier 0) and manages **only** its
-    own VM (socket proxy with `POST`), the MOS host's Docker and the apps VM
+    own LXC (socket proxy with `POST`), the MOS host's Docker and the apps LXC
     (Hawser) — so it is ≈ root on the MOS host (accepted). **Never the
     monitoring host** (backup copy 1 stays outside central control) and
     **never lab agents**.
