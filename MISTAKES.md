@@ -332,6 +332,26 @@ mistakes, not a diary.
   into `grep -q`; and before naming a cause, check it on the affected host
   (one command) rather than reasoning from a hint like a mirror name.
 
+### 2026-10-23 — host ops (ad-hoc disk load test without cleanup)
+
+- **Trigger:** something broke during use — load kept running with no logging
+- **What happened:** the `dd` thermal test I gave in chat hard-coded sensors
+  for two NVMe controllers. One had no sysfs sensor, so the temperature
+  logger died on its first line while the CPU loops and `dd` kept going.
+  My stop advice then killed `dd` and the CPU-heavy subshells, but missed
+  the low-CPU loop around `dd`, which kept starting new writes.
+- **Root cause:** a long-running ad-hoc script with no prerequisite checks
+  before applying load and no single way to stop it (no `trap`, no process
+  group); stop advice targeted symptoms (`dd`, high CPU) instead of the
+  process tree.
+- **Fix applied:** corrected script auto-detects sensors and aborts before
+  any load if the tested drive has none; stop via the `dd` processes'
+  parents.
+- **Rule going forward:** CLAUDE.md §2 — scripts that apply load or run in
+  the background: check prerequisites first (abort before load), and add a
+  `trap` that kills the whole process group on exit/Ctrl-C; give stop
+  instructions as one command for the group (`kill -- -<PGID>`).
+
 ### 2026-10-24 — design (media credentials in the exposed guest)
 
 - **Trigger:** misunderstanding corrected by kaywoz

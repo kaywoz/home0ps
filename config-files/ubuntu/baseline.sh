@@ -67,6 +67,10 @@ if ! grep -qi '^ID=ubuntu' /etc/os-release; then
   exit 1
 fi
 
+# LXC mode: inside a container, kernel settings belong to the host
+CONTAINER=$(systemd-detect-virt -c 2>/dev/null || true); [ "$CONTAINER" = none ] && CONTAINER=""
+if [ -n "$CONTAINER" ]; then echo "Running inside a container ($CONTAINER): sysctl section skipped (host's job)"; fi
+
 FAILS=0
 step() { printf '\n\e[1m== %s\e[0m\n' "$*"; }
 ok()   { printf '  \e[32mOK\e[0m   %s\n' "$*"; }
@@ -215,6 +219,7 @@ verify_ssh() {
 # ---- sysctl: kernel hardening (same values as the Pi) -----------------------
 apply_sysctl() {
   step "sysctl: kernel hardening"
+  if [ -n "$CONTAINER" ]; then echo "  skipped: inside a container ($CONTAINER) — set on the host"; return 0; fi
   put /etc/sysctl.d/99-hardening.conf 644 <<'CONF'
 kernel.kptr_restrict=2
 kernel.dmesg_restrict=1
@@ -225,6 +230,7 @@ CONF
   if [ "$MODE" != dry ]; then sysctl --system >/dev/null; fi
 }
 verify_sysctl() {
+  if [ -n "$CONTAINER" ]; then echo "  sysctl: skipped (container)"; return 0; fi
   [ "$(sysctl -n kernel.kptr_restrict)" = 2 ] && ok "kptr_restrict=2" || bad "kptr_restrict"
   [ "$(sysctl -n kernel.dmesg_restrict)" = 1 ] && ok "dmesg_restrict=1" || bad "dmesg_restrict"
   [ "$(sysctl -n kernel.unprivileged_bpf_disabled)" -ge 1 ] && ok "unprivileged BPF off" || bad "unprivileged_bpf_disabled"
