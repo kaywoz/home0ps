@@ -220,7 +220,8 @@ change explicitly if one no longer fits.
 - **Proportionality** (kaywoz, 2026-10-25): the home side (UniFi, IoT, the
   apps/MOS box, the monitoring host) is a homelab and gets **homelab-grade
   controls** — Tailscale as the access path, grants per flow, one admin UI
-  per host, YubiKey MFA on tier-0 accounts (kaywoz/home0ps#184). **No PAW,
+  per host, phishing-resistant MFA on tier-0 accounts — passkeys in
+  1Password first, physical YubiKeys second (kaywoz/home0ps#184). **No PAW,
   no tier model, no extra boxes** for security's sake; fewer boxes is a goal.
   Don't propose enterprise-grade controls for home unless asked.
 - **Zones:** the **XCP-ng lab is untrusted**. It never administers the home
