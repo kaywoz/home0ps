@@ -250,9 +250,10 @@ change explicitly if one no longer fits.
     (Hawser) — so it is ≈ root on the MOS host (accepted). **Never the
     monitoring host** (backup copy 1 stays outside central control) and
     **never lab agents**.
-  - **Dockhand-lab** runs next to Xen Orchestra in the separate **lab
-    management VM** (VLAN 21, own kernel) and manages lab containers only;
-    lab-facing management never shares a VM with home control.
+  - **Dockhand-lab** runs next to Xen Orchestra in the **lab management
+    VM on dedicated lab hardware** (VLAN 21, not on the MOS host) and
+    manages lab containers only; lab-facing management never runs on home
+    hardware.
   - Both are tier 0 for their zone: UI only via their Tailscale Services,
     own auth (prefer OIDC + MFA), logged, own security-summary entry.
 - **Container names:** `<location>-<class>-<service>-<GGMM>`, e.g.
