@@ -180,6 +180,13 @@
 			"ip":  ["tcp:45876"],
 		},
 		{
+			// TEST RULE: iperf3 throughput tests from the Mac mini to every device (kaywoz/home0ps#190).
+			// Start the server on the target with: iperf3 -s -p <5001-5010>. Remove once testing is done.
+			"src": ["macmini"],
+			"dst": ["*"],
+			"ip":  ["tcp:5001-5010", "udp:5001-5010"],
+		},
+		{
 			// observed hosts ping job heartbeats (tailnet only; healthchecks isn't published elsewhere)
 			"src": ["tag:observed"],
 			"dst": ["svc:healthchecks"],
@@ -258,6 +265,13 @@
 			"accept": ["svc:archivebox:443", "svc:archivewarrior:443", "svc:scrutiny:443", "svc:kopia:443", "svc:rustfs:443"],
 		},
 		{"src": "macmini", "accept": ["svc:archivebox:443", "svc:kopia:443"]},
+		{
+			// TEST RULE: iperf3 from the Mac mini on 5001-5010 (tcp + udp), nothing beyond the range
+			"src":    "macmini",
+			"accept": ["tag:observed:5001", "tag:monitoring:5010", "tag:hypervisor:5005"],
+			"deny":   ["tag:monitoring:5011", "tag:observed:5000"],
+		},
+		{"src": "macmini", "proto": "udp", "accept": ["tag:observed:5001", "tag:monitoring:5010"]},
 		{
 			// host admin UIs are for admins only: observed hosts can't reach another host's Cockpit
 			"src":  "tag:observed",
