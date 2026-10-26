@@ -168,6 +168,13 @@
 			"ip":  ["*"],
 		},
 		{
+			// lab hypervisors -> ISO library on the storage host, NFSv4 only (kaywoz/home0ps#174).
+			// The only lab -> home path; read-only ISO export on the storage side. Remove when ISOs move.
+			"src": ["tag:hypervisor"],
+			"dst": ["tag:storage"],
+			"ip":  ["tcp:2049"],
+		},
+		{
 			//ha to synonology dsm portal
 			"src": ["tag:ha"],
 
@@ -272,6 +279,12 @@
 			"deny":   ["tag:monitoring:5011", "tag:observed:5000"],
 		},
 		{"src": "macmini", "proto": "udp", "accept": ["tag:observed:5001", "tag:monitoring:5010"]},
+		{
+			// lab hypervisors reach the ISO export (NFSv4) on the storage host, nothing else in home
+			"src":    "tag:hypervisor",
+			"accept": ["tag:storage:2049"],
+			"deny":   ["tag:storage:22", "tag:storage:111", "tag:storage:443", "tag:storage:445", "tag:monitoring:443", "tag:observed:45876"],
+		},
 		{
 			// host admin UIs are for admins only: observed hosts can't reach another host's Cockpit
 			"src":  "tag:observed",
