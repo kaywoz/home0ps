@@ -245,8 +245,8 @@ change explicitly if one no longer fits.
   central admin point; the Mac mini is the home admin workstation.
 - **Exception — Dockhand** *(provisional, part of kaywoz/home0ps#174; may be
   revisited)*: one central Docker UI per zone.
-  - **Dockhand-home** runs in the infra LXC (VLAN 24, tier 0) and manages **only** its
-    own LXC (socket proxy with `POST`), the MOS host's Docker and the apps LXC
+  - **Dockhand-home** runs in the infra guest (VLAN 24, tier 0) and manages **only** its
+    own guest (socket proxy with `POST`), the MOS host's Docker and the apps guest
     (Hawser) — so it is ≈ root on the MOS host (accepted). **Never the
     monitoring host** (backup copy 1 stays outside central control) and
     **never lab agents**.
