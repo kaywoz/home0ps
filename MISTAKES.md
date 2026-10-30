@@ -423,3 +423,18 @@ mistakes, not a diary.
   own docs before recommending how it connects; that includes CLI flags and
   config keys. Name the doc page or source file next to any command written
   into an issue.
+
+### 2026-10-30 — media (host guessed)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** kaywoz named the host running the media rclone mount.
+  I couldn't place the name, wrote "the storage host" into #197 and #191,
+  and added a follow-up to move the mount to the MOS host later. The host
+  already is the MOS host.
+- **Root cause:** mapped a device name to a role by guessing instead of
+  asking; "storage host" was also ambiguous next to the old storage host.
+- **Fix applied:** #197 and #191 now say MOS host; the move follow-up was
+  replaced by the read-only bind mount into the media LXC.
+- **Rule going forward:** when a device name in chat doesn't map to a known
+  role, ask in one line before writing it into an issue. In issues, name the
+  role precisely (MOS host / old storage host), never a bare "storage host".
