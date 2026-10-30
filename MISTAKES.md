@@ -438,3 +438,21 @@ mistakes, not a diary.
 - **Rule going forward:** when a device name in chat doesn't map to a known
   role, ask in one line before writing it into an issue. In issues, name the
   role precisely (MOS host / old storage host), never a bare "storage host".
+
+### 2026-10-30 — mos (VM vs LXC mixed up)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** #174, #191 and draft #183 called the MOS guests "VM"
+  in some places and "LXC" in others, and recorded "infra + apps as LXCs"
+  as decided. kaywoz: XCP-ng runs VMs only (some with Docker); on MOS only
+  the media guest is an LXC (needs `/dev/dri`); infra and apps are still
+  open, LXC or VM.
+- **Root cause:** edited the plan section by section as decisions moved and
+  never re-read it end to end for terms; turned a tested option (Docker in
+  an LXC works) into a decision.
+- **Fix applied:** #174 has a "Guest types" note at the top; infra/apps are
+  "infra guest"/"apps guest" with the LXC-vs-VM decision reopened; #191 and
+  #183 updated to match.
+- **Rule going forward:** use "VM" or "LXC" only where the type is decided,
+  "guest" otherwise. After changing a decision in a plan issue, grep the
+  whole issue for the old term before saving.
