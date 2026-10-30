@@ -405,3 +405,36 @@ mistakes, not a diary.
 - **Rule going forward:** when a placement or ownership detail is
   ambiguous ("X is planned there"), ask in one line before writing it into
   an issue or design.
+
+### 2026-10-26 — tailscale (port flag invented)
+
+- **Trigger:** wrong assumption, found before kaywoz acted on it
+- **What happened:** #190 and a comment on it told kaywoz to fix the
+  Tailscale UDP port with `tailscale up --port 41641` / `tailscale set
+  --port=41641` / `TS_PORT`. None of these exist: the port is a `tailscaled`
+  daemon flag (`--port`), set via `PORT` in `/etc/default/tailscaled` on
+  Linux packages, `TS_TAILSCALED_EXTRA_ARGS` in the container image, and
+  `tailscaled-env.txt` on Windows.
+- **Root cause:** wrote CLI flags from memory instead of checking the
+  Tailscale docs/source before putting them into an issue.
+- **Fix applied:** #190 body and comment corrected, with the sources
+  (Tailscale KB 1082 + 1278, `cmd/tailscaled/tailscaled.defaults`).
+- **Rule going forward:** CLAUDE.md §2 already requires reading the app's
+  own docs before recommending how it connects; that includes CLI flags and
+  config keys. Name the doc page or source file next to any command written
+  into an issue.
+
+### 2026-10-30 — media (host guessed)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** kaywoz named the host running the media rclone mount.
+  I couldn't place the name, wrote "the storage host" into #197 and #191,
+  and added a follow-up to move the mount to the MOS host later. The host
+  already is the MOS host.
+- **Root cause:** mapped a device name to a role by guessing instead of
+  asking; "storage host" was also ambiguous next to the old storage host.
+- **Fix applied:** #197 and #191 now say MOS host; the move follow-up was
+  replaced by the read-only bind mount into the media LXC.
+- **Rule going forward:** when a device name in chat doesn't map to a known
+  role, ask in one line before writing it into an issue. In issues, name the
+  role precisely (MOS host / old storage host), never a bare "storage host".
