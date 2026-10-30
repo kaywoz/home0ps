@@ -12,8 +12,8 @@
 # Usage (as root on MOS):
 #   ./create-lxc.sh -n <name> -l <iface> [-m 8G] [-c 2] [-r noble] [--gpu] [--autostart] [--dry-run]
 #
-#   -n NAME       container name, e.g. infra, apps, media
-#   -l IFACE      parent interface for macvlan = the guest's VLAN, e.g. eth1.21 (one VLAN per guest)
+#   -n NAME       container name, e.g. media (infra and apps are VMs, not LXCs — kaywoz/home0ps#174)
+#   -l IFACE      parent interface for macvlan = the guest's VLAN, e.g. bond0.13 (one VLAN per guest)
 #   -m MEM        memory limit (cgroup v2 memory.max), default 4G
 #   -c CPUS       CPU limit in cores (cgroup v2 cpu.max), default 2
 #   -r RELEASE    Ubuntu release for the download template, default noble
@@ -22,10 +22,9 @@
 #   --autostart   lxc.start.auto = 1 (check that MOS starts LXCs at boot)
 #   --dry-run     print the config and steps, change nothing
 #
-# Examples:
-#   ./create-lxc.sh -n infra -l eth1.21 -m 8G  -c 2 --autostart
-#   ./create-lxc.sh -n apps  -l eth1.31 -m 24G -c 4 --autostart
-#   ./create-lxc.sh -n media -l eth1.13 -m 6G  -c 2 --gpu --autostart
+# Example (media LXC on VLAN 13):
+#   ./create-lxc.sh -n media -l bond0.13 -m 6G -c 2 --gpu --autostart --dry-run
+#   ./create-lxc.sh -n media -l bond0.13 -m 6G -c 2 --gpu --autostart
 #
 # Next steps inside the guest (printed at the end): baseline.sh, then docker-host.sh —
 # both detect the container and skip what can't work there (sysctl, userns-remap).
