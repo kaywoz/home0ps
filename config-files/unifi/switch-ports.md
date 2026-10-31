@@ -10,7 +10,8 @@ nothing is cabled to this plan yet. Background: kaywoz/home0ps#174.
   2.5 GbE; on a 1 GbE switch port it negotiates 1G, which caps all routed
   (inter-VLAN) traffic at 1G.
 - The four 2.5 GbE ports go to the links that gain from 2.5G: the gateway
-  uplink, the storage host, the lab switch uplink and the admin workstation.
+  uplink, the storage host, the lab switch uplink and the admin workstation;
+  the monitoring host gets 2.5G on an SFP+ port.
 - Guests on the storage host get one whole NIC port each (PCI passthrough or
   LXC `phys`), on an access port of their VLAN. No trunk to the storage host.
 - Lab traffic stays on the lab switch: hypervisors and the lab management VM
@@ -24,7 +25,7 @@ nothing is cabled to this plan yet. Background: kaywoz/home0ps#174.
 | 2 | 1G | apps VM (storage-host NIC) | 31 | access |
 | 3 | 1G | access point | uplink | unchanged |
 | 4 | 1G | game console | 13 | unchanged |
-| 5 | 1G | monitoring host | 61 | unchanged |
+| 5 | 1G | monitoring host (until it moves to SFP+ 17) | 61 | then spare |
 | 6 | 1G | infra VM (storage-host NIC) | 24 | access |
 | 7 | 1G | spare | — | |
 | 8 | 1G | media LXC (storage-host NIC) | 13 | access |
@@ -34,13 +35,14 @@ nothing is cabled to this plan yet. Background: kaywoz/home0ps#174.
 | 14 | 2.5G | lab switch uplink | trunk 21, 71, 72 | lab only |
 | 15 | 2.5G | gateway uplink | uplink | |
 | 16 | 2.5G | admin workstation dock | 11 | unchanged |
-| 17–18 | SFP+ | spare | — | current RJ45 modules show anomalies (#175) |
+| 17 | SFP+ | monitoring host, 2.5G USB NIC | 61 | needs an RJ45 module that links at 2.5G (#175); it can push 2.5G in some loads (backups, #178) |
+| 18 | SFP+ | spare | — | |
 
 ## Lab switch (5× 2.5 GbE)
 
 | Port | Use | VLAN |
 |---|---|---|
-| 1 | uplink to core port 14 | trunk 21, 71, 72 |
+| 1 | uplink to core port 14, PoE-powered from it | trunk 21, 71, 72 |
 | 2–3 | lab hypervisors | native 21, tagged 71, 72 |
 | 4–5 | spare (lab) | — |
 
@@ -49,9 +51,8 @@ nothing is cabled to this plan yet. Background: kaywoz/home0ps#174.
 - [ ] Measure routed throughput (iperf3, workstation VLAN 11 → storage host
       VLAN 22) before and after moving the uplink — the gateway may not route
       at 2.5G, especially with IDS/IPS on (#190)
-- [ ] Can the lab switch be powered by PoE from core port 14?
-- [ ] 2.5G USB NIC for the monitoring host: only useful once an SFP+ port has a
-      working multi-gig module (#175, backups #178)
+- [ ] SFP+ 17 for the monitoring host: a multi-gig RJ45 module that links at
+      2.5G (today's modules show anomalies and one linked at 1G, #175)
 - [ ] Port profiles: replace the stale `hypervisor` / `oob` profiles on ports
       that change use
 
@@ -62,4 +63,5 @@ nothing is cabled to this plan yet. Background: kaywoz/home0ps#174.
 2. Remove the old storage host; storage host from SFP+ → port 13.
 3. Cable storage-host guests to ports 6 (infra), 2 (apps), 8 (media); set
    each port's VLAN profile.
-4. Lab switch on port 14, hypervisors on the lab switch.
+4. Lab switch on port 14 (PoE-powered), hypervisors on the lab switch.
+5. Monitoring host: 2.5G USB NIC on SFP+ 17 once #175 is fixed.
