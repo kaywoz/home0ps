@@ -1,5 +1,5 @@
 #!/bin/bash
-# docker-host.sh — Docker host layer for Ubuntu hosts in home0ps. Run baseline.sh first.
+# docker-host.sh — Docker host layer for Ubuntu or Debian hosts in home0ps. Run baseline.sh first.
 #
 #   sudo ./docker-host.sh                     # apply all sections, then verify
 #   sudo ./docker-host.sh --dry-run           # show what would change
@@ -46,10 +46,12 @@ if [ "$(id -u)" != "0" ]; then
   echo "This script must be run as root" 1>&2
   exit 1
 fi
-if ! grep -qi '^ID=ubuntu' /etc/os-release; then
-  echo "Not Ubuntu (see /etc/os-release)." 1>&2
-  exit 1
-fi
+# shellcheck disable=SC1091
+DISTRO=$(. /etc/os-release && echo "$ID")
+case "$DISTRO" in
+  ubuntu|debian) ;;
+  *) echo "Not Ubuntu or Debian (see /etc/os-release)." 1>&2; exit 1 ;;
+esac
 
 CONTAINER=$(systemd-detect-virt -c 2>/dev/null || true); [ "$CONTAINER" = none ] && CONTAINER=""
 
@@ -79,10 +81,11 @@ apply_docker() {
       apt-get update -q
       DEBIAN_FRONTEND=noninteractive apt-get install -y -q ca-certificates curl
       install -m 0755 -d /etc/apt/keyrings
-      curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      # same steps for both: only the path differs (docs.docker.com/engine/install/{ubuntu,debian})
+      curl -fsSL "https://download.docker.com/linux/${DISTRO}/gpg" -o /etc/apt/keyrings/docker.asc
       chmod a+r /etc/apt/keyrings/docker.asc
       # shellcheck disable=SC1091
-      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${DISTRO} $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
         > /etc/apt/sources.list.d/docker.list
       apt-get update -q
       DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin

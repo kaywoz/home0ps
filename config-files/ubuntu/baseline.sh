@@ -1,5 +1,6 @@
 #!/bin/bash
-# baseline.sh — baseline for every Ubuntu host in home0ps. Idempotent.
+# baseline.sh — baseline for every Ubuntu or Debian host in home0ps. Idempotent.
+# Debian: MOS guests run Debian 13 (kaywoz/home0ps#174); differences are marked "Debian:".
 #
 #   sudo ./baseline.sh                      # apply all sections, then verify
 #   sudo ./baseline.sh --dry-run            # show what would change
@@ -21,7 +22,7 @@
 #   PACKAGES="htop ncdu git tealdeer|tldr unzip curl ca-certificates"
 #            apt packages; "a|b" = first one installable on this release.
 #            A package with no install candidate is reported, not fatal.
-#   dysk is not in Ubuntu's repos: installed from its GitHub release, checksum-verified
+#   dysk is not in Ubuntu's/Debian's repos: installed from its GitHub release, checksum-verified
 #
 # Docker hosts: run docker-host.sh after this.
 set -euo pipefail
@@ -51,7 +52,7 @@ while [ $# -gt 0 ]; do
     --only) ONLY="${2:?--only needs a list}"; shift ;;
     --skip) SKIP="${2:?--skip needs a list}"; shift ;;
     --force-ssh) FORCE_SSH=1 ;;
-    -h|--help) sed -n '2,20p' "$0" 2>/dev/null || true; exit 0 ;;
+    -h|--help) sed -n '2,21p' "$0" 2>/dev/null || true; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -62,10 +63,12 @@ if [ "$(id -u)" != "0" ]; then
   echo "This script must be run as root" 1>&2
   exit 1
 fi
-if ! grep -qi '^ID=ubuntu' /etc/os-release; then
-  echo "Not Ubuntu (see /etc/os-release)." 1>&2
-  exit 1
-fi
+# shellcheck disable=SC1091
+DISTRO=$(. /etc/os-release && echo "$ID")
+case "$DISTRO" in
+  ubuntu|debian) ;;
+  *) echo "Not Ubuntu or Debian (see /etc/os-release)." 1>&2; exit 1 ;;
+esac
 
 # LXC mode: inside a container, kernel settings belong to the host
 CONTAINER=$(systemd-detect-virt -c 2>/dev/null || true); [ "$CONTAINER" = none ] && CONTAINER=""
@@ -153,13 +156,23 @@ verify_snap() {
 apply_updates() {
   step "updates: unattended upgrades, reboot=$AUTO_REBOOT at $REBOOT_TIME"
   apt_install unattended-upgrades
+  local origins
+  if [ "$DISTRO" = debian ]; then
+    # Debian: the active lines of Debian's 50unattended-upgrades, plus -updates (as on Ubuntu)
+    origins='  "origin=Debian,codename=${distro_codename},label=Debian";
+  "origin=Debian,codename=${distro_codename},label=Debian-Security";
+  "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+  "origin=Debian,codename=${distro_codename}-updates";'
+  else
+    origins='  "origin=Ubuntu,archive=${distro_codename}-security,label=Ubuntu";
+  "origin=Ubuntu,archive=${distro_codename}-updates,label=Ubuntu";
+  "origin=UbuntuESMApps,archive=${distro_codename}-apps-security";
+  "origin=UbuntuESM,archive=${distro_codename}-infra-security";'
+  fi
   put /etc/apt/apt.conf.d/52unattended-local 644 <<CONF
 // baseline.sh (home0ps): overrides 50unattended-upgrades. Docker CE: 53unattended-docker (docker-host.sh).
 Unattended-Upgrade::Origins-Pattern {
-  "origin=Ubuntu,archive=\${distro_codename}-security,label=Ubuntu";
-  "origin=Ubuntu,archive=\${distro_codename}-updates,label=Ubuntu";
-  "origin=UbuntuESMApps,archive=\${distro_codename}-apps-security";
-  "origin=UbuntuESM,archive=\${distro_codename}-infra-security";
+${origins}
 };
 Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
 Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
@@ -192,6 +205,8 @@ verify_updates() {
 # ---- ssh: keys only (refuses without a key unless --force-ssh) --------------
 apply_ssh() {
   step "ssh: keys only, no root, no forwarding"
+  # Debian LXC images ship without an SSH server (access via lxc-attach / Tailscale SSH)
+  if ! command -v sshd >/dev/null 2>&1; then echo "  skipped: no SSH server installed"; return 0; fi
   local home keys
   home=$(getent passwd "${ADMIN_USER:-root}" | cut -d: -f6)
   keys="${home:-/nonexistent}/.ssh/authorized_keys"
@@ -212,6 +227,7 @@ CONF
   fi
 }
 verify_ssh() {
+  if ! command -v sshd >/dev/null 2>&1; then echo "  ssh: skipped (no SSH server)"; return 0; fi
   sshd -T 2>/dev/null | grep -x 'permitrootlogin no' >/dev/null && ok "SSH root login off" || bad "PermitRootLogin"
   sshd -T 2>/dev/null | grep -x 'passwordauthentication no' >/dev/null && ok "SSH passwords off" || bad "PasswordAuthentication"
 }
@@ -262,11 +278,11 @@ apply_packages() {
   apt_install $PACKAGES
   install_dysk
   # tealdeer needs its page cache once per user
-  if installed tealdeer && [ -n "$ADMIN_USER" ] && [ "$MODE" != dry ]; then
+  if installed tealdeer && [ -n "$ADMIN_USER" ] && command -v sudo >/dev/null 2>&1 && [ "$MODE" != dry ]; then
     sudo -u "$ADMIN_USER" -H tldr --update >/dev/null 2>&1 && echo "  tldr pages downloaded for $ADMIN_USER" || echo "  WARN: tldr --update failed (run it as $ADMIN_USER)"
   fi
 }
-# dysk (disk usage overview) isn't packaged for Ubuntu: latest GitHub release, static musl
+# dysk (disk usage overview) isn't packaged for Ubuntu/Debian: latest GitHub release, static musl
 # binary, SHA-256 from the GitHub API checked before extracting. Installed once; re-run
 # with the binary removed to upgrade (not covered by unattended upgrades).
 install_dysk() {
@@ -278,6 +294,8 @@ install_dysk() {
     *) echo "  dysk: no build for $(uname -m), skipped"; return 0 ;;
   esac
   if [ "$MODE" = dry ]; then echo "  + download latest dysk release, verify sha256, install $arch/dysk -> /usr/local/bin/dysk"; return 0; fi
+  # Debian: minimal images (LXC) have no python3, which parses the release JSON
+  command -v python3 >/dev/null 2>&1 || apt_install python3
   meta=$(curl -fsSL https://api.github.com/repos/Canop/dysk/releases/latest)
   read -r tag url sha < <(printf '%s' "$meta" | python3 -c 'import json,sys; d=json.load(sys.stdin); a=d["assets"][0]; print(d["tag_name"], a["browser_download_url"], (a.get("digest") or "").replace("sha256:",""))')
   if [ -z "$sha" ]; then bad "dysk $tag: no checksum published, not installing"; return 0; fi
