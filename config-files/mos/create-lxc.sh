@@ -12,7 +12,7 @@
 #     macvlan on a VLAN interface is the fallback if phys fails on MOS.
 #
 # Usage (as root on MOS):
-#   ./create-lxc.sh -n <name> -l <iface> [-t phys|macvlan] [-m 8G] [-c 2] [-r noble] [--gpu]
+#   ./create-lxc.sh -n <name> -l <iface> [-t phys|macvlan] [-m 8G] [-c 2] [-d debian] [-r trixie] [--gpu]
 #                   [--autostart] [--dry-run]
 #
 #   -n NAME       container name, e.g. media (infra and apps are VMs, not LXCs — kaywoz/home0ps#174)
@@ -21,7 +21,8 @@
 #   -t TYPE       phys (default) or macvlan. phys is UNTESTED on MOS — verify before relying on it
 #   -m MEM        memory limit (cgroup v2 memory.max), default 4G
 #   -c CPUS       CPU limit in cores (cgroup v2 cpu.max), default 2
-#   -r RELEASE    Ubuntu release for the download template, default noble
+#   -d DIST       distribution for the download template, default debian (kaywoz, 2026-11-02)
+#   -r RELEASE    release for the download template, default trixie (Debian 13)
 #   --gpu         pass /dev/dri (iGPU) into the guest and map the host's render group (media LXC).
 #                 UNTESTED on MOS — verify with a transcode before relying on it
 #   --autostart   lxc.start.auto = 1 (check that MOS starts LXCs at boot)
@@ -33,9 +34,10 @@
 #
 # Next steps inside the guest (printed at the end): baseline.sh, then docker-host.sh —
 # both detect the container and skip what can't work there (sysctl, userns-remap).
+# NOTE: both are Ubuntu-only today; Debian support is still to do (kaywoz/home0ps#174).
 set -euo pipefail
 
-NAME=""; LINK=""; NETTYPE=phys; MEM=4G; CPUS=2; RELEASE=noble; GPU=0; AUTOSTART=0; DRY=0
+NAME=""; LINK=""; NETTYPE=phys; MEM=4G; CPUS=2; DIST=debian; RELEASE=trixie; GPU=0; AUTOSTART=0; DRY=0
 UIDBASE=100000; UIDRANGE=65536
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -44,11 +46,12 @@ while [ $# -gt 0 ]; do
     -t) NETTYPE="${2:?}"; shift ;;
     -m) MEM="${2:?}"; shift ;;
     -c) CPUS="${2:?}"; shift ;;
+    -d) DIST="${2:?}"; shift ;;
     -r) RELEASE="${2:?}"; shift ;;
     --gpu) GPU=1 ;;
     --autostart) AUTOSTART=1 ;;
     --dry-run) DRY=1 ;;
-    -h|--help) sed -n '2,35p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,37p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -123,11 +126,11 @@ ${GPU_CONF}
 EOF
 )
 
-echo "== ${NAME}: Ubuntu ${RELEASE}, ${CPUS} cores, ${MEM}, ${NETTYPE} on ${LINK}$( [ "$GPU" = 1 ] && echo ', iGPU' ), lxcpath ${P}"
+echo "== ${NAME}: ${DIST} ${RELEASE}, ${CPUS} cores, ${MEM}, ${NETTYPE} on ${LINK}$( [ "$GPU" = 1 ] && echo ', iGPU' ), lxcpath ${P}"
 if [ "$DRY" = 1 ]; then
   echo "--- config ---"; echo "$CONF"; echo "--------------"
   [ "$GPU" = 1 ] && echo "+ ensure 'root:${RG}:1' in /etc/subgid"
-  echo "+ lxc-create -n ${NAME} -f <config> -t download -- -d ubuntu -r ${RELEASE} -a amd64"
+  echo "+ lxc-create -n ${NAME} -f <config> -t download -- -d ${DIST} -r ${RELEASE} -a amd64"
   echo "+ chmod o+x ${P} ${P}/${NAME}; lxc-start; wait for network; apt-get install curl ca-certificates"
   echo "Dry run, nothing changed."; exit 0
 fi
@@ -138,7 +141,7 @@ echo "$CONF" > "$TMP"
 if [ "$GPU" = 1 ] && ! grep -qx "root:${RG}:1" /etc/subgid; then
   echo "root:${RG}:1" >> /etc/subgid; echo "  added root:${RG}:1 to /etc/subgid (render group passthrough)"
 fi
-lxc-create -n "$NAME" -f "$TMP" -t download -- -d ubuntu -r "$RELEASE" -a amd64
+lxc-create -n "$NAME" -f "$TMP" -t download -- -d "$DIST" -r "$RELEASE" -a amd64
 chmod o+x "$P" "$P/$NAME"
 lxc-start -n "$NAME"
 
