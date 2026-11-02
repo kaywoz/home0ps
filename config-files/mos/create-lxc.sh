@@ -7,42 +7,52 @@
 #     e.g. in MOS's container config editor.
 #   * MOS's LXC is built WITHOUT AppArmor: no nesting.conf include, only its proc/sys mount entries
 #   * Docker works inside (overlayfs, cgroup v2, DOCKER-USER chain)
-#   * no bridges on MOS: networking via macvlan on the guest's VLAN interface
+#   * no bridges on MOS: one port per guest (kaywoz/home0ps#174). Default: the whole port moves
+#     into the guest (lxc.net type phys); the switch port is an access port on the guest's VLAN.
+#     macvlan on a VLAN interface is the fallback if phys fails on MOS.
 #
 # Usage (as root on MOS):
-#   ./create-lxc.sh -n <name> -l <iface> [-m 8G] [-c 2] [-r noble] [--gpu] [--autostart] [--dry-run]
+#   ./create-lxc.sh -n <name> -l <iface> [-t phys|macvlan] [-m 8G] [-c 2] [-r noble] [--gpu]
+#                   [--router] [--autostart] [--dry-run]
 #
 #   -n NAME       container name, e.g. media (infra and apps are VMs, not LXCs — kaywoz/home0ps#174)
-#   -l IFACE      parent interface for macvlan = the guest's VLAN, e.g. bond0.13 (one VLAN per guest)
+#   -l IFACE      phys: the guest's own port, e.g. eth2 (the host loses it while the guest runs)
+#                 macvlan: parent interface on the guest's VLAN, e.g. eth2.13
+#   -t TYPE       phys (default) or macvlan. phys is UNTESTED on MOS — verify before relying on it
 #   -m MEM        memory limit (cgroup v2 memory.max), default 4G
 #   -c CPUS       CPU limit in cores (cgroup v2 cpu.max), default 2
 #   -r RELEASE    Ubuntu release for the download template, default noble
 #   --gpu         pass /dev/dri (iGPU) into the guest and map the host's render group (media LXC).
 #                 UNTESTED on MOS — verify with a transcode before relying on it
+#   --router      Tailscale subnet router: IP forwarding in the guest's network namespace via
+#                 lxc.sysctl (/proc/sys is read-only inside, proc:mixed). Media LXC = router for
+#                 VLAN 13, /32 routes only (kaywoz/home0ps#174)
 #   --autostart   lxc.start.auto = 1 (check that MOS starts LXCs at boot)
 #   --dry-run     print the config and steps, change nothing
 #
-# Example (media LXC on VLAN 13):
-#   ./create-lxc.sh -n media -l bond0.13 -m 6G -c 2 --gpu --autostart --dry-run
-#   ./create-lxc.sh -n media -l bond0.13 -m 6G -c 2 --gpu --autostart
+# Example (media LXC on its own port, switch port = access VLAN 13):
+#   ./create-lxc.sh -n media -l eth2 -m 6G -c 2 --gpu --router --autostart --dry-run
+#   ./create-lxc.sh -n media -l eth2 -m 6G -c 2 --gpu --router --autostart
 #
 # Next steps inside the guest (printed at the end): baseline.sh, then docker-host.sh —
 # both detect the container and skip what can't work there (sysctl, userns-remap).
 set -euo pipefail
 
-NAME=""; LINK=""; MEM=4G; CPUS=2; RELEASE=noble; GPU=0; AUTOSTART=0; DRY=0
+NAME=""; LINK=""; NETTYPE=phys; MEM=4G; CPUS=2; RELEASE=noble; GPU=0; ROUTER=0; AUTOSTART=0; DRY=0
 UIDBASE=100000; UIDRANGE=65536
 while [ $# -gt 0 ]; do
   case "$1" in
     -n) NAME="${2:?}"; shift ;;
     -l) LINK="${2:?}"; shift ;;
+    -t) NETTYPE="${2:?}"; shift ;;
     -m) MEM="${2:?}"; shift ;;
     -c) CPUS="${2:?}"; shift ;;
     -r) RELEASE="${2:?}"; shift ;;
     --gpu) GPU=1 ;;
+    --router) ROUTER=1 ;;
     --autostart) AUTOSTART=1 ;;
     --dry-run) DRY=1 ;;
-    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,38p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -60,7 +70,15 @@ lxc-info -n "$NAME" >/dev/null 2>&1 && die "container '$NAME' already exists"
 for f in /etc/subuid /etc/subgid; do
   grep -qE "^root:${UIDBASE}:${UIDRANGE}$" "$f" 2>/dev/null || die "root:${UIDBASE}:${UIDRANGE} missing in $f"
 done
-ip link show "$LINK" >/dev/null 2>&1 || die "interface $LINK does not exist — create the VLAN interface on MOS first (persistently)"
+[ "$NETTYPE" = phys ] || [ "$NETTYPE" = macvlan ] || die "-t must be phys or macvlan"
+ip link show "$LINK" >/dev/null 2>&1 || die "interface $LINK does not exist"
+if [ "$NETTYPE" = phys ]; then
+  # phys takes the port away from the host: never the one MOS itself is reached on
+  ip route show default | grep -w "dev $LINK" >/dev/null && die "$LINK carries the host's default route — phys would cut MOS off"
+  ip -o link show | grep "@${LINK}:" >/dev/null && die "$LINK has VLAN/child interfaces on the host — phys would take them down; remove them first"
+  ip -4 -o addr show dev "$LINK" | grep inet >/dev/null \
+    && echo "WARN: $LINK has an address on the host ($(ip -4 -o addr show dev "$LINK" | awk '{print $4}' | head -1)) — it moves into the guest with the port"
+fi
 ip -br link show "$LINK" | grep -E '\bUP\b' >/dev/null || echo "WARN: $LINK is not UP — the guest will have no network until it is"
 [[ "$MEM" =~ ^[0-9]+[KMG]$ ]] || die "-m must look like 4G / 512M"
 [[ "$CPUS" =~ ^[0-9]+$ ]] && [ "$CPUS" -ge 1 ] || die "-c must be a whole number of cores"
@@ -82,6 +100,13 @@ lxc.cgroup2.devices.allow = c 226:* rwm
 lxc.mount.entry = /dev/dri dev/dri none bind,optional,create=dir"
 fi
 
+MACVLAN_MODE=""; [ "$NETTYPE" = macvlan ] && MACVLAN_MODE="lxc.net.0.macvlan.mode = bridge
+"
+ROUTER_CONF=""
+[ "$ROUTER" = 1 ] && ROUTER_CONF="# Tailscale subnet router: forwarding in the guest's own network namespace only
+lxc.sysctl.net.ipv4.ip_forward = 1
+lxc.sysctl.net.ipv6.conf.all.forwarding = 1"
+
 CONF=$(cat <<EOF
 # created by create-lxc.sh (home0ps) for '${NAME}'
 # (common.conf + userns.conf are added by the download template itself)
@@ -90,11 +115,10 @@ ${IDMAP_G}
 # nesting (Docker inside) — nesting.conf minus its AppArmor line (MOS LXC has no AppArmor)
 lxc.mount.entry = proc dev/.lxc/proc proc create=dir,optional 0 0
 lxc.mount.entry = sys dev/.lxc/sys sysfs create=dir,optional 0 0
-# network: macvlan on the guest's VLAN interface (MOS has no bridges)
-lxc.net.0.type = macvlan
+# network: ${NETTYPE} on ${LINK} (one port per guest, MOS has no bridges)
+lxc.net.0.type = ${NETTYPE}
 lxc.net.0.link = ${LINK}
-lxc.net.0.macvlan.mode = bridge
-lxc.net.0.flags = up
+${MACVLAN_MODE}lxc.net.0.flags = up
 lxc.net.0.name = eth0
 # /dev/net/tun for Tailscale inside the guest (unprivileged LXCs can't mknod)
 lxc.cgroup2.devices.allow = c 10:200 rwm
@@ -104,10 +128,11 @@ lxc.cgroup2.memory.max = ${MEM}
 lxc.cgroup2.cpu.max = $((CPUS*100000)) 100000
 lxc.start.auto = ${AUTOSTART}
 ${GPU_CONF}
+${ROUTER_CONF}
 EOF
 )
 
-echo "== ${NAME}: Ubuntu ${RELEASE}, ${CPUS} cores, ${MEM}, macvlan on ${LINK}$( [ "$GPU" = 1 ] && echo ', iGPU' ), lxcpath ${P}"
+echo "== ${NAME}: Ubuntu ${RELEASE}, ${CPUS} cores, ${MEM}, ${NETTYPE} on ${LINK}$( [ "$GPU" = 1 ] && echo ', iGPU' )$( [ "$ROUTER" = 1 ] && echo ', subnet router' ), lxcpath ${P}"
 if [ "$DRY" = 1 ]; then
   echo "--- config ---"; echo "$CONF"; echo "--------------"
   [ "$GPU" = 1 ] && echo "+ ensure 'root:${RG}:1' in /etc/subgid"
@@ -142,6 +167,11 @@ if [ "$GPU" = 1 ]; then
     echo "  OK   /dev/dri/renderD128 visible: $(lxc-attach -n "$NAME" -- stat -c '%U:%G %a' /dev/dri/renderD128)"
   else echo "  FAIL /dev/dri/renderD128 not visible in the guest"; fi
 fi
+if [ "$ROUTER" = 1 ]; then
+  FWD=$(lxc-attach -n "$NAME" -- cat /proc/sys/net/ipv4/ip_forward)
+  [ "$FWD" = 1 ] && echo "  OK   IP forwarding on in the guest" || echo "  FAIL ip_forward is '$FWD' in the guest"
+  echo "  host ip_forward (should be unchanged): $(cat /proc/sys/net/ipv4/ip_forward)"
+fi
 
 lxc-attach -n "$NAME" -- bash -c 'DEBIAN_FRONTEND=noninteractive apt-get update -q >/dev/null && apt-get install -y -q curl ca-certificates >/dev/null' \
   && echo "  OK   curl + ca-certificates installed" || echo "  WARN apt failed (no network yet?)"
@@ -153,3 +183,5 @@ Done: ${NAME}. Next, inside the guest (lxc-attach -n ${NAME}):
   curl -fsSL https://raw.githubusercontent.com/kaywoz/home0ps/main/config-files/ubuntu/docker-host.sh | bash -s -- --dry-run
 Both detect the container and skip sysctl / userns-remap. Then: tailscale up --advertise-tags=<tag for this guest>.
 MSG
+[ "$ROUTER" = 1 ] && echo "Subnet router: tailscale set --advertise-routes=<ip>/32,<ip>/32 — single devices only, approved via autoApprovers in policy.hujson."
+true
