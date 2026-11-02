@@ -117,10 +117,17 @@ apply_daemon() {
   # userns-remap inside it is redundant and usually fails
   local remap='  "userns-remap": "default",'
   if [ -n "$CONTAINER" ]; then remap=""; echo "  inside a container ($CONTAINER): no userns-remap (the LXC already maps root)"; fi
-  { echo "{"; [ -n "$remap" ] && echo "$remap"; cat <<'CONF'
+  # icc=false and userland-proxy=false need br_netfilter. An LXC can't load it, and the MOS host
+  # doesn't (dockerd then refuses to start). Without it: Docker defaults for both — icc only covers
+  # the default bridge (apps use their own proxy-<app> networks), docker-proxy serves the ports.
+  local brnf='  "icc": false,
+  "userland-proxy": false,'
+  # (dry run: only checks, doesn't load the module)
+  if [ ! -e /proc/sys/net/bridge/bridge-nf-call-iptables ] && { [ "$MODE" = dry ] || ! modprobe br_netfilter 2>/dev/null; }; then
+    brnf=""; echo "  br_netfilter not available: leaving icc / userland-proxy at Docker's defaults"
+  fi
+  { echo "{"; [ -n "$remap" ] && echo "$remap"; [ -n "$brnf" ] && echo "$brnf"; cat <<'CONF'
   "no-new-privileges": true,
-  "icc": false,
-  "userland-proxy": false,
   "live-restore": true,
   "log-driver": "journald",
   "log-opts": { "tag": "{{.Name}}" }
