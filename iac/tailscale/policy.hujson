@@ -25,6 +25,8 @@
 		"tag:test":       ["group:privusers"], //just a test tag
 		"tag:mgmt":       ["group:privusers"], //mgmt ui still exposed directly on 80/443, not yet behind proxy
 		"tag:observed":   ["group:privusers"], //hosts/collectors shipping logs, pinging healthchecks, pulled by the monitor
+		"tag:infra":      ["group:privusers"], //infra VM on the storage host: tier 0 (Dockhand, cloudflared)
+		"tag:media":      ["group:privusers"], //media LXC on the storage host, IoT VLAN (Jellyfin, Komga, Homey)
 
 		///////////////////////////////////////////////////////////////////
 		//"tag:app-golink":       ["group:privusers"], //golink container access
@@ -49,6 +51,7 @@
 				"tag:hypervisor", "tag:storage", "tag:service", "tag:docker", "tag:oob",
 				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests", "tag:trusted",
 				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt", "tag:observed",
+				"tag:infra", "tag:media",
 			],
 			"users":       ["${LOCAL_UNIX_ACCOUNT}", "root"],
 			"checkPeriod": "24h",
@@ -61,6 +64,7 @@
 				"tag:hypervisor", "tag:storage", "tag:service", "tag:docker", "tag:oob",
 				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests", "tag:trusted",
 				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt", "tag:observed",
+				"tag:infra", "tag:media",
 			],
 			"users":  ["${LOCAL_UNIX_ACCOUNT}", "root"],
 		},
