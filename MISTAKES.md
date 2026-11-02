@@ -456,3 +456,16 @@ mistakes, not a diary.
 - **Rule going forward:** use "VM" or "LXC" only where the type is decided,
   "guest" otherwise. After changing a decision in a plan issue, grep the
   whole issue for the old term before saving.
+
+### 2026-10-31 — network (uplink limit misread)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** from a switch screenshot showing the gateway uplink
+  at GbE, I concluded every inter-VLAN flow tops out at 1 Gbit/s and
+  planned ports around that. The gateway's port is 2.5 GbE; the uplink only
+  negotiated 1G because it sits on a 1G switch port.
+- **Root cause:** treated a negotiated link speed as a device limit without
+  checking both ends of the link.
+- **Fix applied:** port plan redone with the uplink on a 2.5G switch port.
+- **Rule going forward:** a link speed is the slower of its two ends; check
+  both ports' capabilities before calling a speed a hardware limit.
