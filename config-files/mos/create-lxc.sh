@@ -13,7 +13,7 @@
 #
 # Usage (as root on MOS):
 #   ./create-lxc.sh -n <name> -l <iface> [-t phys|macvlan] [-m 8G] [-c 2] [-r noble] [--gpu]
-#                   [--router] [--autostart] [--dry-run]
+#                   [--autostart] [--dry-run]
 #
 #   -n NAME       container name, e.g. media (infra and apps are VMs, not LXCs — kaywoz/home0ps#174)
 #   -l IFACE      phys: the guest's own port, e.g. eth2 (the host loses it while the guest runs)
@@ -24,21 +24,18 @@
 #   -r RELEASE    Ubuntu release for the download template, default noble
 #   --gpu         pass /dev/dri (iGPU) into the guest and map the host's render group (media LXC).
 #                 UNTESTED on MOS — verify with a transcode before relying on it
-#   --router      Tailscale subnet router: IP forwarding in the guest's network namespace via
-#                 lxc.sysctl (/proc/sys is read-only inside, proc:mixed). Media LXC = router for
-#                 VLAN 13, /32 routes only (kaywoz/home0ps#174)
 #   --autostart   lxc.start.auto = 1 (check that MOS starts LXCs at boot)
 #   --dry-run     print the config and steps, change nothing
 #
 # Example (media LXC on its own port, switch port = access VLAN 13):
-#   ./create-lxc.sh -n media -l eth2 -m 6G -c 2 --gpu --router --autostart --dry-run
-#   ./create-lxc.sh -n media -l eth2 -m 6G -c 2 --gpu --router --autostart
+#   ./create-lxc.sh -n media -l eth2 -m 6G -c 2 --gpu --autostart --dry-run
+#   ./create-lxc.sh -n media -l eth2 -m 6G -c 2 --gpu --autostart
 #
 # Next steps inside the guest (printed at the end): baseline.sh, then docker-host.sh —
 # both detect the container and skip what can't work there (sysctl, userns-remap).
 set -euo pipefail
 
-NAME=""; LINK=""; NETTYPE=phys; MEM=4G; CPUS=2; RELEASE=noble; GPU=0; ROUTER=0; AUTOSTART=0; DRY=0
+NAME=""; LINK=""; NETTYPE=phys; MEM=4G; CPUS=2; RELEASE=noble; GPU=0; AUTOSTART=0; DRY=0
 UIDBASE=100000; UIDRANGE=65536
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -49,10 +46,9 @@ while [ $# -gt 0 ]; do
     -c) CPUS="${2:?}"; shift ;;
     -r) RELEASE="${2:?}"; shift ;;
     --gpu) GPU=1 ;;
-    --router) ROUTER=1 ;;
     --autostart) AUTOSTART=1 ;;
     --dry-run) DRY=1 ;;
-    -h|--help) sed -n '2,38p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,35p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -102,10 +98,6 @@ fi
 
 MACVLAN_MODE=""; [ "$NETTYPE" = macvlan ] && MACVLAN_MODE="lxc.net.0.macvlan.mode = bridge
 "
-ROUTER_CONF=""
-[ "$ROUTER" = 1 ] && ROUTER_CONF="# Tailscale subnet router: forwarding in the guest's own network namespace only
-lxc.sysctl.net.ipv4.ip_forward = 1
-lxc.sysctl.net.ipv6.conf.all.forwarding = 1"
 
 CONF=$(cat <<EOF
 # created by create-lxc.sh (home0ps) for '${NAME}'
@@ -128,11 +120,10 @@ lxc.cgroup2.memory.max = ${MEM}
 lxc.cgroup2.cpu.max = $((CPUS*100000)) 100000
 lxc.start.auto = ${AUTOSTART}
 ${GPU_CONF}
-${ROUTER_CONF}
 EOF
 )
 
-echo "== ${NAME}: Ubuntu ${RELEASE}, ${CPUS} cores, ${MEM}, ${NETTYPE} on ${LINK}$( [ "$GPU" = 1 ] && echo ', iGPU' )$( [ "$ROUTER" = 1 ] && echo ', subnet router' ), lxcpath ${P}"
+echo "== ${NAME}: Ubuntu ${RELEASE}, ${CPUS} cores, ${MEM}, ${NETTYPE} on ${LINK}$( [ "$GPU" = 1 ] && echo ', iGPU' ), lxcpath ${P}"
 if [ "$DRY" = 1 ]; then
   echo "--- config ---"; echo "$CONF"; echo "--------------"
   [ "$GPU" = 1 ] && echo "+ ensure 'root:${RG}:1' in /etc/subgid"
@@ -167,11 +158,6 @@ if [ "$GPU" = 1 ]; then
     echo "  OK   /dev/dri/renderD128 visible: $(lxc-attach -n "$NAME" -- stat -c '%U:%G %a' /dev/dri/renderD128)"
   else echo "  FAIL /dev/dri/renderD128 not visible in the guest"; fi
 fi
-if [ "$ROUTER" = 1 ]; then
-  FWD=$(lxc-attach -n "$NAME" -- cat /proc/sys/net/ipv4/ip_forward)
-  [ "$FWD" = 1 ] && echo "  OK   IP forwarding on in the guest" || echo "  FAIL ip_forward is '$FWD' in the guest"
-  echo "  host ip_forward (should be unchanged): $(cat /proc/sys/net/ipv4/ip_forward)"
-fi
 
 lxc-attach -n "$NAME" -- bash -c 'DEBIAN_FRONTEND=noninteractive apt-get update -q >/dev/null && apt-get install -y -q curl ca-certificates >/dev/null' \
   && echo "  OK   curl + ca-certificates installed" || echo "  WARN apt failed (no network yet?)"
@@ -183,5 +169,3 @@ Done: ${NAME}. Next, inside the guest (lxc-attach -n ${NAME}):
   curl -fsSL https://raw.githubusercontent.com/kaywoz/home0ps/main/config-files/ubuntu/docker-host.sh | bash -s -- --dry-run
 Both detect the container and skip sysctl / userns-remap. Then: tailscale up --advertise-tags=<tag for this guest>.
 MSG
-[ "$ROUTER" = 1 ] && echo "Subnet router: tailscale set --advertise-routes=<ip>/32,<ip>/32 — single devices only, approved via autoApprovers in policy.hujson."
-true
