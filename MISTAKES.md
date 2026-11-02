@@ -483,3 +483,19 @@ mistakes, not a diary.
   status list, check the current state of every issue and PR it names
   (`gh issue view N --json state`, `gh pr view N --json state`); never list
   a closed item as open.
+
+### 2026-11-02 — mos (guest NIC name guessed)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** after a VM's passthrough NIC was renamed, the fix
+  handed over was `sed 's/enp1s0/enp2s0/'`, copied from the other VM. The
+  old name in that VM's `/etc/network/interfaces` was `enp3s0`, so the
+  command would have changed nothing.
+- **Root cause:** reused the previous VM's old interface name instead of
+  reading the affected VM's config first.
+- **Fix applied:** read the old name from the VM's `/etc/network/interfaces`,
+  then rename that one.
+- **Rule going forward:** before giving a command that rewrites a name,
+  address or path in a host's config, have kaywoz show the current value on
+  that host (`grep`) and build the command from it — never from another
+  host.
