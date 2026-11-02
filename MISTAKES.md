@@ -469,3 +469,17 @@ mistakes, not a diary.
 - **Fix applied:** port plan redone with the uplink on a 2.5G switch port.
 - **Rule going forward:** a link speed is the slower of its two ends; check
   both ports' capabilities before calling a speed a hardware limit.
+
+### 2026-11-02 — planning (stale next-steps list)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** a "next steps" list told kaywoz to rotate the exposed
+  monitoring secrets and webhook (#114) as "still overdue". #114 was already
+  closed with every item ticked.
+- **Root cause:** the list was built from earlier session notes, not from
+  the current state of each issue/PR it named.
+- **Fix applied:** item dropped from the list.
+- **Rule going forward:** CLAUDE.md §2 — before giving a next-steps or
+  status list, check the current state of every issue and PR it names
+  (`gh issue view N --json state`, `gh pr view N --json state`); never list
+  a closed item as open.
