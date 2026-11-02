@@ -6,6 +6,9 @@
 #     The idmap MUST be there at creation; other lines (net, limits, tun, gpu) can be edited later,
 #     e.g. in MOS's container config editor.
 #   * MOS's LXC is built WITHOUT AppArmor: no nesting.conf include, only its proc/sys mount entries
+#   * MOS's LXC (7.0.0, cgroup v2): device rules placed AFTER the common.conf include replace its
+#     allowlist (/dev/null etc. get blocked, systemd fails, no DHCP). The script moves its own device
+#     lines above that include after lxc-create (tested 2026-11-02, kaywoz/home0ps#174)
 #   * Docker works inside (overlayfs, cgroup v2, DOCKER-USER chain)
 #   * no bridges on MOS: one port per guest (kaywoz/home0ps#174). Default: the whole port moves
 #     into the guest (lxc.net type phys); the switch port is an access port on the guest's VLAN.
@@ -51,7 +54,7 @@ while [ $# -gt 0 ]; do
     --gpu) GPU=1 ;;
     --autostart) AUTOSTART=1 ;;
     --dry-run) DRY=1 ;;
-    -h|--help) sed -n '2,37p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -131,6 +134,7 @@ if [ "$DRY" = 1 ]; then
   echo "--- config ---"; echo "$CONF"; echo "--------------"
   [ "$GPU" = 1 ] && echo "+ ensure 'root:${RG}:1' in /etc/subgid"
   echo "+ lxc-create -n ${NAME} -f <config> -t download -- -d ${DIST} -r ${RELEASE} -a amd64"
+  echo "+ move the lxc.cgroup2.devices lines above the common.conf include in ${P}/${NAME}/config"
   echo "+ chmod o+x ${P} ${P}/${NAME}; lxc-start; wait for network; apt-get install curl ca-certificates"
   echo "Dry run, nothing changed."; exit 0
 fi
@@ -142,6 +146,15 @@ if [ "$GPU" = 1 ] && ! grep -qx "root:${RG}:1" /etc/subgid; then
   echo "root:${RG}:1" >> /etc/subgid; echo "  added root:${RG}:1 to /etc/subgid (render group passthrough)"
 fi
 lxc-create -n "$NAME" -f "$TMP" -t download -- -d "$DIST" -r "$RELEASE" -a amd64
+
+# device rules must come before the common.conf include on MOS (see header)
+CFG="$P/$NAME/config"
+grep -E '^lxc\.include = .*common\.conf$' "$CFG" >/dev/null || die "no common.conf include in $CFG — check the device rules by hand"
+DEVLINES=$(grep '^lxc\.cgroup2\.devices' "$CFG" || true) awk '
+  /^lxc\.cgroup2\.devices/ { next }
+  /^lxc\.include = .*common\.conf$/ && !done { print ENVIRON["DEVLINES"]; done = 1 }
+  { print }' "$CFG" > "$CFG.new" && mv "$CFG.new" "$CFG"
+echo "  device rules moved above the common.conf include"
 chmod o+x "$P" "$P/$NAME"
 lxc-start -n "$NAME"
 
@@ -154,12 +167,14 @@ lxc-attach -n "$NAME" -- ping -c1 -W2 1.1.1.1 >/dev/null 2>&1 || { echo "WARN: n
 echo "== verify"
 MAP=$(lxc-attach -n "$NAME" -- cat /proc/self/uid_map | awk '{print $1, $2, $3}')
 [ "$MAP" = "0 ${UIDBASE} ${UIDRANGE}" ] && echo "  OK   unprivileged (uid_map: $MAP)" || echo "  FAIL uid_map is '$MAP' — not unprivileged"
+if lxc-attach -n "$NAME" -- sh -c 'echo > /dev/null'; then echo "  OK   /dev/null usable"; else echo "  FAIL /dev/null blocked — device rules order in $CFG"; fi
 lxc-attach -n "$NAME" -- ip -br addr show eth0 | sed 's/^/  /'
 if lxc-attach -n "$NAME" -- test -c /dev/net/tun; then echo "  OK   /dev/net/tun available (Tailscale)"; else echo "  FAIL /dev/net/tun missing in the guest"; fi
 if [ "$GPU" = 1 ]; then
-  if lxc-attach -n "$NAME" -- test -e /dev/dri/renderD128; then
-    echo "  OK   /dev/dri/renderD128 visible: $(lxc-attach -n "$NAME" -- stat -c '%U:%G %a' /dev/dri/renderD128)"
-  else echo "  FAIL /dev/dri/renderD128 not visible in the guest"; fi
+  # open without reading (a read on a render node blocks)
+  if lxc-attach -n "$NAME" -- sh -c 'exec 3</dev/dri/renderD128'; then
+    echo "  OK   /dev/dri/renderD128 opens: $(lxc-attach -n "$NAME" -- stat -c '%U:%G %a' /dev/dri/renderD128)"
+  else echo "  FAIL /dev/dri/renderD128 can't be opened in the guest"; fi
 fi
 
 lxc-attach -n "$NAME" -- bash -c 'DEBIAN_FRONTEND=noninteractive apt-get update -q >/dev/null && apt-get install -y -q curl ca-certificates >/dev/null' \
