@@ -9,12 +9,14 @@
 #   sudo ./baseline.sh --skip tailscale
 #   curl -fsSL https://raw.githubusercontent.com/kaywoz/home0ps/main/config-files/ubuntu/baseline.sh | sudo bash -s -- --dry-run
 #
-# Sections: snap updates ssh sysctl purge packages cockpit tailscale
+# Sections: snap updates user ssh sysctl purge packages cockpit tailscale
 #
 # Settings (environment, optional):
 #   REBOOT_TIME=04:00     automatic reboot time for unattended upgrades
 #   AUTO_REBOOT=true      false = never reboot automatically
 #   TS_TAG=tag:observed   tag printed in the `tailscale up` hint
+#   LOCAL_UNIX_ACCOUNT=   admin account when not run via sudo (e.g. as root in an LXC via lxc-attach);
+#                         `user` creates it (home dir, /bin/bash, sudo group) if it doesn't exist
 #   TS_SSH=true           Tailscale SSH on this host (policy: privusers, admin account only,
 #                         24h check, never root). false = off. sshd stays as break-glass.
 #   SSH_IMPORT_ID=gh:kaywoz  ssh-import-id source for the admin user's authorized_keys
@@ -33,7 +35,7 @@ set -euo pipefail
 # Command output is parsed below (apt-cache policy, sshd -T, docker info): force English.
 export LC_ALL=C LANG=C
 
-SECTIONS="snap updates ssh sysctl purge packages cockpit tailscale"
+SECTIONS="snap updates user ssh sysctl purge packages cockpit tailscale"
 REBOOT_TIME="${REBOOT_TIME:-04:00}"
 AUTO_REBOOT="${AUTO_REBOOT:-true}"
 TS_TAG="${TS_TAG:-tag:observed}"
@@ -58,7 +60,7 @@ while [ $# -gt 0 ]; do
     --only) ONLY="${2:?--only needs a list}"; shift ;;
     --skip) SKIP="${2:?--skip needs a list}"; shift ;;
     --force-ssh) FORCE_SSH=1 ;;
-    -h|--help) sed -n '2,31p' "$0" 2>/dev/null || true; exit 0 ;;
+    -h|--help) sed -n '2,33p' "$0" 2>/dev/null || true; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -209,10 +211,36 @@ verify_updates() {
 }
 
 # ---- ssh: keys only (refuses without a key unless --force-ssh) --------------
+# ---- user: the admin account (sudo, /bin/bash) --------------------------------
+apply_user() {
+  step "user: admin account ${ADMIN_USER:-<unset>} (sudo, /bin/bash)"
+  if [ -z "$ADMIN_USER" ] || [ "$ADMIN_USER" = root ]; then
+    bad "no admin account: run via sudo, or set LOCAL_UNIX_ACCOUNT (e.g. as root in an LXC)"; return 0
+  fi
+  apt_install sudo
+  if id "$ADMIN_USER" >/dev/null 2>&1; then
+    echo "  $ADMIN_USER exists"
+  else
+    run useradd -m -s /bin/bash -G sudo "$ADMIN_USER"
+  fi
+  if ! id -nG "$ADMIN_USER" 2>/dev/null | grep -w sudo >/dev/null; then run usermod -aG sudo "$ADMIN_USER"; fi
+  # sudo needs a password; set interactively, never via this script, git or chat
+  if [ "$(passwd -S "$ADMIN_USER" 2>/dev/null | awk '{print $2}')" != P ]; then
+    echo "  Next: passwd $ADMIN_USER   (needed for sudo; login stays key-only)"
+  fi
+}
+verify_user() {
+  if [ -z "$ADMIN_USER" ] || ! id "$ADMIN_USER" >/dev/null 2>&1; then bad "admin account ${ADMIN_USER:-<unset>} missing"; return 0; fi
+  [ "$(getent passwd "$ADMIN_USER" | cut -d: -f7)" = /bin/bash ] && ok "$ADMIN_USER shell /bin/bash" || bad "$ADMIN_USER shell is not /bin/bash"
+  id -nG "$ADMIN_USER" | grep -w sudo >/dev/null && ok "$ADMIN_USER in sudo group" || bad "$ADMIN_USER not in sudo group"
+  [ "$(passwd -S "$ADMIN_USER" 2>/dev/null | awk '{print $2}')" = P ] && ok "$ADMIN_USER has a password (sudo)" || bad "$ADMIN_USER has no password yet: passwd $ADMIN_USER"
+}
+
 apply_ssh() {
   step "ssh: keys only, no root, no forwarding"
-  # Debian LXC images ship without an SSH server (access via lxc-attach / Tailscale SSH)
-  if ! command -v sshd >/dev/null 2>&1; then echo "  skipped: no SSH server installed"; return 0; fi
+  # Debian LXC images ship without an SSH server: install it (Tailscale SSH covers the tailnet,
+  # sshd the LAN address; lxc-attach on the storage host stays the break-glass for an LXC)
+  if ! command -v sshd >/dev/null 2>&1; then apt_install openssh-server; fi
   local home keys
   home=$(getent passwd "${ADMIN_USER:-root}" | cut -d: -f6)
   keys="${home:-/nonexistent}/.ssh/authorized_keys"
@@ -239,7 +267,7 @@ CONF
   fi
 }
 verify_ssh() {
-  if ! command -v sshd >/dev/null 2>&1; then echo "  ssh: skipped (no SSH server)"; return 0; fi
+  if ! command -v sshd >/dev/null 2>&1; then bad "no SSH server (openssh-server)"; return 0; fi
   sshd -T 2>/dev/null | grep -x 'permitrootlogin no' >/dev/null && ok "SSH root login off" || bad "PermitRootLogin"
   sshd -T 2>/dev/null | grep -x 'passwordauthentication no' >/dev/null && ok "SSH passwords off" || bad "PasswordAuthentication"
 }
