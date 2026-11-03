@@ -23,6 +23,8 @@ export LC_ALL=C LANG=C
 
 SECTIONS="docker daemon layout logs"
 DOCKER_ROOT="/srv/docker"
+# sudo from a root shell (e.g. in an LXC) sets SUDO_USER=root: that is no admin account
+[ "${SUDO_USER:-}" = root ] && SUDO_USER=""
 ADMIN_USER="${SUDO_USER:-${LOCAL_UNIX_ACCOUNT:-}}"
 REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/kaywoz/home0ps/main}"
 LOG_FILES="setup-log-shipping.sh daemon.json fluent-bit.conf fluent-bit-override.conf journald-50-logging.conf logtide.lua logtide.env.example"
@@ -58,6 +60,7 @@ esac
 if [ -z "$ADMIN_USER" ] && { : </dev/tty; } 2>/dev/null; then
   read -r -p "Admin account (LOCAL_UNIX_ACCOUNT): " ADMIN_USER </dev/tty || true
 fi
+if [ "$ADMIN_USER" = root ]; then echo "root can't be the admin account (set LOCAL_UNIX_ACCOUNT)" 1>&2; exit 1; fi
 if [ -n "$ADMIN_USER" ] && ! [[ "$ADMIN_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; then
   echo "Invalid account name: $ADMIN_USER" 1>&2; exit 1
 fi
