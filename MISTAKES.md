@@ -499,3 +499,19 @@ mistakes, not a diary.
   address or path in a host's config, have kaywoz show the current value on
   that host (`grep`) and build the command from it — never from another
   host.
+
+### 2026-11-03 — hosts (dysk release asset by position)
+
+- **Trigger:** script failed on a host
+- **What happened:** `baseline.sh` downloaded the dysk release's *first*
+  asset and unzipped it. dysk v3.8.2 changed its release to one tarball
+  per target; the first asset became a macOS `.tar.gz`, its digest still
+  matched, and `unzip` failed on the first VM.
+- **Root cause:** the asset was chosen by list position, an assumption about
+  an upstream layout the project never promised.
+- **Fix applied:** asset picked by exact name for the host's target
+  (`dysk-<tag>-<arch>.tar.gz`, old zip as fallback); aborts with a FAIL
+  check if no match (PR 210).
+- **Rule going forward:** when a script fetches a third-party release,
+  select the asset by exact name for the target, never by index, and fail
+  closed when it's missing.
