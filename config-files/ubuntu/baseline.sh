@@ -247,9 +247,9 @@ verify_user() {
 
 apply_ssh() {
   step "ssh: keys only, no root, no forwarding"
-  # Debian LXC images ship without an SSH server: install it (Tailscale SSH covers the tailnet,
-  # sshd the LAN address; lxc-attach on the storage host stays the break-glass for an LXC)
-  if ! command -v sshd >/dev/null 2>&1; then apt_install openssh-server; fi
+  # LXCs get no sshd: access is Tailscale SSH, break-glass is lxc-attach on the storage host
+  if [ -n "$CONTAINER" ]; then echo "  skipped: container ($CONTAINER), no sshd (Tailscale SSH + lxc-attach)"; return 0; fi
+  if ! command -v sshd >/dev/null 2>&1; then echo "  skipped: no SSH server installed"; return 0; fi
   local home keys
   home=$(getent passwd "${ADMIN_USER:-root}" | cut -d: -f6)
   keys="${home:-/nonexistent}/.ssh/authorized_keys"
@@ -276,7 +276,11 @@ CONF
   fi
 }
 verify_ssh() {
-  if ! command -v sshd >/dev/null 2>&1; then bad "no SSH server (openssh-server)"; return 0; fi
+  if [ -n "$CONTAINER" ]; then
+    command -v sshd >/dev/null 2>&1 && bad "sshd installed in a container: apt purge openssh-server" || ok "no sshd (container)"
+    return 0
+  fi
+  if ! command -v sshd >/dev/null 2>&1; then echo "  ssh: skipped (no SSH server)"; return 0; fi
   sshd -T 2>/dev/null | grep -x 'permitrootlogin no' >/dev/null && ok "SSH root login off" || bad "PermitRootLogin"
   sshd -T 2>/dev/null | grep -x 'passwordauthentication no' >/dev/null && ok "SSH passwords off" || bad "PasswordAuthentication"
 }
