@@ -1,5 +1,6 @@
 #!/bin/bash
-# baseline.sh — baseline for every Ubuntu host in home0ps. Idempotent.
+# baseline.sh — baseline for every Ubuntu or Debian host in home0ps. Idempotent.
+# Debian: MOS guests run Debian 13 (kaywoz/home0ps#174); differences are marked "Debian:".
 #
 #   sudo ./baseline.sh                      # apply all sections, then verify
 #   sudo ./baseline.sh --dry-run            # show what would change
@@ -14,6 +15,10 @@
 #   REBOOT_TIME=04:00     automatic reboot time for unattended upgrades
 #   AUTO_REBOOT=true      false = never reboot automatically
 #   TS_TAG=tag:observed   tag printed in the `tailscale up` hint
+#   TS_SSH=true           Tailscale SSH on this host (policy: privusers, admin account only,
+#                         24h check, never root). false = off. sshd stays as break-glass.
+#   SSH_IMPORT_ID=gh:kaywoz  ssh-import-id source for the admin user's authorized_keys
+#                         (adds keys, never removes them). Empty = skip the import.
 #   COCKPIT_SVC=          Tailscale Service name for this host's Cockpit: cockpit-<device>,
 #                         e.g. cockpit-sexy (CLAUDE.md §4 Service-name exception). Unset = section skipped.
 #   TS_TAILNET_DNS=       <tailnet>.ts.net, for Cockpit's Origins (needed with COCKPIT_SVC)
@@ -21,7 +26,7 @@
 #   PACKAGES="htop ncdu git tealdeer|tldr unzip curl ca-certificates"
 #            apt packages; "a|b" = first one installable on this release.
 #            A package with no install candidate is reported, not fatal.
-#   dysk is not in Ubuntu's repos: installed from its GitHub release, checksum-verified
+#   dysk is not in Ubuntu's/Debian's repos: installed from its GitHub release, checksum-verified
 #
 # Docker hosts: run docker-host.sh after this.
 set -euo pipefail
@@ -32,6 +37,8 @@ SECTIONS="snap updates ssh sysctl purge packages cockpit tailscale"
 REBOOT_TIME="${REBOOT_TIME:-04:00}"
 AUTO_REBOOT="${AUTO_REBOOT:-true}"
 TS_TAG="${TS_TAG:-tag:observed}"
+TS_SSH="${TS_SSH:-true}"
+SSH_IMPORT_ID="${SSH_IMPORT_ID-gh:kaywoz}"
 PACKAGES="${PACKAGES:-htop ncdu git tealdeer|tldr unzip curl ca-certificates}"
 COCKPIT_SVC="${COCKPIT_SVC:-}"
 TS_TAILNET_DNS="${TS_TAILNET_DNS:-}"
@@ -51,7 +58,7 @@ while [ $# -gt 0 ]; do
     --only) ONLY="${2:?--only needs a list}"; shift ;;
     --skip) SKIP="${2:?--skip needs a list}"; shift ;;
     --force-ssh) FORCE_SSH=1 ;;
-    -h|--help) sed -n '2,20p' "$0" 2>/dev/null || true; exit 0 ;;
+    -h|--help) sed -n '2,31p' "$0" 2>/dev/null || true; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -62,10 +69,12 @@ if [ "$(id -u)" != "0" ]; then
   echo "This script must be run as root" 1>&2
   exit 1
 fi
-if ! grep -qi '^ID=ubuntu' /etc/os-release; then
-  echo "Not Ubuntu (see /etc/os-release)." 1>&2
-  exit 1
-fi
+# shellcheck disable=SC1091
+DISTRO=$(. /etc/os-release && echo "$ID")
+case "$DISTRO" in
+  ubuntu|debian) ;;
+  *) echo "Not Ubuntu or Debian (see /etc/os-release)." 1>&2; exit 1 ;;
+esac
 
 # LXC mode: inside a container, kernel settings belong to the host
 CONTAINER=$(systemd-detect-virt -c 2>/dev/null || true); [ "$CONTAINER" = none ] && CONTAINER=""
@@ -153,13 +162,23 @@ verify_snap() {
 apply_updates() {
   step "updates: unattended upgrades, reboot=$AUTO_REBOOT at $REBOOT_TIME"
   apt_install unattended-upgrades
+  local origins
+  if [ "$DISTRO" = debian ]; then
+    # Debian: the active lines of Debian's 50unattended-upgrades, plus -updates (as on Ubuntu)
+    origins='  "origin=Debian,codename=${distro_codename},label=Debian";
+  "origin=Debian,codename=${distro_codename},label=Debian-Security";
+  "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+  "origin=Debian,codename=${distro_codename}-updates";'
+  else
+    origins='  "origin=Ubuntu,archive=${distro_codename}-security,label=Ubuntu";
+  "origin=Ubuntu,archive=${distro_codename}-updates,label=Ubuntu";
+  "origin=UbuntuESMApps,archive=${distro_codename}-apps-security";
+  "origin=UbuntuESM,archive=${distro_codename}-infra-security";'
+  fi
   put /etc/apt/apt.conf.d/52unattended-local 644 <<CONF
 // baseline.sh (home0ps): overrides 50unattended-upgrades. Docker CE: 53unattended-docker (docker-host.sh).
 Unattended-Upgrade::Origins-Pattern {
-  "origin=Ubuntu,archive=\${distro_codename}-security,label=Ubuntu";
-  "origin=Ubuntu,archive=\${distro_codename}-updates,label=Ubuntu";
-  "origin=UbuntuESMApps,archive=\${distro_codename}-apps-security";
-  "origin=UbuntuESM,archive=\${distro_codename}-infra-security";
+${origins}
 };
 Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
 Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
@@ -192,9 +211,17 @@ verify_updates() {
 # ---- ssh: keys only (refuses without a key unless --force-ssh) --------------
 apply_ssh() {
   step "ssh: keys only, no root, no forwarding"
+  # Debian LXC images ship without an SSH server (access via lxc-attach / Tailscale SSH)
+  if ! command -v sshd >/dev/null 2>&1; then echo "  skipped: no SSH server installed"; return 0; fi
   local home keys
   home=$(getent passwd "${ADMIN_USER:-root}" | cut -d: -f6)
   keys="${home:-/nonexistent}/.ssh/authorized_keys"
+  # admin user's keys from GitHub; root is skipped (no root login anyway)
+  if [ -n "$SSH_IMPORT_ID" ] && [ -n "$ADMIN_USER" ] && [ -n "$home" ]; then
+    apt_install ssh-import-id
+    run install -d -m 700 -o "$ADMIN_USER" -g "$(id -gn "$ADMIN_USER")" "$home/.ssh"
+    run runuser -u "$ADMIN_USER" -- ssh-import-id -o "$keys" "$SSH_IMPORT_ID" || echo "  WARN: ssh-import-id $SSH_IMPORT_ID failed (no network?) — checking for an existing key"
+  fi
   if [ "$FORCE_SSH" = 0 ] && ! grep -qsE '^(ssh-|ecdsa-|sk-)' "$keys"; then
     bad "no SSH key in $keys for '${ADMIN_USER:-root}' — not disabling passwords (lockout). Add a key or use --force-ssh"
     return 0
@@ -212,6 +239,7 @@ CONF
   fi
 }
 verify_ssh() {
+  if ! command -v sshd >/dev/null 2>&1; then echo "  ssh: skipped (no SSH server)"; return 0; fi
   sshd -T 2>/dev/null | grep -x 'permitrootlogin no' >/dev/null && ok "SSH root login off" || bad "PermitRootLogin"
   sshd -T 2>/dev/null | grep -x 'passwordauthentication no' >/dev/null && ok "SSH passwords off" || bad "PasswordAuthentication"
 }
@@ -262,13 +290,15 @@ apply_packages() {
   apt_install $PACKAGES
   install_dysk
   # tealdeer needs its page cache once per user
-  if installed tealdeer && [ -n "$ADMIN_USER" ] && [ "$MODE" != dry ]; then
+  if installed tealdeer && [ -n "$ADMIN_USER" ] && command -v sudo >/dev/null 2>&1 && [ "$MODE" != dry ]; then
     sudo -u "$ADMIN_USER" -H tldr --update >/dev/null 2>&1 && echo "  tldr pages downloaded for $ADMIN_USER" || echo "  WARN: tldr --update failed (run it as $ADMIN_USER)"
   fi
 }
-# dysk (disk usage overview) isn't packaged for Ubuntu: latest GitHub release, static musl
+# dysk (disk usage overview) isn't packaged for Ubuntu/Debian: latest GitHub release, static musl
 # binary, SHA-256 from the GitHub API checked before extracting. Installed once; re-run
 # with the binary removed to upgrade (not covered by unattended upgrades).
+# The asset is picked by name: since v3.8.2 each target is its own dysk-<tag>-<arch>.tar.gz
+# (older releases: one dysk_<ver>.zip with <arch>/dysk inside, still handled).
 install_dysk() {
   if command -v dysk >/dev/null 2>&1; then echo "  dysk already installed ($(dysk --version 2>/dev/null | head -1))"; return 0; fi
   local arch meta tag url sha tmp
@@ -278,13 +308,24 @@ install_dysk() {
     *) echo "  dysk: no build for $(uname -m), skipped"; return 0 ;;
   esac
   if [ "$MODE" = dry ]; then echo "  + download latest dysk release, verify sha256, install $arch/dysk -> /usr/local/bin/dysk"; return 0; fi
+  # Debian: minimal images (LXC) have no python3, which parses the release JSON
+  command -v python3 >/dev/null 2>&1 || apt_install python3
   meta=$(curl -fsSL https://api.github.com/repos/Canop/dysk/releases/latest)
-  read -r tag url sha < <(printf '%s' "$meta" | python3 -c 'import json,sys; d=json.load(sys.stdin); a=d["assets"][0]; print(d["tag_name"], a["browser_download_url"], (a.get("digest") or "").replace("sha256:",""))')
+  read -r tag url sha < <(printf '%s' "$meta" | ARCH="$arch" python3 -c '
+import json, os, sys
+d = json.load(sys.stdin); t = d["tag_name"]; v = t.lstrip("v"); arch = os.environ["ARCH"]
+want = [f"dysk-{t}-{arch}.tar.gz", f"dysk_{v}.zip"]
+a = next((a for n in want for a in d["assets"] if a["name"] == n), None)
+print(t, a["browser_download_url"] if a else "-", (a.get("digest") or "").replace("sha256:", "") if a else "")')
+  if [ "$url" = - ]; then bad "dysk $tag: no $arch asset in the release, not installing"; return 0; fi
   if [ -z "$sha" ]; then bad "dysk $tag: no checksum published, not installing"; return 0; fi
   tmp=$(mktemp -d)
-  curl -fsSL "$url" -o "$tmp/dysk.zip"
-  if ! echo "$sha  $tmp/dysk.zip" | sha256sum -c --quiet -; then bad "dysk $tag: checksum mismatch, not installing"; rm -rf "$tmp"; return 0; fi
-  unzip -q -j "$tmp/dysk.zip" "$arch/dysk" -d "$tmp"
+  curl -fsSL "$url" -o "$tmp/asset"
+  if ! echo "$sha  $tmp/asset" | sha256sum -c --quiet -; then bad "dysk $tag: checksum mismatch, not installing"; rm -rf "$tmp"; return 0; fi
+  case "$url" in
+    *.tar.gz) tar -xzf "$tmp/asset" -C "$tmp" --strip-components=1 "dysk-${tag}-${arch}/dysk" ;;
+    *.zip)    unzip -q -j "$tmp/asset" "$arch/dysk" -d "$tmp" ;;
+  esac
   install -m 755 "$tmp/dysk" /usr/local/bin/dysk
   rm -rf "$tmp"
   echo "  installed dysk $tag"
@@ -344,9 +385,10 @@ verify_cockpit() {
   installed network-manager && bad "NetworkManager got installed (check renderer)" || ok "no NetworkManager pulled in"
 }
 
-# ---- tailscale: install only; joining is interactive ------------------------
+# ---- tailscale: install; joining is interactive, Tailscale SSH once joined ----
+ts_running() { tailscale status --json 2>/dev/null | grep '"BackendState": "Running"' >/dev/null; }
 apply_tailscale() {
-  step "tailscale: install (login is interactive)"
+  step "tailscale: install (login is interactive), Tailscale SSH ${TS_SSH}"
   if command -v tailscale >/dev/null 2>&1; then
     echo "  already installed"
   elif [ "$MODE" = dry ]; then
@@ -354,11 +396,17 @@ apply_tailscale() {
   else
     curl -fsSL https://tailscale.com/install.sh | sh
   fi
-  echo "  Next: sudo tailscale up --advertise-tags=${TS_TAG}   (no --ssh, no --accept-routes)"
+  # Tailscale SSH takes over port 22 on the tailnet address; sshd stays reachable on the LAN address
+  if command -v tailscale >/dev/null 2>&1 && ts_running; then
+    run tailscale set --ssh="${TS_SSH}"
+  else
+    echo "  Next: sudo tailscale up --advertise-tags=${TS_TAG} --ssh=${TS_SSH}   (no --accept-routes)"
+  fi
 }
 verify_tailscale() {
   command -v tailscale >/dev/null 2>&1 && ok "tailscale installed" || { bad "tailscale missing"; return 0; }
   tailscale status --self --json 2>/dev/null | grep "\"${TS_TAG}\"" >/dev/null && ok "tagged ${TS_TAG}" || bad "not tagged ${TS_TAG} (yet)"
+  tailscale debug prefs 2>/dev/null | grep "\"RunSSH\": ${TS_SSH}" >/dev/null && ok "Tailscale SSH ${TS_SSH}" || bad "Tailscale SSH not ${TS_SSH}"
 }
 
 # ---- main -------------------------------------------------------------------
