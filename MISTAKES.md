@@ -549,3 +549,19 @@ mistakes, not a diary.
 - **Rule going forward:** before offering an option, check it against the
   decisions already made for the same component (here: who owns port 22 on
   the tailnet address).
+
+### 2026-11-03 — workflow (commits pushed to an already-merged PR)
+
+- **Trigger:** script ran without changes that were "in the PR"
+- **What happened:** follow-up commits were pushed to the branches of PR 210
+  and PR 217 after kaywoz had merged them. The pushes succeeded, but the
+  commits never reached `main`. The media LXC then ran the merged first
+  version: no account prompt, sshd installed in the LXC, SSH checks failing.
+- **Root cause:** assumed an open PR was still open because it was earlier
+  in the session; didn't check its state before pushing.
+- **Fix applied:** the lost commits were cherry-picked onto a new branch
+  from `main` (PR 220).
+- **Rule going forward:** before adding a commit to an existing PR branch,
+  check `gh pr view N --json state`; if it isn't `OPEN`, branch from `main`
+  and open a new PR. A `git push` that prints "Create a pull request for …"
+  means the branch has no open PR — stop.

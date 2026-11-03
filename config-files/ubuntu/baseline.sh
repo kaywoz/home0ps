@@ -16,7 +16,8 @@
 #   AUTO_REBOOT=true      false = never reboot automatically
 #   TS_TAG=tag:observed   tag printed in the `tailscale up` hint
 #   LOCAL_UNIX_ACCOUNT=   admin account when not run via sudo (e.g. as root in an LXC via lxc-attach);
-#                         `user` creates it (home dir, /bin/bash, sudo group) if it doesn't exist
+#                         unset = asked on the terminal. `user` creates it (home dir, /bin/bash,
+#                         sudo group) if it doesn't exist
 #   TS_SSH=true           Tailscale SSH on this host (policy: privusers, admin account only,
 #                         24h check, never root). false = off. sshd stays as break-glass.
 #   SSH_IMPORT_ID=gh:kaywoz  ssh-import-id source for the admin user's authorized_keys
@@ -60,7 +61,7 @@ while [ $# -gt 0 ]; do
     --only) ONLY="${2:?--only needs a list}"; shift ;;
     --skip) SKIP="${2:?--skip needs a list}"; shift ;;
     --force-ssh) FORCE_SSH=1 ;;
-    -h|--help) sed -n '2,33p' "$0" 2>/dev/null || true; exit 0 ;;
+    -h|--help) sed -n '2,34p' "$0" 2>/dev/null || true; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -79,6 +80,14 @@ case "$DISTRO" in
 esac
 
 # LXC mode: inside a container, kernel settings belong to the host
+# Admin account: SUDO_USER, else LOCAL_UNIX_ACCOUNT, else ask on the terminal (also works when
+# piped from curl, e.g. as root in an LXC). Never stored by this script.
+if [ -z "$ADMIN_USER" ] && { : </dev/tty; } 2>/dev/null; then
+  read -r -p "Admin account (LOCAL_UNIX_ACCOUNT): " ADMIN_USER </dev/tty || true
+fi
+if [ -n "$ADMIN_USER" ] && ! [[ "$ADMIN_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; then
+  echo "Invalid account name: $ADMIN_USER" 1>&2; exit 1
+fi
 CONTAINER=$(systemd-detect-virt -c 2>/dev/null || true); [ "$CONTAINER" = none ] && CONTAINER=""
 if [ -n "$CONTAINER" ]; then echo "Running inside a container ($CONTAINER): sysctl section skipped (host's job)"; fi
 
@@ -238,9 +247,9 @@ verify_user() {
 
 apply_ssh() {
   step "ssh: keys only, no root, no forwarding"
-  # Debian LXC images ship without an SSH server: install it (Tailscale SSH covers the tailnet,
-  # sshd the LAN address; lxc-attach on the storage host stays the break-glass for an LXC)
-  if ! command -v sshd >/dev/null 2>&1; then apt_install openssh-server; fi
+  # LXCs get no sshd: access is Tailscale SSH, break-glass is lxc-attach on the storage host
+  if [ -n "$CONTAINER" ]; then echo "  skipped: container ($CONTAINER), no sshd (Tailscale SSH + lxc-attach)"; return 0; fi
+  if ! command -v sshd >/dev/null 2>&1; then echo "  skipped: no SSH server installed"; return 0; fi
   local home keys
   home=$(getent passwd "${ADMIN_USER:-root}" | cut -d: -f6)
   keys="${home:-/nonexistent}/.ssh/authorized_keys"
@@ -267,7 +276,11 @@ CONF
   fi
 }
 verify_ssh() {
-  if ! command -v sshd >/dev/null 2>&1; then bad "no SSH server (openssh-server)"; return 0; fi
+  if [ -n "$CONTAINER" ]; then
+    command -v sshd >/dev/null 2>&1 && bad "sshd installed in a container: apt purge openssh-server" || ok "no sshd (container)"
+    return 0
+  fi
+  if ! command -v sshd >/dev/null 2>&1; then echo "  ssh: skipped (no SSH server)"; return 0; fi
   sshd -T 2>/dev/null | grep -x 'permitrootlogin no' >/dev/null && ok "SSH root login off" || bad "PermitRootLogin"
   sshd -T 2>/dev/null | grep -x 'passwordauthentication no' >/dev/null && ok "SSH passwords off" || bad "PasswordAuthentication"
 }
