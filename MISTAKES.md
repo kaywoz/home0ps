@@ -533,3 +533,19 @@ mistakes, not a diary.
   it runs in (network, SSH, firewall changes), check its docs or source; in
   scripts, any step that can drop the operator's own connection is printed
   as a final manual step, never run mid-script.
+
+### 2026-11-03 — hosts (sshd on the tailnet address offered)
+
+- **Trigger:** wrong assumption
+- **What happened:** PR 217 offered "bind sshd to the tailnet address" as
+  a way to keep LXC sshd off the IoT VLAN; kaywoz chose it. With Tailscale
+  SSH on (decided the same day), tailscaled takes port 22 on the tailnet
+  address, so an sshd bound there would never receive a connection. Bound
+  to a not-yet-up 100.x address, it would also fail to start at boot.
+- **Root cause:** offered an option without checking it against the
+  Tailscale SSH decision made earlier in the same session.
+- **Fix applied:** option withdrawn before anything was built; the
+  alternatives went back to kaywoz.
+- **Rule going forward:** before offering an option, check it against the
+  decisions already made for the same component (here: who owns port 22 on
+  the tailnet address).
