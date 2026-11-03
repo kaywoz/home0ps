@@ -17,7 +17,6 @@
 		"tag:monitoring": ["group:privusers"], //monitoring host(s): observation-only, pulls from observed hosts
 		"tag:proxy":      ["group:privusers"], //TODO: description
 		"tag:guests":     ["group:privusers"], //guest assets
-		"tag:trusted":    ["group:privusers"], //natively trusted assets
 		"tag:ha":         ["group:privusers"], //all home automation
 		"tag:exit-node":  ["group:privusers"], //all exit-nodes
 		"tag:auto":       ["group:privusers"], //deployed via pipeline
@@ -41,7 +40,8 @@
 	},
 
 	"ssh": [
-		// privusers and trusted devices can tailscale-ssh to all devices with the admin/root accounts.
+		// privusers can tailscale-ssh to all devices as the admin account, after a 24h re-auth (check).
+		// No root: use sudo on the host. sshd (keys only) stays on every host as break-glass.
 		// ssh dst can't be "*": every tag is listed -- add new tags here too.
 		{
 			"action":      "check",
@@ -49,24 +49,12 @@
 			"dst": [
 				"autogroup:self",
 				"tag:hypervisor", "tag:storage", "tag:service", "tag:docker", "tag:oob",
-				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests", "tag:trusted",
+				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests",
 				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt", "tag:observed",
 				"tag:infra", "tag:media",
 			],
-			"users":       ["${LOCAL_UNIX_ACCOUNT}", "root"],
+			"users":       ["${LOCAL_UNIX_ACCOUNT}"],
 			"checkPeriod": "24h",
-		},
-		{
-			// tagged sources can't ssh into user-owned devices, so tags only
-			"action": "accept",
-			"src":    ["tag:trusted"],
-			"dst": [
-				"tag:hypervisor", "tag:storage", "tag:service", "tag:docker", "tag:oob",
-				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests", "tag:trusted",
-				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt", "tag:observed",
-				"tag:infra", "tag:media",
-			],
-			"users":  ["${LOCAL_UNIX_ACCOUNT}", "root"],
 		},
 	],
 
@@ -106,28 +94,28 @@
 	"grants": [
 		{
 			// ssh (tailscale ssh + regular sshd) to all devices
-			"src": ["tag:trusted", "group:privusers"],
+			"src": ["group:privusers"],
 			"dst": ["*"],
 			"ip":  ["tcp:22"],
 		},
 		{
 			// mgmt ports (80/443) on all devices -- mgmt uis should end up behind the proxy
-			"src": ["tag:trusted", "group:privusers"],
+			"src": ["group:privusers"],
 			"dst": ["*"],
 			"ip":  ["tcp:80", "tcp:443"],
 		},
 		{
 			// TEST RULE: app on placeholder -- devices tagged tag:test only, remove once the app is sorted
-			"src": ["tag:trusted", "group:privusers"],
+			"src": ["group:privusers"],
 			"dst": ["tag:proxy"],
 			"ip":  ["tcp:8080", "tcp:81","tcp:443"],
 		},
 
 		// !!! BREAK-GLASS ONLY -- TEST RULE, DISABLED !!!
-		// Full TCP from trusted devices/privusers to everything. Uncomment only in a
+		// Full TCP from privusers to everything. Uncomment only in a
 		// break-the-glass scenario, via PR, and re-comment once resolved.
 		//{
-		//	"src": ["tag:trusted", "group:privusers"],
+		//	"src": ["group:privusers"],
 		//	"dst": ["*"],
 		//	"ip":  ["tcp:*"],
 		//},
@@ -145,7 +133,7 @@
 		},
 		{
 			// admins -> storage host app UIs (same sources as full access to tag:storage)
-			"src": ["autogroup:admin", "group:privusers", "tag:trusted", "macmini"],
+			"src": ["autogroup:admin", "group:privusers", "macmini"],
 			"dst": ["svc:archivebox", "svc:archivewarrior", "svc:scrutiny", "svc:kopia", "svc:rustfs"],
 			"ip":  ["tcp:443"],
 		},
@@ -161,13 +149,13 @@
 			"ip":  ["tcp:*"],
 		},
 		{
-			"src": ["tag:trusted", "group:privusers"],
+			"src": ["group:privusers"],
 			"dst": ["tag:proxy"],
 			"ip":  ["tcp:*"],
 		},
 		{
-			// admins (privusers, trusted devices, the Mac mini) reach everything on the storage host
-			"src": ["tag:trusted", "group:privusers", "macmini"],
+			// admins (privusers, the Mac mini) reach everything on the storage host
+			"src": ["group:privusers", "macmini"],
 			"dst": ["tag:storage"],
 			"ip":  ["*"],
 		},
@@ -213,13 +201,8 @@
 
 	"tests": [
 		{
-			"src":    "tag:trusted", //test that trusted devices always can access ssh
-			"accept": ["tag:ssh:22"],
-		},
-		{
-			// trusted devices reach the reverse proxies on their ports (http, https, npm admin)
-			"src":    "tag:trusted",
-			"accept": ["tag:proxy:80", "tag:proxy:443", "tag:proxy:81"],
+			"src":    "${TS_PRIVUSER}", //privusers always reach ssh (tailscale ssh and sshd break-glass)
+			"accept": ["tag:ssh:22", "tag:storage:22", "tag:infra:22", "tag:media:22", "tag:observed:22"],
 		},
 		{
 			// privusers reach the reverse proxies on their ports (http, https, npm admin)
@@ -227,12 +210,7 @@
 			"accept": ["tag:proxy:80", "tag:proxy:443", "tag:proxy:81"],
 		},
 		{
-			// break-glass must stay off: no catch-all tcp from trusted devices/privusers
-			"src":  "tag:trusted",
-			"deny": ["tag:hypervisor:8080", "tag:docker:3389"],
-		},
-		{
-			// break-glass must stay off: no catch-all tcp from trusted devices/privusers
+			// break-glass must stay off: no catch-all tcp from privusers
 			"src":  "${TS_PRIVUSER}",
 			"deny": ["tag:hypervisor:8080", "tag:docker:3389"],
 		},
@@ -262,7 +240,6 @@
 		{"src": "${TS_PRIVUSER}", "proto": "udp", "accept": ["tag:storage:2049", "tag:storage:137"]},
 		{"src": "${TS_PRIVUSER}", "proto": "icmp", "accept": ["tag:storage:0"]},
 		{"src": "macmini", "accept": ["tag:storage:445", "tag:storage:2049"]},
-		{"src": "tag:trusted", "accept": ["tag:storage:445"]},
 		{
 			// storage host app UIs reachable as services
 			"src":    "${TS_PRIVUSER}",
@@ -279,6 +256,16 @@
 			// host admin UIs are for admins only: observed hosts can't reach another host's Cockpit
 			"src":  "tag:observed",
 			"deny": ["svc:cockpit-janky:443", "svc:cockpit-sexy:443"],
+		},
+	],
+
+	"sshTests": [
+		{
+			// tailscale ssh: admin account only after re-auth, never root
+			"src":   "${TS_PRIVUSER}",
+			"dst":   ["tag:storage", "tag:infra", "tag:media", "tag:observed", "tag:monitoring"],
+			"check": ["${LOCAL_UNIX_ACCOUNT}"],
+			"deny":  ["root"],
 		},
 	],
 }
