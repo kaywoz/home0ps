@@ -32,6 +32,7 @@ Two independent planes:
 | Risk | Control |
 |---|---|
 | SSH brute force | Keys only, no root, no passwords, no forwarding |
+| Tailscale SSH | Only privusers (no tagged sources), only the admin account, never `root` (`sudo` on the host), `check` re-auth every 24h; enabled per host with `tailscale set --ssh`; sshd stays as break-glass; `sshTests` in the policy |
 | Access after reaching the tailnet | Every app has its own login; tailnet access alone grants nothing |
 | Attacker-created accounts | Self-registration disabled in every app |
 
