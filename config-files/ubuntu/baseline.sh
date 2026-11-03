@@ -40,6 +40,7 @@ SECTIONS="snap updates user ssh sysctl purge packages cockpit tailscale"
 REBOOT_TIME="${REBOOT_TIME:-04:00}"
 AUTO_REBOOT="${AUTO_REBOOT:-true}"
 TS_TAG="${TS_TAG:-tag:observed}"
+case "$TS_TAG" in tag:*) ;; *) TS_TAG="tag:$TS_TAG" ;; esac   # accept "media" for "tag:media"
 TS_SSH="${TS_SSH:-true}"
 SSH_IMPORT_ID="${SSH_IMPORT_ID-gh:kaywoz}"
 PACKAGES="${PACKAGES:-htop ncdu git tealdeer|tldr unzip curl ca-certificates}"
@@ -50,6 +51,8 @@ COCKPIT_PORT=9091
 # no cockpit-pcp (not in 26.04), no machines/podman (Docker hosts, no VMs)
 COCKPIT_MODULES="${COCKPIT_MODULES:-cockpit-ws cockpit-system cockpit-bridge cockpit-storaged cockpit-packagekit cockpit-files cockpit-sosreport}"
 PURGE="avahi-daemon cups cups-browsed bluez modemmanager triggerhappy popularity-contest"
+# sudo from a root shell (e.g. in an LXC) sets SUDO_USER=root: that is no admin account
+[ "${SUDO_USER:-}" = root ] && SUDO_USER=""
 ADMIN_USER="${SUDO_USER:-${LOCAL_UNIX_ACCOUNT:-}}"
 
 # ---- framework --------------------------------------------------------------
@@ -85,6 +88,7 @@ esac
 if [ -z "$ADMIN_USER" ] && { : </dev/tty; } 2>/dev/null; then
   read -r -p "Admin account (LOCAL_UNIX_ACCOUNT): " ADMIN_USER </dev/tty || true
 fi
+if [ "$ADMIN_USER" = root ]; then echo "root can't be the admin account (set LOCAL_UNIX_ACCOUNT)" 1>&2; exit 1; fi
 if [ -n "$ADMIN_USER" ] && ! [[ "$ADMIN_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; then
   echo "Invalid account name: $ADMIN_USER" 1>&2; exit 1
 fi
