@@ -37,7 +37,12 @@
 #
 # Next steps inside the guest (printed at the end): baseline.sh, then docker-host.sh —
 # both detect the container and skip what can't work there (sysctl, userns-remap).
-# NOTE: both are Ubuntu-only today; Debian support is still to do (kaywoz/home0ps#174).
+# Both handle Debian and Ubuntu, and ask for the admin account when run as root.
+#
+# Id maps: as root, LXC writes the uid/gid maps itself unless shadow's newuidmap/newgidmap are
+# installed (lxc src/lxc/idmap_utils.c, lxc_map_ids). MOS has neither, so /etc/subuid and
+# /etc/subgid aren't consulted (and /etc is rebuilt at boot anyway): the script only checks and
+# extends them when those tools exist.
 set -euo pipefail
 
 NAME=""; LINK=""; NETTYPE=phys; MEM=4G; CPUS=2; DIST=debian; RELEASE=trixie; GPU=0; AUTOSTART=0; DRY=0
@@ -54,7 +59,7 @@ while [ $# -gt 0 ]; do
     --gpu) GPU=1 ;;
     --autostart) AUTOSTART=1 ;;
     --dry-run) DRY=1 ;;
-    -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,45p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -69,9 +74,13 @@ die() { echo "ABORT (nothing changed): $*" >&2; exit 1; }
 command -v lxc-create >/dev/null || die "lxc-create not found"
 P=$(lxc-config lxc.lxcpath)
 lxc-info -n "$NAME" >/dev/null 2>&1 && die "container '$NAME' already exists"
-for f in /etc/subuid /etc/subgid; do
-  grep -qE "^root:${UIDBASE}:${UIDRANGE}$" "$f" 2>/dev/null || die "root:${UIDBASE}:${UIDRANGE} missing in $f"
-done
+SHADOW_IDMAP=0
+if command -v newuidmap >/dev/null 2>&1 && command -v newgidmap >/dev/null 2>&1; then
+  SHADOW_IDMAP=1
+  for f in /etc/subuid /etc/subgid; do
+    grep -E "^root:${UIDBASE}:${UIDRANGE}$" "$f" >/dev/null 2>&1 || die "root:${UIDBASE}:${UIDRANGE} missing in $f (newuidmap/newgidmap installed, so LXC needs it)"
+  done
+fi
 [ "$NETTYPE" = phys ] || [ "$NETTYPE" = macvlan ] || die "-t must be phys or macvlan"
 ip link show "$LINK" >/dev/null 2>&1 || die "interface $LINK does not exist"
 if [ "$NETTYPE" = phys ]; then
@@ -93,7 +102,7 @@ if [ "$GPU" = 1 ]; then
   [ -e /dev/dri/renderD128 ] || die "--gpu: /dev/dri/renderD128 not found"
   RG=$(stat -c %g /dev/dri/renderD128)
   [ "$RG" -gt 0 ] && [ "$RG" -lt "$UIDRANGE" ] || die "--gpu: render group id $RG out of range"
-  # split the gid map so container gid RG = host gid RG (needs root:RG:1 in /etc/subgid)
+  # split the gid map so container gid RG = host gid RG (root:RG:1 in /etc/subgid only with newgidmap)
   IDMAP_G="lxc.idmap = g 0 ${UIDBASE} ${RG}
 lxc.idmap = g ${RG} ${RG} 1
 lxc.idmap = g $((RG+1)) $((UIDBASE+RG+1)) $((UIDRANGE-RG-1))"
@@ -132,7 +141,8 @@ EOF
 echo "== ${NAME}: ${DIST} ${RELEASE}, ${CPUS} cores, ${MEM}, ${NETTYPE} on ${LINK}$( [ "$GPU" = 1 ] && echo ', iGPU' ), lxcpath ${P}"
 if [ "$DRY" = 1 ]; then
   echo "--- config ---"; echo "$CONF"; echo "--------------"
-  [ "$GPU" = 1 ] && echo "+ ensure 'root:${RG}:1' in /etc/subgid"
+  if [ "$GPU" = 1 ] && [ "$SHADOW_IDMAP" = 1 ]; then echo "+ ensure 'root:${RG}:1' in /etc/subgid"; fi
+  [ "$SHADOW_IDMAP" = 1 ] || echo "+ no newuidmap/newgidmap: LXC writes the id maps directly, /etc/subuid + /etc/subgid not needed"
   echo "+ lxc-create -n ${NAME} -f <config> -t download -- -d ${DIST} -r ${RELEASE} -a amd64"
   echo "+ move the lxc.cgroup2.devices lines above the common.conf include in ${P}/${NAME}/config"
   echo "+ chmod o+x ${P} ${P}/${NAME}; lxc-start; wait for network; apt-get install curl ca-certificates"
@@ -142,7 +152,7 @@ fi
 # ---- create -------------------------------------------------------------------
 TMP=$(mktemp); trap 'rm -f "$TMP"' EXIT
 echo "$CONF" > "$TMP"
-if [ "$GPU" = 1 ] && ! grep -qx "root:${RG}:1" /etc/subgid; then
+if [ "$GPU" = 1 ] && [ "$SHADOW_IDMAP" = 1 ] && ! grep -x "root:${RG}:1" /etc/subgid >/dev/null; then
   echo "root:${RG}:1" >> /etc/subgid; echo "  added root:${RG}:1 to /etc/subgid (render group passthrough)"
 fi
 lxc-create -n "$NAME" -f "$TMP" -t download -- -d "$DIST" -r "$RELEASE" -a amd64
@@ -171,6 +181,8 @@ if lxc-attach -n "$NAME" -- sh -c 'echo > /dev/null'; then echo "  OK   /dev/nul
 lxc-attach -n "$NAME" -- ip -br addr show eth0 | sed 's/^/  /'
 if lxc-attach -n "$NAME" -- test -c /dev/net/tun; then echo "  OK   /dev/net/tun available (Tailscale)"; else echo "  FAIL /dev/net/tun missing in the guest"; fi
 if [ "$GPU" = 1 ]; then
+  lxc-attach -n "$NAME" -- cat /proc/self/gid_map | grep -E "^ *${RG} +${RG} +1$" >/dev/null \
+    && echo "  OK   render group ${RG} mapped 1:1 (gid_map)" || echo "  FAIL render group ${RG} not mapped 1:1 in gid_map"
   # open without reading (a read on a render node blocks)
   if lxc-attach -n "$NAME" -- sh -c 'exec 3</dev/dri/renderD128'; then
     echo "  OK   /dev/dri/renderD128 opens: $(lxc-attach -n "$NAME" -- stat -c '%U:%G %a' /dev/dri/renderD128)"
