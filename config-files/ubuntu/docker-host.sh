@@ -145,6 +145,12 @@ verify_daemon() {
   fi
   [ "$(docker info --format '{{.LoggingDriver}}' 2>/dev/null)" = journald ] && ok "log driver journald" || bad "log driver not journald"
   docker info 2>&1 | grep -i 'no memory limit support' >/dev/null && bad "memory limits unsupported (cgroup)" || ok "memory limits supported"
+  # end-to-end: the configured daemon pulls and runs a container; the image is removed again
+  # unless it was already there
+  local had=""
+  docker image inspect hello-world >/dev/null 2>&1 && had=1
+  docker run --rm hello-world >/dev/null 2>&1 && ok "container runs (hello-world)" || bad "docker run hello-world failed (try it by hand for the error)"
+  [ -n "$had" ] || docker image rm hello-world >/dev/null 2>&1 || true
 }
 
 # ---- layout: /srv/docker -----------------------------------------------------
