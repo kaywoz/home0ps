@@ -39,8 +39,9 @@ Raspberry Pi 5 (8 GB, 128 GB NVMe), Raspberry Pi OS Lite 64-bit. Observational-o
 ## 4. Tailscale
 
 - [ ] `tag:monitoring` exists in `tagOwners` (`iac/tailscale/policy.hujson`)
-- [ ] Install [script], then `sudo tailscale up --advertise-tags=tag:monitoring`
-  - No `--ssh`, no `--accept-routes`
+- [ ] Install [script], then `sudo tailscale up --advertise-tags=tag:monitoring --ssh`
+  - Tailscale SSH: policy allows privusers only, admin account only, 24h check, never root (kaywoz/home0ps#212); sshd stays on the LAN address as break-glass
+  - No `--accept-routes`
 - [ ] Verify the tag: `tailscale status --self --json | grep -A2 '"Tags"'`
 - [ ] No grants from `tag:monitoring` until a flow needs one; add them one per flow
 

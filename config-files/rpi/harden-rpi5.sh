@@ -124,9 +124,14 @@ CONF
   systemctl restart docker
   mkdir -p "$DOCKER_ROOT" && chown "$ADMIN_USER": "$DOCKER_ROOT"
 
-  step "Tailscale (install only — login is interactive)"
+  step "Tailscale (install; login is interactive), Tailscale SSH on once joined"
   command -v tailscale >/dev/null || curl -fsSL https://tailscale.com/install.sh | sh
-  echo "  Next: sudo tailscale up --advertise-tags=${TS_TAG}   (no --ssh, no --accept-routes)"
+  # Tailscale SSH takes over port 22 on the tailnet address; sshd stays reachable on the LAN address
+  if tailscale status --json 2>/dev/null | grep '"BackendState": "Running"' >/dev/null; then
+    tailscale set --ssh
+  else
+    echo "  Next: sudo tailscale up --advertise-tags=${TS_TAG} --ssh   (no --accept-routes)"
+  fi
 
   step "Boot order: NVMe only (only if currently booted from NVMe)"
   if findmnt -no SOURCE / | grep -q nvme; then
@@ -160,7 +165,7 @@ verify() {
   systemctl is-active --quiet fluent-bit                    && ok "fluent-bit running"  || bad "fluent-bit not running"
   if command -v tailscale >/dev/null; then
     tailscale status --self --json 2>/dev/null | grep -q "\"${TS_TAG}\"" && ok "tailnet tag ${TS_TAG}" || bad "tag ${TS_TAG} missing"
-    tailscale debug prefs 2>/dev/null | grep -q '"RunSSH": false' && ok "Tailscale SSH off" || bad "Tailscale SSH on?"
+    tailscale debug prefs 2>/dev/null | grep '"RunSSH": true' >/dev/null && ok "Tailscale SSH on" || bad "Tailscale SSH off"
   fi
   if [ "$INSTALL_COCKPIT" = 1 ]; then
     ss -tln | grep -q "127.0.0.1:${COCKPIT_LOCAL_PORT}" && ok "Cockpit on localhost:${COCKPIT_LOCAL_PORT}" || bad "Cockpit listener"
