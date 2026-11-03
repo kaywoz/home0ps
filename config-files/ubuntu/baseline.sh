@@ -233,9 +233,15 @@ apply_user() {
     run useradd -m -s /bin/bash -G sudo "$ADMIN_USER"
   fi
   if ! id -nG "$ADMIN_USER" 2>/dev/null | grep -w sudo >/dev/null; then run usermod -aG sudo "$ADMIN_USER"; fi
-  # sudo needs a password; set interactively, never via this script, git or chat
+  # sudo needs a password: typed by the operator at passwd's own prompt on the terminal; the
+  # script never sees or stores it. No terminal (or dry run): print the step instead.
   if [ "$(passwd -S "$ADMIN_USER" 2>/dev/null | awk '{print $2}')" != P ]; then
-    echo "  Next: passwd $ADMIN_USER   (needed for sudo; login stays key-only)"
+    if [ "$MODE" != dry ] && { : </dev/tty; } 2>/dev/null; then
+      echo "  $ADMIN_USER has no password yet (needed for sudo; login stays key-only)"
+      passwd "$ADMIN_USER" </dev/tty >/dev/tty 2>&1 || echo "  WARN: passwd failed — run it by hand: passwd $ADMIN_USER"
+    else
+      echo "  Next: passwd $ADMIN_USER   (needed for sudo; login stays key-only)"
+    fi
   fi
 }
 verify_user() {
