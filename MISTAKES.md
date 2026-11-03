@@ -515,3 +515,21 @@ mistakes, not a diary.
 - **Rule going forward:** when a script fetches a third-party release,
   select the asset by exact name for the target, never by index, and fail
   closed when it's missing.
+
+### 2026-11-03 — hosts (Tailscale SSH switch over a tailnet session)
+
+- **Trigger:** script failed on a host; claim corrected by the CLI
+- **What happened:** the rollout note said an SSH session open while
+  Tailscale SSH is switched on "survives". In fact `tailscale set --ssh`
+  refuses (no change, non-zero exit) when the shell came in over
+  Tailscale, and `set -e` ended `baseline.sh` before its verify step on
+  the apps VM.
+- **Root cause:** stated the CLI's behaviour without checking it, and the
+  script treated an expected refusal as fatal.
+- **Fix applied:** both host scripts warn and print
+  `tailscale set --ssh --accept-risk=lose-ssh` as the last manual step
+  (PR 215).
+- **Rule going forward:** before asserting what a CLI does to the session
+  it runs in (network, SSH, firewall changes), check its docs or source; in
+  scripts, any step that can drop the operator's own connection is printed
+  as a final manual step, never run mid-script.
