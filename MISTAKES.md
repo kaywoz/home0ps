@@ -483,3 +483,53 @@ mistakes, not a diary.
   status list, check the current state of every issue and PR it names
   (`gh issue view N --json state`, `gh pr view N --json state`); never list
   a closed item as open.
+
+### 2026-11-02 — mos (guest NIC name guessed)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** after a VM's passthrough NIC was renamed, the fix
+  handed over was `sed 's/enp1s0/enp2s0/'`, copied from the other VM. The
+  old name in that VM's `/etc/network/interfaces` was `enp3s0`, so the
+  command would have changed nothing.
+- **Root cause:** reused the previous VM's old interface name instead of
+  reading the affected VM's config first.
+- **Fix applied:** read the old name from the VM's `/etc/network/interfaces`,
+  then rename that one.
+- **Rule going forward:** before giving a command that rewrites a name,
+  address or path in a host's config, have kaywoz show the current value on
+  that host (`grep`) and build the command from it — never from another
+  host.
+
+### 2026-11-03 — hosts (dysk release asset by position)
+
+- **Trigger:** script failed on a host
+- **What happened:** `baseline.sh` downloaded the dysk release's *first*
+  asset and unzipped it. dysk v3.8.2 changed its release to one tarball
+  per target; the first asset became a macOS `.tar.gz`, its digest still
+  matched, and `unzip` failed on the first VM.
+- **Root cause:** the asset was chosen by list position, an assumption about
+  an upstream layout the project never promised.
+- **Fix applied:** asset picked by exact name for the host's target
+  (`dysk-<tag>-<arch>.tar.gz`, old zip as fallback); aborts with a FAIL
+  check if no match (PR 210).
+- **Rule going forward:** when a script fetches a third-party release,
+  select the asset by exact name for the target, never by index, and fail
+  closed when it's missing.
+
+### 2026-11-03 — hosts (Tailscale SSH switch over a tailnet session)
+
+- **Trigger:** script failed on a host; claim corrected by the CLI
+- **What happened:** the rollout note said an SSH session open while
+  Tailscale SSH is switched on "survives". In fact `tailscale set --ssh`
+  refuses (no change, non-zero exit) when the shell came in over
+  Tailscale, and `set -e` ended `baseline.sh` before its verify step on
+  the apps VM.
+- **Root cause:** stated the CLI's behaviour without checking it, and the
+  script treated an expected refusal as fatal.
+- **Fix applied:** both host scripts warn and print
+  `tailscale set --ssh --accept-risk=lose-ssh` as the last manual step
+  (PR 215).
+- **Rule going forward:** before asserting what a CLI does to the session
+  it runs in (network, SSH, firewall changes), check its docs or source; in
+  scripts, any step that can drop the operator's own connection is printed
+  as a final manual step, never run mid-script.
