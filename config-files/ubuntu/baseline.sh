@@ -15,6 +15,8 @@
 #   REBOOT_TIME=04:00     automatic reboot time for unattended upgrades
 #   AUTO_REBOOT=true      false = never reboot automatically
 #   TS_TAG=tag:observed   tag printed in the `tailscale up` hint
+#   TS_SSH=true           Tailscale SSH on this host (policy: privusers, admin account only,
+#                         24h check, never root). false = off. sshd stays as break-glass.
 #   SSH_IMPORT_ID=gh:kaywoz  ssh-import-id source for the admin user's authorized_keys
 #                         (adds keys, never removes them). Empty = skip the import.
 #   COCKPIT_SVC=          Tailscale Service name for this host's Cockpit: cockpit-<device>,
@@ -35,6 +37,7 @@ SECTIONS="snap updates ssh sysctl purge packages cockpit tailscale"
 REBOOT_TIME="${REBOOT_TIME:-04:00}"
 AUTO_REBOOT="${AUTO_REBOOT:-true}"
 TS_TAG="${TS_TAG:-tag:observed}"
+TS_SSH="${TS_SSH:-true}"
 SSH_IMPORT_ID="${SSH_IMPORT_ID-gh:kaywoz}"
 PACKAGES="${PACKAGES:-htop ncdu git tealdeer|tldr unzip curl ca-certificates}"
 COCKPIT_SVC="${COCKPIT_SVC:-}"
@@ -55,7 +58,7 @@ while [ $# -gt 0 ]; do
     --only) ONLY="${2:?--only needs a list}"; shift ;;
     --skip) SKIP="${2:?--skip needs a list}"; shift ;;
     --force-ssh) FORCE_SSH=1 ;;
-    -h|--help) sed -n '2,29p' "$0" 2>/dev/null || true; exit 0 ;;
+    -h|--help) sed -n '2,31p' "$0" 2>/dev/null || true; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -382,9 +385,10 @@ verify_cockpit() {
   installed network-manager && bad "NetworkManager got installed (check renderer)" || ok "no NetworkManager pulled in"
 }
 
-# ---- tailscale: install only; joining is interactive ------------------------
+# ---- tailscale: install; joining is interactive, Tailscale SSH once joined ----
+ts_running() { tailscale status --json 2>/dev/null | grep '"BackendState": "Running"' >/dev/null; }
 apply_tailscale() {
-  step "tailscale: install (login is interactive)"
+  step "tailscale: install (login is interactive), Tailscale SSH ${TS_SSH}"
   if command -v tailscale >/dev/null 2>&1; then
     echo "  already installed"
   elif [ "$MODE" = dry ]; then
@@ -392,11 +396,17 @@ apply_tailscale() {
   else
     curl -fsSL https://tailscale.com/install.sh | sh
   fi
-  echo "  Next: sudo tailscale up --advertise-tags=${TS_TAG}   (no --ssh, no --accept-routes)"
+  # Tailscale SSH takes over port 22 on the tailnet address; sshd stays reachable on the LAN address
+  if command -v tailscale >/dev/null 2>&1 && ts_running; then
+    run tailscale set --ssh="${TS_SSH}"
+  else
+    echo "  Next: sudo tailscale up --advertise-tags=${TS_TAG} --ssh=${TS_SSH}   (no --accept-routes)"
+  fi
 }
 verify_tailscale() {
   command -v tailscale >/dev/null 2>&1 && ok "tailscale installed" || { bad "tailscale missing"; return 0; }
   tailscale status --self --json 2>/dev/null | grep "\"${TS_TAG}\"" >/dev/null && ok "tagged ${TS_TAG}" || bad "not tagged ${TS_TAG} (yet)"
+  tailscale debug prefs 2>/dev/null | grep "\"RunSSH\": ${TS_SSH}" >/dev/null && ok "Tailscale SSH ${TS_SSH}" || bad "Tailscale SSH not ${TS_SSH}"
 }
 
 # ---- main -------------------------------------------------------------------
