@@ -53,6 +53,14 @@ case "$DISTRO" in
   *) echo "Not Ubuntu or Debian (see /etc/os-release)." 1>&2; exit 1 ;;
 esac
 
+# Admin account: SUDO_USER, else LOCAL_UNIX_ACCOUNT, else ask on the terminal (also works when
+# piped from curl, e.g. as root in an LXC). Never stored by this script.
+if [ -z "$ADMIN_USER" ] && { : </dev/tty; } 2>/dev/null; then
+  read -r -p "Admin account (LOCAL_UNIX_ACCOUNT): " ADMIN_USER </dev/tty || true
+fi
+if [ -n "$ADMIN_USER" ] && ! [[ "$ADMIN_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; then
+  echo "Invalid account name: $ADMIN_USER" 1>&2; exit 1
+fi
 CONTAINER=$(systemd-detect-virt -c 2>/dev/null || true); [ "$CONTAINER" = none ] && CONTAINER=""
 
 FAILS=0
