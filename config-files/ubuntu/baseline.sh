@@ -396,9 +396,12 @@ apply_tailscale() {
   else
     curl -fsSL https://tailscale.com/install.sh | sh
   fi
-  # Tailscale SSH takes over port 22 on the tailnet address; sshd stays reachable on the LAN address
+  # Tailscale SSH takes over port 22 on the tailnet address; sshd stays reachable on the LAN address.
+  # tailscale refuses (no change) when this shell itself came in over the tailnet: switching would
+  # drop the session mid-run, so that case only prints the step to run last.
   if command -v tailscale >/dev/null 2>&1 && ts_running; then
-    run tailscale set --ssh="${TS_SSH}"
+    run tailscale set --ssh="${TS_SSH}" \
+      || echo "  WARN: not switched (session over Tailscale). Run last, then reconnect: sudo tailscale set --ssh=${TS_SSH} --accept-risk=lose-ssh"
   else
     echo "  Next: sudo tailscale up --advertise-tags=${TS_TAG} --ssh=${TS_SSH}   (no --accept-routes)"
   fi

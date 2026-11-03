@@ -126,9 +126,11 @@ CONF
 
   step "Tailscale (install; login is interactive), Tailscale SSH on once joined"
   command -v tailscale >/dev/null || curl -fsSL https://tailscale.com/install.sh | sh
-  # Tailscale SSH takes over port 22 on the tailnet address; sshd stays reachable on the LAN address
+  # Tailscale SSH takes over port 22 on the tailnet address; sshd stays reachable on the LAN address.
+  # tailscale refuses (no change) when this shell came in over the tailnet: print the step to run last.
   if tailscale status --json 2>/dev/null | grep '"BackendState": "Running"' >/dev/null; then
-    tailscale set --ssh
+    tailscale set --ssh \
+      || echo "  WARN: not switched (session over Tailscale). Run last, then reconnect: sudo tailscale set --ssh --accept-risk=lose-ssh"
   else
     echo "  Next: sudo tailscale up --advertise-tags=${TS_TAG} --ssh   (no --accept-routes)"
   fi
