@@ -15,6 +15,8 @@
 #   REBOOT_TIME=04:00     automatic reboot time for unattended upgrades
 #   AUTO_REBOOT=true      false = never reboot automatically
 #   TS_TAG=tag:observed   tag printed in the `tailscale up` hint
+#   SSH_IMPORT_ID=gh:kaywoz  ssh-import-id source for the admin user's authorized_keys
+#                         (adds keys, never removes them). Empty = skip the import.
 #   COCKPIT_SVC=          Tailscale Service name for this host's Cockpit: cockpit-<device>,
 #                         e.g. cockpit-sexy (CLAUDE.md §4 Service-name exception). Unset = section skipped.
 #   TS_TAILNET_DNS=       <tailnet>.ts.net, for Cockpit's Origins (needed with COCKPIT_SVC)
@@ -33,6 +35,7 @@ SECTIONS="snap updates ssh sysctl purge packages cockpit tailscale"
 REBOOT_TIME="${REBOOT_TIME:-04:00}"
 AUTO_REBOOT="${AUTO_REBOOT:-true}"
 TS_TAG="${TS_TAG:-tag:observed}"
+SSH_IMPORT_ID="${SSH_IMPORT_ID-gh:kaywoz}"
 PACKAGES="${PACKAGES:-htop ncdu git tealdeer|tldr unzip curl ca-certificates}"
 COCKPIT_SVC="${COCKPIT_SVC:-}"
 TS_TAILNET_DNS="${TS_TAILNET_DNS:-}"
@@ -52,7 +55,7 @@ while [ $# -gt 0 ]; do
     --only) ONLY="${2:?--only needs a list}"; shift ;;
     --skip) SKIP="${2:?--skip needs a list}"; shift ;;
     --force-ssh) FORCE_SSH=1 ;;
-    -h|--help) sed -n '2,21p' "$0" 2>/dev/null || true; exit 0 ;;
+    -h|--help) sed -n '2,29p' "$0" 2>/dev/null || true; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -210,6 +213,12 @@ apply_ssh() {
   local home keys
   home=$(getent passwd "${ADMIN_USER:-root}" | cut -d: -f6)
   keys="${home:-/nonexistent}/.ssh/authorized_keys"
+  # admin user's keys from GitHub; root is skipped (no root login anyway)
+  if [ -n "$SSH_IMPORT_ID" ] && [ -n "$ADMIN_USER" ] && [ -n "$home" ]; then
+    apt_install ssh-import-id
+    run install -d -m 700 -o "$ADMIN_USER" -g "$(id -gn "$ADMIN_USER")" "$home/.ssh"
+    run runuser -u "$ADMIN_USER" -- ssh-import-id -o "$keys" "$SSH_IMPORT_ID" || echo "  WARN: ssh-import-id $SSH_IMPORT_ID failed (no network?) — checking for an existing key"
+  fi
   if [ "$FORCE_SSH" = 0 ] && ! grep -qsE '^(ssh-|ecdsa-|sk-)' "$keys"; then
     bad "no SSH key in $keys for '${ADMIN_USER:-root}' — not disabling passwords (lockout). Add a key or use --force-ssh"
     return 0
