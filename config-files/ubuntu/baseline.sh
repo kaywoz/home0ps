@@ -285,6 +285,8 @@ apply_packages() {
 # dysk (disk usage overview) isn't packaged for Ubuntu/Debian: latest GitHub release, static musl
 # binary, SHA-256 from the GitHub API checked before extracting. Installed once; re-run
 # with the binary removed to upgrade (not covered by unattended upgrades).
+# The asset is picked by name: since v3.8.2 each target is its own dysk-<tag>-<arch>.tar.gz
+# (older releases: one dysk_<ver>.zip with <arch>/dysk inside, still handled).
 install_dysk() {
   if command -v dysk >/dev/null 2>&1; then echo "  dysk already installed ($(dysk --version 2>/dev/null | head -1))"; return 0; fi
   local arch meta tag url sha tmp
@@ -297,12 +299,21 @@ install_dysk() {
   # Debian: minimal images (LXC) have no python3, which parses the release JSON
   command -v python3 >/dev/null 2>&1 || apt_install python3
   meta=$(curl -fsSL https://api.github.com/repos/Canop/dysk/releases/latest)
-  read -r tag url sha < <(printf '%s' "$meta" | python3 -c 'import json,sys; d=json.load(sys.stdin); a=d["assets"][0]; print(d["tag_name"], a["browser_download_url"], (a.get("digest") or "").replace("sha256:",""))')
+  read -r tag url sha < <(printf '%s' "$meta" | ARCH="$arch" python3 -c '
+import json, os, sys
+d = json.load(sys.stdin); t = d["tag_name"]; v = t.lstrip("v"); arch = os.environ["ARCH"]
+want = [f"dysk-{t}-{arch}.tar.gz", f"dysk_{v}.zip"]
+a = next((a for n in want for a in d["assets"] if a["name"] == n), None)
+print(t, a["browser_download_url"] if a else "-", (a.get("digest") or "").replace("sha256:", "") if a else "")')
+  if [ "$url" = - ]; then bad "dysk $tag: no $arch asset in the release, not installing"; return 0; fi
   if [ -z "$sha" ]; then bad "dysk $tag: no checksum published, not installing"; return 0; fi
   tmp=$(mktemp -d)
-  curl -fsSL "$url" -o "$tmp/dysk.zip"
-  if ! echo "$sha  $tmp/dysk.zip" | sha256sum -c --quiet -; then bad "dysk $tag: checksum mismatch, not installing"; rm -rf "$tmp"; return 0; fi
-  unzip -q -j "$tmp/dysk.zip" "$arch/dysk" -d "$tmp"
+  curl -fsSL "$url" -o "$tmp/asset"
+  if ! echo "$sha  $tmp/asset" | sha256sum -c --quiet -; then bad "dysk $tag: checksum mismatch, not installing"; rm -rf "$tmp"; return 0; fi
+  case "$url" in
+    *.tar.gz) tar -xzf "$tmp/asset" -C "$tmp" --strip-components=1 "dysk-${tag}-${arch}/dysk" ;;
+    *.zip)    unzip -q -j "$tmp/asset" "$arch/dysk" -d "$tmp" ;;
+  esac
   install -m 755 "$tmp/dysk" /usr/local/bin/dysk
   rm -rf "$tmp"
   echo "  installed dysk $tag"
