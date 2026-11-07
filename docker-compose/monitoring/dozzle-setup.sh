@@ -1,19 +1,9 @@
 #!/usr/bin/env bash
-# One-time Dozzle setup on the monitoring host: own mTLS cert pair + first user. Run from /srv/docker.
+# One-time Dozzle setup on the monitoring host: first user. Run from /srv/docker.
+# (No cert pair: remote hosts are read through their socket proxies, not Dozzle agents.)
 set -euo pipefail
 UIDMAP=165534   # container 65534 under userns-remap (base 100000)
-mkdir -p dozzle/certs dozzle/data
-
-if [ ! -f dozzle/certs/key.pem ]; then
-  echo "== Generating Dozzle mTLS key and certificate (valid 5 years)"
-  umask 077
-  openssl genpkey -algorithm Ed25519 -out dozzle/certs/key.pem
-  openssl req -new -x509 -key dozzle/certs/key.pem -out dozzle/certs/cert.pem \
-    -days 1825 -subj "/O=krypinet/CN=dozzle-mtls"
-  openssl x509 -in dozzle/certs/cert.pem -noout -subject -enddate
-else
-  echo "== Cert pair exists, keeping it"
-fi
+mkdir -p dozzle/data
 
 if [ ! -f dozzle/data/users.yml ]; then
   echo "== Creating first Dozzle user"
@@ -27,8 +17,7 @@ else
 fi
 
 sudo chown -R "$UIDMAP:$UIDMAP" dozzle
-sudo chmod 700 dozzle/certs dozzle/data
-sudo chmod 600 dozzle/certs/key.pem dozzle/data/users.yml
-sudo chmod 644 dozzle/certs/cert.pem
-for p in dozzle/data/ dozzle/certs/key.pem; do grep -qxF "$p" .gitignore 2>/dev/null || echo "$p" >> .gitignore; done
+sudo chmod 700 dozzle/data
+sudo chmod 600 dozzle/data/users.yml
+for p in dozzle/data/; do grep -qxF "$p" .gitignore 2>/dev/null || echo "$p" >> .gitignore; done
 echo "== Done. Next: docker compose up -d dozzle"

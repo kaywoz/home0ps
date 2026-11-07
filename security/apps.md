@@ -13,7 +13,7 @@ Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh)
 | Lateral movement from this host | UniFi zone with internet-only egress; switch port VLAN 31 native + 13 tagged only, never management *(planned, #118)* |
 | Containers reaching other VLAN 31 hosts (storage host) | `DOCKER-USER` rule blocking container bridges → VLAN 31 *(planned, #118)* |
 | IoT-facing apps on VLAN 13 | macvlan on the VLAN 13 sub-interface, no host IP on it *(planned, #118)* — keeps the host itself off the IoT network |
-| Over-broad tailnet access | `tag:observed` only. Inbound from the tailnet: monitoring host → tcp:45876 (Beszel agent) and tcp:7007 (Dozzle agent); privusers → tcp:22, 80, 443 (admin baseline grants). Outbound pushes limited to `svc:logtide-api`, `svc:healthchecks`, `svc:beszel` |
+| Over-broad tailnet access | `tag:observed` only. Inbound from the tailnet: monitoring host → tcp:45876 (Beszel agent) and tcp:2375 (read-only socket proxy for Dozzle, via `tailscale serve`); privusers → tcp:22, 80, 443 (admin baseline grants). Outbound pushes limited to `svc:logtide-api`, `svc:healthchecks`, `svc:beszel` |
 | User-facing apps exposed | Via Cloudflare Tunnel + Access (outbound-only `cloudflared`, JWT validation on), never published ports *(planned, #118)* |
 | Admin UI exposure | Cockpit on `127.0.0.1:9091` only, published as `svc:cockpit-sexy`; `Origins` pinned, `LoginTo = false`, root disallowed |
 
@@ -31,7 +31,7 @@ Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh)
 |---|---|
 | Container escape to root | `userns-remap` (base 100000), `no-new-privileges` daemon-wide, `icc: false`, no userland proxy, `live-restore` (`docker-host.sh` `daemon`) |
 | App data ownership | Bind mounts owned by the remapped UID (container 65534 → 165534); `/srv/docker` owned by the admin user, mode 750 |
-| Docker control via monitoring agents | Beszel agent should read Docker through a read-only socket proxy (`POST=0`) per §8 *(unverified on this host — check the agent's `DOCKER_HOST`)*. Dozzle agent mounts `docker.sock` directly (agents can't use a proxy) *(planned, #138)* — see accepted risks |
+| Docker control via monitoring agents | Beszel agent should read Docker through a read-only socket proxy (`POST=0`) per §8 *(unverified on this host — check the agent's `DOCKER_HOST`)*. Dozzle reads through a read-only socket proxy (remote-host mode), no agent *(planned, #138)* |
 | Risky workloads | Not run here: anything untrusted or `privileged` goes to the lab |
 
 ## Platform
@@ -55,7 +55,6 @@ Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh)
 
 - Docker CE upgrades unattended: `dockerd` restarts in the 04:00 window; containers return via restart policies / `live-restore`.
 - `dysk` comes from its GitHub release (checksum-verified), not apt — not covered by unattended upgrades.
-- Dozzle agent (once added) holds the full Docker socket; the shared mTLS key is rotated on all hosts at once.
 - Admin baseline grants give privusers tcp:22/80/443 to every device, this one included.
 
 ## Open issues

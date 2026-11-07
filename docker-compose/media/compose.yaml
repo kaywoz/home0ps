@@ -92,10 +92,46 @@ services:
     volumes:
       - ./homey:/homey/user
 
+  # Read-only Docker API for Dozzle on the monitoring host (Dozzle "remote host" mode; no agent:
+  # an agent needs the full socket and allows exec into containers). Published on localhost only;
+  # `tailscale serve --bg --tcp=2375 tcp://localhost:2375` exposes it on the tailnet address, where
+  # only tag:monitoring may reach it (policy grant + test).
+  socketproxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: kr-ccp-socketproxy-0101
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /run
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    mem_limit: 64m
+    environment:
+      - CONTAINERS=1   # list/inspect/logs
+      - INFO=1
+      - EVENTS=1
+      - POST=0         # read-only API
+    ports:
+      - "127.0.0.1:2375:2375"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro   # :ro restricts nothing; POST=0 does
+    networks:
+      - socketproxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:2375/_ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
 networks:
   proxy-jellyfin:
     name: proxy-jellyfin
     driver: bridge
   proxy-komga:
     name: proxy-komga
+    driver: bridge
+  socketproxy:
+    name: socketproxy
     driver: bridge

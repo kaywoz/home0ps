@@ -105,17 +105,17 @@ services:
       DOZZLE_AUTH_TTL: 48h
       DOZZLE_ENABLE_ACTIONS: "false"
       DOZZLE_NO_ANALYTICS: "true"
-      # Remote agents over the tailnet (grant tag:monitoring -> tag:observed tcp:7007); same mTLS pair as below
-      DOZZLE_REMOTE_AGENT: ${DOZZLE_REMOTE_AGENT}
+      # Remote hosts over the tailnet: each host's read-only socket proxy (POST=0), served on its
+      # tailnet address port 2375 (grant tag:monitoring -> tag:observed tcp:2375). No agents: an
+      # agent needs the full Docker socket and allows exec into containers.
+      DOZZLE_REMOTE_HOST: ${DOZZLE_REMOTE_HOST}
     ports:
       - "127.0.0.1:8082:8080"        # svc:dozzle via tailscale serve
     networks:
-      - proxy-dozzle                 # egress to remote agents over the tailnet
+      - proxy-dozzle                 # egress to remote hosts' socket proxies over the tailnet
       - socketproxy                  # this host's Docker API (read-only)
     volumes:
       - ./dozzle/data:/data
-      - ./dozzle/certs/cert.pem:/dozzle_cert.pem:ro   # own mTLS pair, shared with agents
-      - ./dozzle/certs/key.pem:/dozzle_key.pem:ro
     healthcheck:
       test: ["CMD", "/dozzle", "healthcheck"]
       interval: 30s
