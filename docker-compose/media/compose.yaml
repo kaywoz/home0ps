@@ -1,0 +1,92 @@
+# Media LXC (VLAN 13, IoT): Jellyfin, Komga, Homey — kaywoz/home0ps#174, #197.
+# Deployed as /srv/docker/compose.yaml inside the LXC, one data folder per service.
+# Docker in an unprivileged LXC: no userns-remap (the LXC already maps root to an unprivileged
+# host uid), so container uids are LXC uids: data folders are owned by the uid in `user:`.
+# Service uids 2001/2002 are deliberately not the admin account's uid.
+# Media comes read-only from the storage host's rclone mount, bound into the LXC at /mnt/media.
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: kr-ccp-jellyfin-0101
+    restart: unless-stopped
+    user: "2001:2001"
+    group_add:
+      - "44"                           # host render group, mapped 1:1 into the LXC (create-lxc.sh --gpu)
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128   # Intel QSV / VA-API
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=256m
+    pids_limit: 500
+    mem_limit: 4g
+    environment:
+      JELLYFIN_PublishedServerUrl: http://${MEDIA_LAN_IP}:8096   # what LAN discovery hands out
+    ports:
+      - "127.0.0.1:8096:8096"          # svc:jellyfin via tailscale serve (phones, laptops)
+      # Exception to "127.0.0.1 only" (kaywoz, 2026-11-07): Apple TV and other VLAN 13 clients
+      # reach Jellyfin on the LAN. HTTP + client discovery only; no DLNA, no host network.
+      - "${MEDIA_LAN_IP}:8096:8096"
+      - "${MEDIA_LAN_IP}:7359:7359/udp"
+    networks:
+      - proxy-jellyfin                 # egress: metadata providers
+    volumes:
+      - ./jellyfin/config:/config
+      - ./jellyfin/cache:/cache        # image sets XDG_CACHE_HOME here (fontconfig etc.)
+      - /mnt/media:/media:ro
+    # healthcheck: built into the image (curl http://localhost:8096/health)
+
+  komga:
+    image: gotson/komga:latest
+    container_name: kr-ccp-komga-0101
+    restart: unless-stopped
+    user: "2002:2002"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=256m,exec            # exec: the SQLite JDBC driver loads its native library from /tmp
+    pids_limit: 300
+    mem_limit: 1536m
+    environment:
+      JAVA_TOOL_OPTIONS: -Xmx1g        # Komga docs: default heap ~1 GB; raise on OutOfMemory
+    ports:
+      - "127.0.0.1:25600:25600"        # svc:komga via tailscale serve
+    networks:
+      - proxy-komga                    # egress: metadata
+    volumes:
+      - ./komga/config:/config
+      - /mnt/media:/data:ro            # library folders are picked under /data in the UI
+    # no healthcheck: none documented by Komga
+
+  homey:
+    image: ghcr.io/athombv/homey-shs:latest
+    container_name: kr-ccp-homey-0101
+    restart: unless-stopped
+    # Athom's guide uses network_mode: host + privileged: true. Host network kept: Homey needs the
+    # LXC's own VLAN 13 address for discovery and the Homey/Hue bridges. privileged dropped
+    # (kaywoz, 2026-11-07): devices are reached over VLAN 13, no local radios.
+    network_mode: host
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=128m
+    pids_limit: 300
+    mem_limit: 768m                    # Athom: ~200-300 MB in use
+    environment:
+      HOMEY_LOCAL_ADDRESS: ${MEDIA_LAN_IP}   # documented override for LAN address detection
+    volumes:
+      - ./homey:/homey/user
+
+networks:
+  proxy-jellyfin:
+    name: proxy-jellyfin
+    driver: bridge
+  proxy-komga:
+    name: proxy-komga
+    driver: bridge
