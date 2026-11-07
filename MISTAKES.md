@@ -565,3 +565,18 @@ mistakes, not a diary.
   check `gh pr view N --json state`; if it isn't `OPEN`, branch from `main`
   and open a new PR. A `git push` that prints "Create a pull request for …"
   means the branch has no open PR — stop.
+
+### 2026-11-07 — mos (lock fd inherited by daemons)
+
+- **Trigger:** script failed on the host
+- **What happened:** `media-mount.sh` took an `flock` on fd 9 and then started
+  the rclone daemon and `lxc-start`. Both inherited fd 9 and kept the lock,
+  so every later run, including the cron watchdog, reported "another run is
+  active" and did nothing.
+- **Root cause:** a lock held through an open fd lives as long as any
+  process holds that fd; long-lived children weren't considered.
+- **Fix applied:** fd 9 is closed (`9>&-`) for the rclone daemon and
+  `lxc-start` (PR 224).
+- **Rule going forward:** in scripts that lock with `flock` on an fd, close
+  that fd for every child that outlives the script (daemons, monitors,
+  `&` jobs).
