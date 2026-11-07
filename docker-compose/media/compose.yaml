@@ -72,10 +72,19 @@ services:
     network_mode: host
     read_only: true
     cap_drop: [ALL]
+    cap_add:                           # tested one by one on the media LXC (2026-11-07):
+      - SETUID                         # D-Bus + avahi switch to their own users (dbus bus/audit.c,
+      - SETGID                         #   avahi caps.c keeps exactly SYS_CHROOT, SETUID, SETGID)
+      - SYS_CHROOT                     # avahi chroots itself
+      - CHOWN                          # go2rtc chowns its socket in /run/go2rtc
+    # Verified 2026-11-07 on a fresh data folder: runs with read_only, no-new-privileges and only
+    # these four capabilities. Data restored from an older install crashed homey-matter-daemon
+    # (even with privileged: true) — start fresh, re-pair Matter devices.
     security_opt:
       - no-new-privileges:true
     tmpfs:
       - /tmp:size=128m
+      - /run:size=16m                  # Homey starts its own D-Bus daemon (/run/dbus) at boot
     pids_limit: 300
     mem_limit: 768m                    # Athom: ~200-300 MB in use
     environment:

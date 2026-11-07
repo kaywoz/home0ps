@@ -12,7 +12,7 @@ Rebuild: [`config-files/mos/create-lxc.sh`](../config-files/mos/create-lxc.sh) o
 |---|---|
 | IoT devices reaching the LXC | Only Jellyfin **8096/tcp + 7359/udp** on the LXC's VLAN 13 address — an explicit exception to "ports on 127.0.0.1" so Apple TV and other VLAN 13 clients can play and discover (kaywoz, 2026-11-07). No DLNA, no host network for Jellyfin. Homey listens on the LAN by design (see below). No sshd in the LXC (verified: `baseline.sh` "no sshd (container)") |
 | Over-broad tailnet access | `tag:media` + `tag:observed`; Komga and Jellyfin for phones/laptops as `svc:komga` / `svc:jellyfin` *(planned)*; Tailscale SSH: privusers, admin account only, 24h check, never root |
-| Homey on host network | Needed for its LAN role (bridges, discovery on VLAN 13). Runs **without `privileged`** (Athom's guide uses it; dropped, kaywoz 2026-11-07), `cap_drop: [ALL]` *(untested)* |
+| Homey on host network | Needed for its LAN role (bridges, discovery on VLAN 13). Runs **without `privileged`** (Athom's guide uses it; dropped, kaywoz 2026-11-07), `cap_drop: [ALL]` plus only `SETUID`, `SETGID`, `SYS_CHROOT`, `CHOWN` (D-Bus, avahi, go2rtc switching users / chroot / socket ownership), `/run` as tmpfs. Verified running on a fresh data folder (2026-11-07); data restored from an older install crashed its Matter daemon even with `privileged` |
 
 ## Credentials
 
@@ -25,7 +25,7 @@ Rebuild: [`config-files/mos/create-lxc.sh`](../config-files/mos/create-lxc.sh) o
 
 | Risk | Control |
 |---|---|
-| App compromise → LXC | Container standard: non-root service uids (2001/2002, not the admin account's uid), `read_only` + `tmpfs`, `cap_drop: [ALL]`, `no-new-privileges`, memory/pid limits *(untested on Homey: runs as the image's user)* |
+| App compromise → LXC | Container standard: non-root service uids (2001/2002, not the admin account's uid), `read_only` + `tmpfs`, `cap_drop: [ALL]`, `no-new-privileges`, memory/pid limits — all verified running (2026-11-07). Homey runs as the image's own user (root inside the container) with only `SETUID`, `SETGID`, `SYS_CHROOT`, `CHOWN` |
 | LXC compromise → storage host | Unprivileged LXC (root = uid 100000 on the host), device rules allow only tun + the render node, GPU group 44 mapped 1:1; break-glass `lxc-attach` from the host |
 | GPU access | `/dev/dri/renderD128` only, via `group_add: 44` for Jellyfin |
 | Komga native libraries | `/tmp` tmpfs with `exec` (SQLite JDBC loads its library from there) — the one tmpfs without `noexec` |
