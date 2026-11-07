@@ -585,13 +585,13 @@ mistakes, not a diary.
 
 - **Trigger:** misunderstood request
 - **What happened:** the host steps for Dozzle remote hosts labelled the media
-  LXC `media` in `DOZZLE_REMOTE_HOST`; kaywoz wants each host shown under its
-  actual hostname.
+  LXC `media` in `DOZZLE_REMOTE_HOST`; kaywoz's convention is each host's
+  MagicDNS name, `<hostname>.<tailnet>.ts.net`.
 - **Root cause:** carried the git rule "role names, not device names" over to
   a host-local `.env` value, where it doesn't apply, and `.env.example` said
   only `<label>`.
 - **Fix applied:** `.env.example` and the compose comment say the label is the
-  host's actual hostname (from `hostname`); the host's `.env` was corrected.
+  host's MagicDNS name; the host's `.env` was corrected.
 - **Rule going forward:** display names in host-local config (`.env`, UIs)
-  use the host's actual hostname; the role-name rule applies only to what goes
-  into git.
+  use the host's MagicDNS name (`<hostname>.<tailnet>.ts.net`); the role-name rule
+  applies only to what goes into git, where the tailnet name stays a placeholder.
