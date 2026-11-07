@@ -201,10 +201,11 @@
 			"ip":  ["tcp:443"],
 		},
 		{
-			// monitoring host pulls agents on observed hosts: beszel agent, dozzle agent
+			// monitoring host pulls from observed hosts: beszel agent (45876), and Dozzle reading each
+			// host's read-only docker-socket-proxy (2375, POST=0; remote-host mode, no Dozzle agent)
 			"src": ["tag:monitoring"],
 			"dst": ["tag:observed"],
-			"ip":  ["tcp:45876", "tcp:7007"],
+			"ip":  ["tcp:45876", "tcp:2375"],
 		},
 	],
 
@@ -233,13 +234,13 @@
 			// observed hosts reach log ingest, heartbeats and the Beszel hub only, nothing else on the monitoring host
 			"src":    "tag:observed",
 			"accept": ["svc:logtide-api:443", "svc:healthchecks:443", "svc:beszel:443"],
-			"deny":   ["tag:monitoring:22", "tag:monitoring:443", "tag:observed:45876"],
+			"deny":   ["tag:monitoring:22", "tag:monitoring:443", "tag:observed:45876", "tag:observed:2375"],
 		},
 		{
-			// the monitoring host pulls agents, nothing else
+			// the monitoring host pulls agents and read-only Docker APIs, nothing else
 			"src":    "tag:monitoring",
-			"accept": ["tag:observed:45876", "tag:observed:7007", "macmini:45876"],
-			"deny":   ["tag:observed:22", "macmini:22"],
+			"accept": ["tag:observed:45876", "tag:observed:2375", "macmini:45876"],
+			"deny":   ["tag:observed:22", "tag:observed:7007", "macmini:22"],
 		},
 		{
 			// admins reach everything on the storage host: tcp (smb, nfs), udp, icmp
@@ -261,12 +262,14 @@
 			"accept": ["svc:jellyfin:443", "svc:komga:443"],
 		},
 		{"src": "tag:observed", "deny": ["svc:jellyfin:443", "svc:komga:443"]},
+		// the read-only Docker APIs are for the monitoring host only, not for admins' devices
+		{"src": "${TS_PRIVUSER}", "deny": ["tag:media:2375", "tag:infra:2375"]},
 		{"src": "tag:hypervisor", "deny": ["svc:jellyfin:443", "svc:komga:443"]},
 		{
 			// lab hypervisors reach the ISO export (NFSv4) on the storage host, nothing else in home
 			"src":    "tag:hypervisor",
 			"accept": ["tag:storage:2049"],
-			"deny":   ["tag:storage:22", "tag:storage:111", "tag:storage:443", "tag:storage:445", "tag:monitoring:443", "tag:observed:45876"],
+			"deny":   ["tag:storage:22", "tag:storage:111", "tag:storage:443", "tag:storage:445", "tag:monitoring:443", "tag:observed:45876", "tag:observed:2375"],
 		},
 		{
 			// host admin UIs are for admins only: observed hosts can't reach another host's Cockpit
