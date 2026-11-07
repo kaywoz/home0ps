@@ -1,0 +1,5 @@
+# Host-local config and runtime data: never commit
+.env
+jellyfin/
+komga/
+homey/
