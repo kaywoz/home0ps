@@ -22,6 +22,10 @@ locals {
 
     # apps host (tag:observed)
     "cockpit-sexy" = "Host admin UI (apps host)"
+
+    # media LXC (tag:media)
+    jellyfin = "Media server"
+    komga    = "Comics and books server"
   }
 }
 
