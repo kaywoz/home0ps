@@ -84,6 +84,9 @@
 			"svc:rustfs":          ["tag:storage"],
 			// apps host admin UI
 			"svc:cockpit-sexy":    ["tag:observed"],
+			// media LXC apps
+			"svc:jellyfin":        ["tag:media"],
+			"svc:komga":           ["tag:media"],
 		},
 	},
 
@@ -135,6 +138,12 @@
 			// admins -> storage host app UIs (same sources as full access to tag:storage)
 			"src": ["autogroup:admin", "group:privusers", "macmini"],
 			"dst": ["svc:archivebox", "svc:archivewarrior", "svc:scrutiny", "svc:kopia", "svc:rustfs"],
+			"ip":  ["tcp:443"],
+		},
+		{
+			// privusers' personal devices -> media apps (Apple TV etc. use the LAN, see security/media.md)
+			"src": ["group:privusers"],
+			"dst": ["svc:jellyfin", "svc:komga"],
 			"ip":  ["tcp:443"],
 		},
 		{
@@ -246,6 +255,13 @@
 			"accept": ["svc:archivebox:443", "svc:archivewarrior:443", "svc:scrutiny:443", "svc:kopia:443", "svc:rustfs:443"],
 		},
 		{"src": "macmini", "accept": ["svc:archivebox:443", "svc:kopia:443"]},
+		{
+			// media apps as services: privusers yes; other hosts and the lab no
+			"src":    "${TS_PRIVUSER}",
+			"accept": ["svc:jellyfin:443", "svc:komga:443"],
+		},
+		{"src": "tag:observed", "deny": ["svc:jellyfin:443", "svc:komga:443"]},
+		{"src": "tag:hypervisor", "deny": ["svc:jellyfin:443", "svc:komga:443"]},
 		{
 			// lab hypervisors reach the ISO export (NFSv4) on the storage host, nothing else in home
 			"src":    "tag:hypervisor",
