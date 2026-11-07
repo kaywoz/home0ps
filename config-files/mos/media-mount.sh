@@ -3,8 +3,9 @@
 # LXCs that bind it (kaywoz/home0ps#197, #174). Idempotent: run it at boot and as a watchdog.
 #
 # Cron (as root on MOS):
-#   @reboot      /boot/config/home0ps/media-mount.sh
-#   */5 * * * *  /boot/config/home0ps/media-mount.sh     # watchdog: remounts if the mount died
+#   @reboot      bash /boot/config/home0ps/media-mount.sh
+#   */5 * * * *  bash /boot/config/home0ps/media-mount.sh     # watchdog: remounts if the mount died
+# (via bash: /boot on MOS doesn't allow executing files directly)
 #
 #   media-mount.sh            mount (if needed), then start/restart the LXCs (if needed)
 #   media-mount.sh --check    report only, change nothing; exit 1 if anything is wrong
@@ -35,7 +36,7 @@ MODE=apply
 case "${1:-}" in
   --check) MODE=check ;;
   --umount) MODE=umount ;;
-  -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
+  -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
   "") ;;
   *) echo "unknown option: $1" >&2; exit 1 ;;
 esac
@@ -54,7 +55,8 @@ for v in RCLONE_CONFIG REMOTE CACHE_DIR LOG_FILE; do [ -n "${!v:-}" ] || die "$v
 [ -r "$RCLONE_CONFIG" ] || die "rclone config $RCLONE_CONFIG not readable"
 command -v "$RCLONE_BIN" >/dev/null || die "$RCLONE_BIN not found"
 
-# one run at a time (the watchdog can overlap a slow boot mount)
+# one run at a time (the watchdog can overlap a slow boot mount). Long-lived children (the rclone
+# daemon, the LXC monitor) get fd 9 closed (9>&-), or they'd hold the lock for as long as they run.
 exec 9>/run/media-mount.lock
 command -v flock >/dev/null 2>&1 && { flock -n 9 || { log "another run is active, skipping"; exit 0; }; }
 
@@ -103,7 +105,7 @@ if ! is_healthy; then
     --vfs-cache-max-size "$CACHE_MAX_SIZE" --vfs-cache-max-age "$CACHE_MAX_AGE" \
     --vfs-read-ahead "$READ_AHEAD" --dir-cache-time "$DIR_CACHE_TIME" \
     --log-file "$LOG_FILE" --log-level NOTICE \
-    --daemon --daemon-wait 60s
+    --daemon --daemon-wait 60s 9>&-
   is_healthy || die "mount did not come up — see $LOG_FILE"
   log "mounted"; MOUNTED_NOW=1
 fi
@@ -112,8 +114,8 @@ fi
 # A stopped LXC is only started when this run mounted: the watchdog leaves a stopped LXC alone.
 for c in $LXCS; do
   if ! lxc_running "$c"; then
-    if [ "$MOUNTED_NOW" = 1 ]; then log "starting LXC $c"; lxc-start -n "$c"; fi
+    if [ "$MOUNTED_NOW" = 1 ]; then log "starting LXC $c"; lxc-start -n "$c" 9>&-; fi
   elif ! lxc_sees_media "$c"; then
-    log "LXC $c started before the mount: restarting it"; lxc-stop -n "$c"; lxc-start -n "$c"
+    log "LXC $c started before the mount: restarting it"; lxc-stop -n "$c"; lxc-start -n "$c" 9>&-
   fi
 done
