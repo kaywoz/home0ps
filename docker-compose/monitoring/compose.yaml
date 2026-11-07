@@ -108,6 +108,7 @@ services:
       # Remote hosts over the tailnet: each host's read-only socket proxy (POST=0), served on its
       # tailnet address port 2375 (grant tag:monitoring -> tag:observed tcp:2375). No agents: an
       # agent needs the full Docker socket and allows exec into containers.
+      # Label each host with its actual hostname (host-local .env only, never in git).
       DOZZLE_REMOTE_HOST: ${DOZZLE_REMOTE_HOST}
     ports:
       - "127.0.0.1:8082:8080"        # svc:dozzle via tailscale serve
