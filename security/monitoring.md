@@ -12,7 +12,7 @@ Rebuild: [`config-files/rpi/HARDENING.md`](../config-files/rpi/HARDENING.md) + [
 | Services reachable from LAN/internet | UIs only as Tailscale Services on 443 (`svc:gatus`, `svc:beszel`, `svc:dozzle`, `svc:logtide`, `svc:logtide-api`, `svc:healthchecks`, `svc:cockpit-janky`); all ports on `127.0.0.1`, Beszel agent on `172.31.250.1` (bridge gateway only) |
 | Non-tailnet inbound | Only LAN syslog (UDP/TCP 514), restricted to LAN ranges, not on the Tailscale interface — kaywoz/home0ps#97 |
 | Tailscale feature abuse | `tag:monitoring` only; no `--accept-routes`; stale nodes removed. Tailscale SSH on: privusers only, admin account only, 24h check, never root (`sshTests`); sshd stays on the LAN address as break-glass |
-| Over-broad tailnet access | Admin grant to the `svc:*` list on 443; explicit outbound grants per flow (agent pulls on 45876/7007); observed hosts may push only to `svc:logtide-api`, `svc:healthchecks` and `svc:beszel` (Beszel agent WebSocket), each with an ACL test |
+| Over-broad tailnet access | Admin grant to the `svc:*` list on 443; explicit outbound grants per flow (Beszel agent pull on 45876, Dozzle reads remote hosts' read-only socket proxies on 2375); observed hosts may push only to `svc:logtide-api`, `svc:healthchecks` and `svc:beszel` (Beszel agent WebSocket), each with an ACL test |
 | Wireless / serial attack surface | Wi-Fi, Bluetooth, UART disabled (`-pi5` overlays) |
 
 ## Authentication
@@ -27,7 +27,7 @@ Rebuild: [`config-files/rpi/HARDENING.md`](../config-files/rpi/HARDENING.md) + [
 | Risk | Control |
 |---|---|
 | `userns-remap` exemptions | Only the socket proxy (must open `docker.sock`) and the Beszel agent (host networking; runs as real UID 65534) |
-| Docker control via monitoring tools | Dozzle actions off; Beszel agent and Dozzle read through the socket proxy (`POST=0`) |
+| Docker control via monitoring tools | Dozzle actions off; Beszel agent and Dozzle read through the socket proxy (`POST=0`). Remote hosts also only through their own `POST=0` proxies (Dozzle remote-host mode), never Dozzle agents: an agent needs the full socket and allows exec into containers (decided 2026-11-07) |
 | This host controlling others | No write paths outward (no Dockhand/Hawser here); agents are pulled over scoped grants, or push to the hub's Service; inbound pushes reach only those three Services |
 | Direct DB access | LogTide Postgres/Redis on the internal `logtide-db` network, no published ports |
 | Compromised log shipper | Fluent Bit as `fluentbit` (`systemd-journal`), no capabilities, `ProtectSystem=strict`, `MemoryMax` |
@@ -46,7 +46,6 @@ Rebuild: [`config-files/rpi/HARDENING.md`](../config-files/rpi/HARDENING.md) + [
 
 | Risk | Control |
 |---|---|
-| Default trust material | Own Dozzle Ed25519 mTLS pair; expiry (~5 years) tracked |
 | Gatus secrets | `security.yaml`, `heartbeat.yaml`, `alerting.yaml` as files (`600`, owned 165534), gitignored |
 
 ## Detection
@@ -61,7 +60,7 @@ Rebuild: [`config-files/rpi/HARDENING.md`](../config-files/rpi/HARDENING.md) + [
 
 - `userns-remap` exemptions: socket proxy, Beszel agent.
 - LogTide and Healthchecks secrets are env vars (visible via the socket proxy).
-- Dozzle mTLS key shared across agent hosts; the ACL is the primary gate.
+- Dozzle → remote socket proxies is plain HTTP inside WireGuard (no TLS of its own); the ACL grant (tcp:2375, `tag:monitoring` only) is the gate, and the proxies only allow read calls. Dozzle documents remote-host mode as superseded by agents (no upstream support for its issues).
 - Gatus doesn't log failed logins.
 
 ## Open issues
