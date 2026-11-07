@@ -8,6 +8,7 @@ Shared controls for every home0ps system. Each host role adds its own summary in
 |---|---|
 | Monitoring host (Raspberry Pi 5) | [`security/monitoring.md`](security/monitoring.md) |
 | Apps host (Intel N305) | [`security/apps.md`](security/apps.md) |
+| Media LXC (on the storage host, VLAN 13) | [`security/media.md`](security/media.md) |
 | Storage host (MOS NAS) | `security/storage.md` — later |
 | Lab (XCP-ng) | `security/lab.md` — later, not home0ps production |
 
