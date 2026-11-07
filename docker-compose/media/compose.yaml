@@ -72,9 +72,13 @@ services:
     network_mode: host
     read_only: true
     cap_drop: [ALL]
-    cap_add:                           # its D-Bus daemon starts as root and switches to `messagebus`
-      - SETUID                         # (dbus bus/audit.c: capng_change_id); tested: these two suffice
-      - SETGID
+    cap_add:                           # tested one by one on the media LXC (2026-11-07):
+      - SETUID                         # D-Bus + avahi switch to their own users (dbus bus/audit.c,
+      - SETGID                         #   avahi caps.c keeps exactly SYS_CHROOT, SETUID, SETGID)
+      - SYS_CHROOT                     # avahi chroots itself
+      - CHOWN                          # go2rtc chowns its socket in /run/go2rtc
+    # KNOWN ISSUE: homey-matter-daemon crashes right after start (core dump), even with privileged:
+    # true — not a permission problem. Homey then exits (ERR_STREAM_DESTROYED). Open with Athom.
     security_opt:
       - no-new-privileges:true
     tmpfs:

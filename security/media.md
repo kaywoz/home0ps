@@ -12,7 +12,7 @@ Rebuild: [`config-files/mos/create-lxc.sh`](../config-files/mos/create-lxc.sh) o
 |---|---|
 | IoT devices reaching the LXC | Only Jellyfin **8096/tcp + 7359/udp** on the LXC's VLAN 13 address — an explicit exception to "ports on 127.0.0.1" so Apple TV and other VLAN 13 clients can play and discover (kaywoz, 2026-11-07). No DLNA, no host network for Jellyfin. Homey listens on the LAN by design (see below). No sshd in the LXC (verified: `baseline.sh` "no sshd (container)") |
 | Over-broad tailnet access | `tag:media` + `tag:observed`; Komga and Jellyfin for phones/laptops as `svc:komga` / `svc:jellyfin` *(planned)*; Tailscale SSH: privusers, admin account only, 24h check, never root |
-| Homey on host network | Needed for its LAN role (bridges, discovery on VLAN 13). Runs **without `privileged`** (Athom's guide uses it; dropped, kaywoz 2026-11-07), `cap_drop: [ALL]` plus only `SETUID`/`SETGID` for its D-Bus daemon to switch user, `/run` as tmpfs |
+| Homey on host network | Needed for its LAN role (bridges, discovery on VLAN 13). Runs **without `privileged`** (Athom's guide uses it; dropped, kaywoz 2026-11-07), `cap_drop: [ALL]` plus only `SETUID`, `SETGID`, `SYS_CHROOT`, `CHOWN` (D-Bus, avahi, go2rtc switching users / chroot / socket ownership), `/run` as tmpfs. **Not running yet:** its Matter daemon crashes in Docker-in-LXC even with `privileged` (#174) |
 
 ## Credentials
 
