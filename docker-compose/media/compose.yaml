@@ -76,6 +76,7 @@ services:
       - no-new-privileges:true
     tmpfs:
       - /tmp:size=128m
+      - /run:size=16m                  # Homey starts its own D-Bus daemon (/run/dbus) at boot
     pids_limit: 300
     mem_limit: 768m                    # Athom: ~200-300 MB in use
     environment:
