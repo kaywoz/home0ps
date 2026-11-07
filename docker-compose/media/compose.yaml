@@ -72,6 +72,9 @@ services:
     network_mode: host
     read_only: true
     cap_drop: [ALL]
+    cap_add:                           # its D-Bus daemon starts as root and switches to `messagebus`
+      - SETUID                         # (dbus bus/audit.c: capng_change_id); tested: these two suffice
+      - SETGID
     security_opt:
       - no-new-privileges:true
     tmpfs:
