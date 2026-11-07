@@ -176,13 +176,6 @@
 			"ip":  ["tcp:2049"],
 		},
 		{
-			//ha to synonology dsm portal
-			"src": ["tag:ha"],
-
-			"dst": ["tag:storage"],
-			"ip":  ["tcp:*"],
-		},
-		{
 			"src": ["tag:monitoring"],
 			"dst": ["macmini"],
 			"ip":  ["tcp:45876"],
@@ -265,6 +258,8 @@
 		// the read-only Docker APIs are for the monitoring host only, not for admins' devices
 		{"src": "${TS_PRIVUSER}", "deny": ["tag:media:2375", "tag:infra:2375"]},
 		{"src": "tag:hypervisor", "deny": ["svc:jellyfin:443", "svc:komga:443"]},
+		// home automation has no path to the storage host (old tcp:* grant removed)
+		{"src": "tag:ha", "deny": ["tag:storage:443", "tag:storage:445", "tag:storage:2375", "tag:storage:5000"]},
 		{
 			// lab hypervisors reach the ISO export (NFSv4) on the storage host, nothing else in home
 			"src":    "tag:hypervisor",
