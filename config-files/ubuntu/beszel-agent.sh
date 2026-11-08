@@ -82,16 +82,21 @@ fi
 step "verify"
 systemctl is-active --quiet "$UNIT" && ok "$UNIT running" || bad "$UNIT not running (journalctl -u $UNIT)"
 grep -qx "Environment=\"LISTEN=${TS_IP}:45876\"" "$DROPIN" 2>/dev/null && ok "LISTEN=${TS_IP}:45876 in drop-in" || bad "drop-in missing or LISTEN not ${TS_IP}:45876"
+# The agent only listens (SSH fallback) while its WebSocket to the hub is down: once connected it
+# stops the server (beszel agent/connection_manager.go). Nothing or only the tailnet IP is fine.
 L=$(ss -Hltnp 2>/dev/null | awk '/beszel-agent/ {print $4}' | sort -u | tr '\n' ' ')
-[ "$L" = "${TS_IP}:45876 " ] && ok "listens only on ${TS_IP}:45876" || bad "listens on: ${L:-nothing}"
+case "$L" in
+  "") ok "not listening (WebSocket to the hub is up; SSH fallback starts on ${TS_IP}:45876 only when it drops)" ;;
+  "${TS_IP}:45876 ") ok "listens only on ${TS_IP}:45876 (SSH fallback active)" ;;
+  *) bad "listens on: $L" ;;
+esac
 in_group docker && bad "beszel in docker group (full socket)" || ok "beszel not in docker group"
 if in_group disk; then [ "$VIRT" = none ] && ok "beszel in disk (bare metal, S.M.A.R.T.)" || bad "beszel in disk on a $VIRT guest"
 else ok "beszel not in disk"; fi
 curl -s --max-time 5 http://127.0.0.1:2375/_ping | grep -qx OK && ok "read-only proxy answers on 127.0.0.1:2375" || bad "no proxy on 127.0.0.1:2375 (Docker stats will be missing)"
-if journalctl -u "$UNIT" --since "-2min" --no-pager 2>/dev/null | grep -qi 'connection failed'; then
-  bad "WebSocket to the hub failed in the last 2 minutes (journalctl -u $UNIT)"
-else
-  echo "  no hub connection errors in the last 2 minutes — confirm the host is green in Beszel"
-fi
+LOG=$(journalctl -u "$UNIT" --since "-2min" --no-pager 2>/dev/null || true)
+if echo "$LOG" | grep -q 'WebSocket connected'; then ok "WebSocket connected to the hub"
+elif echo "$LOG" | grep -qi 'connection failed'; then bad "WebSocket to the hub failed (journalctl -u $UNIT)"
+else echo "  no connection message in the last 2 minutes — confirm the host is green in Beszel"; fi
 
 echo; [ "$FAILS" = 0 ] && echo "all checks passed" || { echo "$FAILS check(s) failed"; exit 1; }
