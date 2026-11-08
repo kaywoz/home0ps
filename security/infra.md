@@ -11,8 +11,8 @@ Rebuild: [`baseline.sh`](../config-files/ubuntu/baseline.sh) then [`docker-host.
 | Risk | Control |
 |---|---|
 | Over-broad tailnet access | `tag:infra` + `tag:observed` + `tag:ssh`; nothing served yet. Inbound: monitoring host → tcp:45876 (Beszel agent) and tcp:2375 (read-only socket proxy, Dozzle); privusers are denied 2375 (ACL test) |
-| Docker API exposure | `docker-socket-proxy` (`CONTAINERS`, `INFO`, `EVENTS`; `POST=0`) on bridge, `127.0.0.1:2375` only, exposed via `tailscale serve --tcp=2375` *(untested)* |
-| Beszel agent | Native binary + systemd service from Beszel's install script (not a container), pushing to `svc:beszel`. Found 2026-11-08: listening on `*:45876` (LAN too), user `beszel` in `disk` (raw block devices), not in `docker` (no Docker stats). Hardened by [`beszel-agent.sh`](../config-files/ubuntu/beszel-agent.sh): drop-in with `LISTEN=<tailnet-ip>:45876` and `DOCKER_HOST` → the read-only proxy, `beszel` out of `docker` and (on VMs) `disk` *(untested)* |
+| Docker API exposure | `docker-socket-proxy` (`CONTAINERS`, `INFO`, `EVENTS`; `POST=0`) on bridge, `127.0.0.1:2375` only, exposed via `tailscale serve --tcp=2375`; from the monitoring host read OK, write `POST`→403 (2026-11-08); LAN refusal *(untested)* |
+| Beszel agent | Native binary + systemd service from Beszel's install script (not a container), pushing to `svc:beszel`. Found 2026-11-08: listening on `*:45876` (LAN too), user `beszel` in `disk` (raw block devices), not in `docker` (no Docker stats). Hardened by [`beszel-agent.sh`](../config-files/ubuntu/beszel-agent.sh): drop-in with `LISTEN=<tailnet-ip>:45876` and `DOCKER_HOST` → the read-only proxy, `beszel` out of `docker` and (on VMs) `disk` — `--verify` passed 2026-11-08; idle listener while connected, Docker stats via the proxy |
 
 ## Containment
 
