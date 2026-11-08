@@ -98,7 +98,7 @@ services:
   # only tag:monitoring may reach it (policy grant + test).
   socketproxy:
     image: tecnativa/docker-socket-proxy:latest
-    container_name: kr-ccp-socketproxy-0102
+    container_name: kr-ccp-socketproxy-0201
     restart: unless-stopped
     read_only: true
     tmpfs:
