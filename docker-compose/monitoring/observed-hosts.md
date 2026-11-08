@@ -2,11 +2,10 @@
 
 How a host becomes visible to the monitoring host: Docker logs in Dozzle (remote-host mode through a read-only socket proxy) and metrics in Beszel. Design and reasons: kaywoz/home0ps#138, [`security/monitoring.md`](../../security/monitoring.md). Done so far: media LXC, storage host, infra VM; apps VM in progress.
 
-Values used below — set them once per shell:
+Values used below — set them in the monitoring host's shell. The IP is looked up from the tailnet, so a value from an earlier host can't carry over:
 
 ```bash
-IP=<host-tailnet-ip>          # tailscale ip -4 on the host
-FQDN=<hostname>.<tailnet>.ts.net
+H=<hostname>; IP=$(tailscale ip -4 "$H"); echo "$H -> $IP"
 ```
 
 The host's MagicDNS name, which is also its Dozzle label, can be read on the host itself:
@@ -68,13 +67,11 @@ Expect `OK`, then `403`. From a LAN device, the host's LAN address on 2375 must 
 
 ## 5. Dozzle (monitoring host)
 
-Append the host to `DOZZLE_REMOTE_HOST` (skipped if already listed; needs at least one existing entry) and recreate Dozzle:
+Rebuild `DOZZLE_REMOTE_HOST` from the list of **all** observed hosts (hostnames, not in git), with each IP looked up from the tailnet — rerunnable, no duplicates, no stale IPs; nothing is written if any host doesn't resolve:
 
 ```bash
-cd /srv/docker && { grep -q "|$FQDN" .env || sudo sed -i "s#^\(DOZZLE_REMOTE_HOST=.*\)\$#\1,tcp://$IP:2375|$FQDN#" .env; } && grep '^DOZZLE_REMOTE_HOST=' .env && docker compose up -d dozzle
+cd /srv/docker && HOSTS="<host> <host> ..." TN=<tailnet>.ts.net; L=; for h in $HOSTS; do ip=$(tailscale ip -4 "$h") && [ -n "$ip" ] || { echo "no tailnet IP for $h"; L=; break; }; L="$L${L:+,}tcp://$ip:2375|$h.$TN"; done; [ -n "$L" ] && sudo sed -i "s#^DOZZLE_REMOTE_HOST=.*#DOZZLE_REMOTE_HOST=$L#" .env && grep '^DOZZLE_REMOTE_HOST=' .env && docker compose up -d dozzle
 ```
-
-For the very first entry, set the line by hand: `DOZZLE_REMOTE_HOST=tcp://<ip>:2375|<fqdn>`.
 
 ## Publishing an admin UI as a Tailscale Service
 
@@ -91,7 +88,7 @@ Check with `tailscale serve status`; the "approval from an admin is required" me
 
 ## Speeding this up (ideas, parked)
 
-- **`dozzle-add-host.sh <ip> <fqdn>`** on the monitoring host: the step-5 one-liner as a script that also handles an empty list and validates the IP.
-- **`onboard-observed.sh`** on the host: step 2's `tailscale serve` + local `_ping`, step 3's data-folder ownership, and print `IP`/`FQDN` for steps 4–5.
+- **Host list in `.env`:** keep the observed hostnames in a host-local variable (e.g. `DOZZLE_HOSTS`), so step 5 needs no typing at all.
+- **`onboard-observed.sh`** on the host: step 2's `tailscale serve` + local `_ping`, step 3's data-folder ownership, and print the tailnet IP for the hub.
 - **Tag at join:** `baseline.sh` already prints `tailscale up --advertise-tags=${TS_TAG}` (default `tag:observed`), but takes one tag; accepting a list (role tag + `tag:observed`) would skip step 1 for new hosts. Hosts not built with `baseline.sh` (MOS) still need the console.
 - **Compose hosts:** keep `socketproxy` and the Beszel agent in every host's compose, so step 2–3 is `docker compose up -d`.
