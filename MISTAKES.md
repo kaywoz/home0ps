@@ -607,10 +607,15 @@ mistakes, not a diary.
 - **Root cause:** copied the name from the monitoring compose without
   checking which instance numbers were used; no register of names existed.
 - **Fix applied:** `docker-compose/CONTAINERS.md` registers every container
-  per host role; media → `-0201`, storage host → `-0301` (creation order),
-  storage Beszel agent → `kr-ccp-beszelagent-0201`; MOS deploy settings and
-  the onboarding runbook name the container.
+  per host role; media → `-0102`, storage host → `-0103`, storage Beszel
+  agent → `kr-ccp-beszelagent-0102`; MOS deploy settings and the onboarding
+  runbook name the container. The first fix numbered them `-0201`/`-0301`,
+  reading the suffix as an instance counter; it is **individual + group**
+  (`0101` = 1st individual in group 1, a separate instance is a new group,
+  an HA pair shares one) — kaywoz corrected it, now spelled out in
+  CLAUDE.md §8.
 - **Rule going forward:** before naming a new container, look up the next
-  free instance number in `docker-compose/CONTAINERS.md` and add the new
-  container there in the same change; deploy instructions always state the
-  container name.
+  free group in `docker-compose/CONTAINERS.md` and add the new container
+  there in the same change; deploy instructions always state the container
+  name. Don't infer a naming scheme from one example — ask what each part
+  means.

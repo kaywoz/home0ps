@@ -258,6 +258,9 @@ change explicitly if one no longer fits.
     own auth (prefer OIDC + MFA), logged, own security-summary entry.
 - **Container names:** `<location>-<class>-<service>-<GGMM>`, e.g.
   `kr-ccp-gatus-0101` (kr = Krypinet, ccp = Custom Container Production).
+  Suffix = individual + group: `0101` is the 1st individual in group 1; an
+  independent second instance is a new group (`0102`); an HA pair shares a
+  group (`0103`, `0203`). Registered in `docker-compose/CONTAINERS.md`.
 - **Host layout:** `/srv/docker/compose.yaml` — one file, all services
   inline, no `include:` — plus one data subfolder per service. Host-level
   config lives in this repo (`config-files/`), not in `/srv/docker`.
