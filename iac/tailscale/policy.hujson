@@ -255,7 +255,7 @@
 		},
 		{"src": "tag:observed", "deny": ["svc:jellyfin:443", "svc:komga:443"]},
 		// the read-only Docker APIs are for the monitoring host only, not for admins' devices
-		{"src": "${TS_PRIVUSER}", "deny": ["tag:media:2375", "tag:infra:2375"]},
+		{"src": "${TS_PRIVUSER}", "deny": ["tag:media:2375", "tag:infra:2375", "tag:docker:2375"]},
 		{"src": "tag:hypervisor", "deny": ["svc:jellyfin:443", "svc:komga:443"]},
 		{
 			// lab hypervisors reach the ISO export (NFSv4) on the storage host, nothing else in home
