@@ -618,3 +618,20 @@ mistakes, not a diary.
   there in the same change; deploy instructions always state the container
   name. Don't infer a naming scheme from one example — ask what each part
   means.
+
+### 2026-11-08 — compose (infra Beszel agent)
+
+- **Trigger:** wrong assumption
+- **What happened:** the infra stack (PR 236) added a containerised Beszel
+  agent, but the infra VM (and the apps VM) already run Beszel's agent
+  natively as a systemd service. Two agents would fight over port 45876 and
+  show up twice in the hub.
+- **Root cause:** didn't check the host for an existing agent before writing
+  the stack; `security/apps.md` already hinted at a running agent.
+- **Fix applied:** container agent removed from the infra stack; the native
+  agent is documented, with its hardening planned; the onboarding runbook
+  checks for a native agent first.
+- **Rule going forward:** before adding an agent or service to a host, check
+  what already runs there (`systemctl list-units`, `docker ps -a`, listening
+  ports) — not only the containers.
+
