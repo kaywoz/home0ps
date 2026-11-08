@@ -595,3 +595,26 @@ mistakes, not a diary.
 - **Rule going forward:** display names in host-local config (`.env`, UIs)
   use the host's MagicDNS name (`<hostname>.<tailnet>.ts.net`); the role-name rule
   applies only to what goes into git, where the tailnet name stays a placeholder.
+
+### 2026-11-08 — compose (container instance numbers)
+
+- **Trigger:** kaywoz had to correct it
+- **What happened:** the media LXC's socket proxy was named
+  `kr-ccp-socketproxy-0101` in its compose (PR 230), the same name as the
+  monitoring host's. The storage host's proxy was deployed as
+  `kr-ccp-dockerproxy-0101` (wrong service name, number taken) because the
+  MOS deploy settings (PR 234) gave no container name at all.
+- **Root cause:** copied the name from the monitoring compose without
+  checking which instance numbers were used; no register of names existed.
+- **Fix applied:** `docker-compose/CONTAINERS.md` registers every container
+  per host role; media → `-0201`, storage host → `-0301`, storage Beszel
+  agent → `kr-ccp-beszelagent-0201`; MOS deploy settings and the onboarding
+  runbook name the container. Along the way the suffix was first read as a
+  counter, then as individual + group; after discussing readability kaywoz
+  settled on **group, then member** (GGMM) and a written standard,
+  `NAMING.md`, covering devices too.
+- **Rule going forward:** before naming a new container, look up the next
+  free group in `docker-compose/CONTAINERS.md` and add the new container
+  there in the same change; deploy instructions always state the container
+  name. Don't infer a naming scheme from one example — ask what each part
+  means.

@@ -256,8 +256,11 @@ change explicitly if one no longer fits.
     hardware.
   - Both are tier 0 for their zone: UI only via their Tailscale Services,
     own auth (prefer OIDC + MFA), logged, own security-summary entry.
-- **Container names:** `<location>-<class>-<service>-<GGMM>`, e.g.
-  `kr-ccp-gatus-0101` (kr = Krypinet, ccp = Custom Container Production).
+- **Names:** [`NAMING.md`](NAMING.md) — physical hardware gets a `-y`
+  name (never in git); everything logical is
+  `<site>-<type><platform><env>-<service>-<GGMM>`, e.g. `kr-ccp-gatus-0101`,
+  GGMM = group then member. Containers are registered in
+  `docker-compose/CONTAINERS.md`; take the next free group there.
 - **Host layout:** `/srv/docker/compose.yaml` — one file, all services
   inline, no `include:` — plus one data subfolder per service. Host-level
   config lives in this repo (`config-files/`), not in `/srv/docker`.

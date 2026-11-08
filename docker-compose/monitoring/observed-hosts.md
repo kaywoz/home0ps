@@ -21,6 +21,8 @@ Add `tag:observed` to the host, keeping its role tag. Use the console, not `tail
 
 ## 2. Socket proxy on the host
 
+Name every new container from the [container register](../CONTAINERS.md) (next free group number) and add it there in the same change.
+
 - **Compose hosts:** the `socketproxy` service as in [`../media/compose.yaml`](../media/compose.yaml) (bridge, `127.0.0.1:2375`, `POST=0`), `docker compose up -d socketproxy`.
 - **MOS:** Docker Socket Proxy template with the deploy settings in [`config-files/mos/containers.md`](../../config-files/mos/containers.md). Network bridge, never host.
 
