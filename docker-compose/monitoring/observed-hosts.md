@@ -40,6 +40,8 @@ Check first whether an agent already runs natively (Beszel's install script; the
 systemctl is-active beszel-agent; id beszel 2>/dev/null
 ```
 
+Native agent (Ubuntu/Debian): harden it with [`config-files/ubuntu/beszel-agent.sh`](../../config-files/ubuntu/beszel-agent.sh) — tailnet-only `LISTEN`, Docker through the read-only proxy, out of the `docker`/`disk` groups — after the proxy is up. Otherwise, the container agent:
+
 In the hub, add the system (host `$IP`, port 45876) and copy key and token. Agent: host network, `DOCKER_HOST=tcp://127.0.0.1:2375`, `LISTEN=<tailnet-ip>:45876`, `HUB_URL=https://beszel.<tailnet>.ts.net`, runs as uid 65534.
 
 Data folder permissions before the first start (the agent can't write its state otherwise). Under `userns-remap` without `userns_mode: host` the owner is `165534` instead:
