@@ -1,5 +1,7 @@
 # Apps host security design
 
+> **Being re-planned (kaywoz/home0ps#174):** the apps role moved from the bare-metal N305 into the **apps VM on the storage host (MOS)**. Rows below that describe the bare-metal host (switch port, Cockpit service name) are to be reviewed with #118/#174; the monitoring rows reflect the VM (2026-11-08).
+
 Intel N305 (4× 2.5GbE, dual NVMe), **Ubuntu 26.04 LTS**. Runs **trusted, well-known apps only**, all as containers; anything risky or needing `privileged` goes to the XCP-ng lab instead. Builds on the [global baseline](../SECURITY.md); this file lists only what is specific to this role.
 
 Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh) then [`docker-host.sh`](../config-files/ubuntu/docker-host.sh) — both ran clean on this host (2026-10-19). Build-out: kaywoz/home0ps#118.
@@ -13,7 +15,7 @@ Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh)
 | Lateral movement from this host | UniFi zone with internet-only egress; switch port VLAN 31 native + 13 tagged only, never management *(planned, #118)* |
 | Containers reaching other VLAN 31 hosts (storage host) | `DOCKER-USER` rule blocking container bridges → VLAN 31 *(planned, #118)* |
 | IoT-facing apps on VLAN 13 | macvlan on the VLAN 13 sub-interface, no host IP on it *(planned, #118)* — keeps the host itself off the IoT network |
-| Over-broad tailnet access | `tag:observed` only. Inbound from the tailnet: monitoring host → tcp:45876 (Beszel agent) and tcp:2375 (read-only socket proxy for Dozzle, via `tailscale serve`); privusers → tcp:22, 80, 443 (admin baseline grants). Outbound pushes limited to `svc:logtide-api`, `svc:healthchecks`, `svc:beszel` |
+| Over-broad tailnet access | `tag:docker` + `tag:observed` + `tag:ssh` (apps VM, 2026-11-08). Inbound from the tailnet: monitoring host → tcp:45876 (Beszel agent) and tcp:2375 (read-only socket proxy for Dozzle, via `tailscale serve`); privusers → tcp:22, 80, 443 (admin baseline grants). Outbound pushes limited to `svc:logtide-api`, `svc:healthchecks`, `svc:beszel` |
 | User-facing apps exposed | Via Cloudflare Tunnel + Access (outbound-only `cloudflared`, JWT validation on), never published ports *(planned, #118)* |
 | Admin UI exposure | Cockpit on `127.0.0.1:9091` only, published as `svc:cockpit-sexy`; `Origins` pinned, `LoginTo = false`, root disallowed |
 
@@ -31,7 +33,7 @@ Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh)
 |---|---|
 | Container escape to root | `userns-remap` (base 100000), `no-new-privileges` daemon-wide, `icc: false`, no userland proxy, `live-restore` (`docker-host.sh` `daemon`) |
 | App data ownership | Bind mounts owned by the remapped UID (container 65534 → 165534); `/srv/docker` owned by the admin user, mode 750 |
-| Docker control via monitoring agents | Beszel agent should read Docker through a read-only socket proxy (`POST=0`) per §8 *(unverified on this host — check the agent's `DOCKER_HOST`)*. Dozzle reads through a read-only socket proxy (remote-host mode), no agent *(planned, #138)* |
+| Docker control via monitoring agents | Read-only socket proxy `kr-ccp-socketproxy-0501` (`POST=0`, `127.0.0.1:2375`, `tailscale serve --tcp=2375`) for Dozzle and the native Beszel agent. Agent found 2026-11-08 with `PORT=45876` (SSH fallback would listen on all interfaces; idle while its WebSocket is up), in `disk`, not in `docker`; hardened by [`beszel-agent.sh`](../config-files/ubuntu/beszel-agent.sh): tailnet-only `LISTEN`, `DOCKER_HOST` → proxy, out of `disk` *(untested)* |
 | Risky workloads | Not run here: anything untrusted or `privileged` goes to the lab |
 
 ## Platform
