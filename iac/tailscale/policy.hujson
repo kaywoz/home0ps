@@ -17,7 +17,6 @@
 		"tag:monitoring": ["group:privusers"], //monitoring host(s): observation-only, pulls from observed hosts
 		"tag:proxy":      ["group:privusers"], //TODO: description
 		"tag:guests":     ["group:privusers"], //guest assets
-		"tag:ha":         ["group:privusers"], //all home automation
 		"tag:exit-node":  ["group:privusers"], //all exit-nodes
 		"tag:auto":       ["group:privusers"], //deployed via pipeline
 		"tag:ssh":        ["group:privusers"], //tailscale ssh access
@@ -50,7 +49,7 @@
 				"autogroup:self",
 				"tag:hypervisor", "tag:storage", "tag:service", "tag:docker", "tag:oob",
 				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests",
-				"tag:ha", "tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt", "tag:observed",
+				"tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt", "tag:observed",
 				"tag:infra", "tag:media",
 			],
 			"users":       ["${LOCAL_UNIX_ACCOUNT}"],
@@ -174,13 +173,6 @@
 			"src": ["tag:hypervisor"],
 			"dst": ["tag:storage"],
 			"ip":  ["tcp:2049"],
-		},
-		{
-			//ha to synonology dsm portal
-			"src": ["tag:ha"],
-
-			"dst": ["tag:storage"],
-			"ip":  ["tcp:*"],
 		},
 		{
 			"src": ["tag:monitoring"],
