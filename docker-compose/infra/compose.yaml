@@ -1,9 +1,9 @@
-# Infra VM (VLAN 24, tier 0): Dockhand-home and the home cloudflared tunnel later (CLAUDE.md §8,
+# Infra VM (VLAN 24, tier 0): Dockhand-home, and the home cloudflared tunnel later (CLAUDE.md §8,
 # kaywoz/home0ps#174). Deployed as /srv/docker/compose.yaml, one data folder per service.
-# This first part only makes the VM observable (kaywoz/home0ps#138, docker-compose/monitoring/observed-hosts.md):
-# a read-only socket proxy for Dozzle (and the Beszel agent, which runs natively here as a systemd
-# service, not as a container). Docker runs with userns-remap (docker-host.sh): the proxy opts out
-# with userns_mode: host to open docker.sock — same as on the monitoring host.
+# Observability (kaywoz/home0ps#138, docker-compose/monitoring/observed-hosts.md): a read-only socket
+# proxy for Dozzle and the native Beszel agent (systemd service, not a container).
+# Docker runs with userns-remap (docker-host.sh): the proxy and Dockhand opt out with
+# userns_mode: host to open docker.sock — same as the proxy on the monitoring host.
 services:
   socketproxy:
     image: tecnativa/docker-socket-proxy:latest
@@ -35,7 +35,41 @@ services:
       timeout: 3s
       retries: 3
 
+  # Dockhand-home: central Docker management (CLAUDE.md §8). Full Docker socket on this VM — the one
+  # exception to the socket-proxy rule (kaywoz, 2026-11-08); remote hosts through Hawser (standard
+  # mode, token, tcp:2376 over the tailnet). UI only as svc:dockhand. Ships with auth OFF: enable it
+  # (Settings > Authentication) right after the first start, before anyone else can reach it.
+  # Docs: https://dockhand.pro/manual (quick start, docker socket permissions, encryption).
+  dockhand:
+    image: fnsys/dockhand:latest
+    container_name: kr-ccp-dockhand-0101
+    restart: unless-stopped
+    userns_mode: host                # must open docker.sock under userns-remap
+    environment:
+      PUID: "2101"                   # entrypoint starts as root, fixes data ownership, drops to this
+      PGID: "2101"                   #   uid/gid (manual: docker socket permissions, option 3)
+      ORIGIN: ${DOCKHAND_ORIGIN}     # https://dockhand.<tailnet>.ts.net
+      DATA_DIR: /app/data
+    group_add:
+      - ${DOCKER_GID}                # host docker group: socket access for the dropped uid
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID] # entrypoint chown + privilege drop
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    mem_limit: 1g
+    ports:
+      - "127.0.0.1:3000:3000"        # svc:dockhand via tailscale serve
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./dockhand/data:/app/data    # db, .encryption_key (back it up), stacks
+    networks:
+      - proxy-dockhand               # egress: Hawser agents over the tailnet, registries
+
 networks:
   socketproxy:
     name: socketproxy
+    driver: bridge
+  proxy-dockhand:
+    name: proxy-dockhand
     driver: bridge
