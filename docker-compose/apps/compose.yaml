@@ -1,0 +1,41 @@
+# Apps VM (VLAN 31): trusted, well-known apps only (CLAUDE.md §8, kaywoz/home0ps#174, #118).
+# Deployed as /srv/docker/compose.yaml, one data folder per service.
+# This first part only makes the VM observable (kaywoz/home0ps#138, docker-compose/monitoring/observed-hosts.md):
+# a read-only socket proxy for Dozzle and the native Beszel agent (systemd service, hardened by
+# config-files/ubuntu/beszel-agent.sh). Docker runs with userns-remap (docker-host.sh): the proxy opts
+# out with userns_mode: host to open docker.sock — same as on the monitoring host and the infra VM.
+services:
+  socketproxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: kr-ccp-socketproxy-0501
+    restart: unless-stopped
+    userns_mode: host                # must be real root to open docker.sock under userns-remap
+    read_only: true
+    tmpfs:
+      - /run
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    mem_limit: 64m
+    environment:
+      - CONTAINERS=1   # list/inspect/logs/stats
+      - INFO=1
+      - EVENTS=1
+      - POST=0         # read-only API
+    ports:
+      - "127.0.0.1:2375:2375"        # native Beszel agent + tailscale serve --tcp=2375 for Dozzle
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro   # :ro restricts nothing; POST=0 does
+    networks:
+      - socketproxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:2375/_ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+networks:
+  socketproxy:
+    name: socketproxy
+    driver: bridge
