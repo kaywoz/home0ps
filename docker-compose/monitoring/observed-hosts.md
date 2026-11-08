@@ -1,6 +1,6 @@
 # Onboarding an observed host (Dozzle + Beszel)
 
-How a host becomes visible to the monitoring host: Docker logs in Dozzle (remote-host mode through a read-only socket proxy) and metrics in Beszel. Design and reasons: kaywoz/home0ps#138, [`security/monitoring.md`](../../security/monitoring.md). Done so far: media LXC, storage host.
+How a host becomes visible to the monitoring host: Docker logs in Dozzle (remote-host mode through a read-only socket proxy) and metrics in Beszel. Design and reasons: kaywoz/home0ps#138, [`security/monitoring.md`](../../security/monitoring.md). Done so far: media LXC, storage host; infra VM in progress.
 
 Values used below — set them once per shell:
 
