@@ -635,3 +635,18 @@ mistakes, not a diary.
   what already runs there (`systemctl list-units`, `docker ps -a`, listening
   ports) — not only the containers.
 
+### 2026-11-08 — ubuntu (beszel-agent.sh verify)
+
+- **Trigger:** script check failed on the host
+- **What happened:** `beszel-agent.sh --verify` failed "listens on:
+  nothing" on the infra VM although the agent was healthy.
+- **Root cause:** assumed the agent always listens on 45876; it only runs
+  its SSH server while the WebSocket to the hub is down and stops it once
+  connected (`agent/connection_manager.go`). The storage host's log had
+  shown this order (WebSocket failed → SSH server started).
+- **Fix applied:** the check accepts no listener or the tailnet IP only, and
+  confirms "WebSocket connected" in the log.
+- **Rule going forward:** before writing a check for an app's behaviour,
+  read how the app actually behaves (source or docs) — including states
+  where it legitimately does nothing.
+
