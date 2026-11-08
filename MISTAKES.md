@@ -650,3 +650,20 @@ mistakes, not a diary.
   read how the app actually behaves (source or docs) — including states
   where it legitimately does nothing.
 
+### 2026-11-08 — compose (Dozzle host list)
+
+- **Trigger:** host setup broke (Dozzle missing a host)
+- **What happened:** `DOZZLE_REMOTE_HOST` ended up with duplicate entries
+  (storage host, infra VM) and the apps VM under the infra VM's IP, so
+  Dozzle dropped it as a duplicate.
+- **Root cause:** the first append one-liner had no duplicate guard, and
+  the later one took `IP` from a shell variable typed by hand — a value left
+  over from the previous host was reused. Placeholders like `<apps-ip>` in
+  commands also got run literally.
+- **Fix applied:** the runbook rebuilds the whole line from a list of
+  hostnames and looks each IP up with `tailscale ip -4 <host>`; rerunnable,
+  writes nothing if a host doesn't resolve.
+- **Rule going forward:** commands for kaywoz derive values on the host
+  (lookups) instead of asking for them to be typed; any edit to a list in
+  a config file is a full, idempotent rebuild, not an append.
+
