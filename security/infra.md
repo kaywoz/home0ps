@@ -24,8 +24,9 @@ Rebuild: [`baseline.sh`](../config-files/ubuntu/baseline.sh) then [`docker-host.
 ## Planned: Dockhand-home (kaywoz/home0ps#174)
 
 Decided 2026-11-08, details in its PR:
-- Its own VM through a **separate write-enabled socket proxy** (start/stop/restart, images, networks, volumes) on an internal network, **`EXEC` off** (no shell or file browser into containers here); never `docker.sock` in Dockhand itself.
-- Storage host and apps VM through **Hawser, standard mode** (agent listens with a token on the tailnet IP, one grant `tag:infra` → those hosts tcp:2376). Hawser needs the full Docker socket: Dockhand ≈ root on those hosts (accepted, §8), and there `EXEC` can't be blocked by a proxy.
+- Its own VM through the **full Docker socket** — the one exception to "only the socket proxy mounts `docker.sock`" (kaywoz, 2026-11-08): this is where write access to Docker is consolidated, and a write-enabled proxy would add no real protection (`POST` + container create already allows a privileged container with host user namespace, i.e. root on the VM).
+- Storage host and apps VM through **Hawser, standard mode** (agent listens with a token on the tailnet IP, one grant `tag:infra` → those hosts tcp:2376). Hawser needs the full Docker socket: Dockhand ≈ root on those hosts (accepted, §8).
+- Terminal/exec into containers is therefore available on all managed hosts; the controls are around Dockhand: UI only as `svc:dockhand` for admins, auth on before serving, Hawser tokens on tailnet IPs, one grant per flow.
 - UI only as `svc:dockhand`, auth enabled before serving (it ships with auth off), admins only.
 
 ## Accepted risks (this role)
