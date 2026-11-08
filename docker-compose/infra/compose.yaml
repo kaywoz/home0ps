@@ -1,9 +1,9 @@
 # Infra VM (VLAN 24, tier 0): Dockhand-home and the home cloudflared tunnel later (CLAUDE.md §8,
 # kaywoz/home0ps#174). Deployed as /srv/docker/compose.yaml, one data folder per service.
 # This first part only makes the VM observable (kaywoz/home0ps#138, docker-compose/monitoring/observed-hosts.md):
-# a read-only socket proxy for Dozzle and the Beszel agent.
-# Docker runs with userns-remap (docker-host.sh): both services opt out with userns_mode: host,
-# the proxy to open docker.sock, the agent for host networking — same as on the monitoring host.
+# a read-only socket proxy for Dozzle (and the Beszel agent, which runs natively here as a systemd
+# service, not as a container). Docker runs with userns-remap (docker-host.sh): the proxy opts out
+# with userns_mode: host to open docker.sock — same as on the monitoring host.
 services:
   socketproxy:
     image: tecnativa/docker-socket-proxy:latest
@@ -24,7 +24,7 @@ services:
       - EVENTS=1
       - POST=0         # read-only API
     ports:
-      - "127.0.0.1:2375:2375"        # Beszel agent (host network) + tailscale serve --tcp=2375 for Dozzle
+      - "127.0.0.1:2375:2375"        # native Beszel agent + tailscale serve --tcp=2375 for Dozzle
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro   # :ro restricts nothing; POST=0 does
     networks:
@@ -33,36 +33,6 @@ services:
       test: ["CMD", "wget", "-qO-", "http://localhost:2375/_ping"]
       interval: 10s
       timeout: 3s
-      retries: 3
-
-  beszel-agent:
-    image: henrygd/beszel-agent:latest
-    container_name: kr-ccp-beszelagent-0301
-    restart: unless-stopped
-    userns_mode: host                # required for host networking under userns-remap
-    network_mode: host               # host interface stats (Beszel docs: "Why host network mode?")
-    user: "65534:65534"              # real nobody on the host: not root, no caps
-    read_only: true
-    cap_drop: [ALL]
-    security_opt:
-      - no-new-privileges:true
-    pids_limit: 50
-    mem_limit: 128m
-    depends_on:
-      socketproxy:
-        condition: service_healthy
-    environment:
-      LISTEN: ${BESZEL_LISTEN}       # <tailnet-ip>:45876 — SSH pull fallback, not on the LAN
-      HUB_URL: ${BESZEL_HUB_URL}     # https://beszel.<tailnet>.ts.net — push over WebSocket
-      KEY: ${BESZEL_KEY}             # hub's PUBLIC key
-      TOKEN: ${BESZEL_TOKEN}
-      DOCKER_HOST: tcp://127.0.0.1:2375
-    volumes:
-      - ./beszel/agent-data:/var/lib/beszel-agent   # owned 65534:65534
-    healthcheck:
-      test: ["CMD", "/agent", "health"]
-      interval: 30s
-      timeout: 5s
       retries: 3
 
 networks:

@@ -34,6 +34,12 @@ tailscale serve --bg --tcp=2375 tcp://localhost:2375 && tailscale ip -4 && curl 
 
 ## 3. Beszel agent on the host
 
+Check first whether an agent already runs natively (Beszel's install script; the infra VM and apps VM have one) — then don't add a container agent, harden the native one instead:
+
+```bash
+systemctl is-active beszel-agent; id beszel 2>/dev/null
+```
+
 In the hub, add the system (host `$IP`, port 45876) and copy key and token. Agent: host network, `DOCKER_HOST=tcp://127.0.0.1:2375`, `LISTEN=<tailnet-ip>:45876`, `HUB_URL=https://beszel.<tailnet>.ts.net`, runs as uid 65534.
 
 Data folder permissions before the first start (the agent can't write its state otherwise). Under `userns-remap` without `userns_mode: host` the owner is `165534` instead:

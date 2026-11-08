@@ -12,14 +12,14 @@ Rebuild: [`baseline.sh`](../config-files/ubuntu/baseline.sh) then [`docker-host.
 |---|---|
 | Over-broad tailnet access | `tag:infra` + `tag:observed` + `tag:ssh`; nothing served yet. Inbound: monitoring host → tcp:45876 (Beszel agent) and tcp:2375 (read-only socket proxy, Dozzle); privusers are denied 2375 (ACL test) |
 | Docker API exposure | `docker-socket-proxy` (`CONTAINERS`, `INFO`, `EVENTS`; `POST=0`) on bridge, `127.0.0.1:2375` only, exposed via `tailscale serve --tcp=2375` *(untested)* |
-| Beszel agent listening | Host network, `LISTEN` on the tailnet IP only; pushes to `svc:beszel` *(untested)* |
+| Beszel agent | Native binary + systemd service from Beszel's install script (not a container). That script adds user `beszel` to the `docker` group (full Docker socket, ≈ root) and listens on `PORT` on all interfaces *(unverified on this host)*. To harden: `DOCKER_HOST` → the read-only proxy, out of the `docker` group, `LISTEN` on the tailnet IP *(planned)* |
 
 ## Containment
 
 | Risk | Control |
 |---|---|
-| Container escape | `userns-remap` daemon-wide (`docker-host.sh`); exemptions: socket proxy (opens `docker.sock`) and Beszel agent (host network) |
-| Monitoring tools controlling Docker | Read-only proxy (`POST=0`); the agent runs as uid 65534, read-only, no capabilities |
+| Container escape | `userns-remap` daemon-wide (`docker-host.sh`); exemption: socket proxy (opens `docker.sock`) |
+| Monitoring tools controlling Docker | Dozzle through the read-only proxy (`POST=0`); the native Beszel agent still has the full socket via the `docker` group *(planned fix, above)* |
 
 ## Planned: Dockhand-home (kaywoz/home0ps#174)
 
