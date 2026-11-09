@@ -248,10 +248,12 @@ change explicitly if one no longer fits.
   - **Dockhand-home** runs in the infra VM (VLAN 24, tier 0) and manages **only** its
     own VM (**full Docker socket** — a write-enabled proxy adds no real
     protection for a management tool; kaywoz, 2026-11-08), and through
-    Hawser (standard mode, token, tcp:2376 over the tailnet) the MOS host's
-    Docker, the apps VM and the media LXC — so it is ≈ root on those hosts
-    (accepted). **Never the monitoring host** (backup copy 1 stays outside
-    central control) and **never lab agents**.
+    Hawser (standard mode, token, tcp:2376 over the tailnet) the apps VM and
+    the media LXC — so it is ≈ root on those hosts (accepted). Hawser runs
+    only on the infra VM, apps VM and media LXC unless kaywoz says otherwise:
+    **not the storage host** (kaywoz, 2026-11-09), **never the monitoring
+    host** (backup copy 1 stays outside central control) and **never lab
+    agents**.
   - **Dockhand-lab** runs next to Xen Orchestra in the **lab management
     VM on dedicated lab hardware** (VLAN 21, not on the MOS host) and
     manages lab containers only; lab-facing management never runs on home

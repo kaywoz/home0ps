@@ -31,7 +31,7 @@ Containers are deployed from [MOS templates](https://github.com/kaywoz/mos-templ
 | Container compromise | Socket proxy: `--read-only`, tmpfs `/run` + `/tmp`, `no-new-privileges`, 64 MB, 100 pids. Beszel agent: uid 65534, `--read-only`, `--cap-drop ALL`, `no-new-privileges`, 128 MB, 50 pids. `userns-remap` on MOS's Docker *(unverified)* |
 | LXC guest → host | Unprivileged LXCs (root = uid 100000 on the host; MOS has no `newuidmap`, LXC writes the maps itself), device allowlist before the `common.conf` include, GPU group mapped 1:1 only where passed (`config-files/mos/create-lxc.sh`) |
 | LXC filling the pool | No disk limit yet (btrfs simple quota idea parked in kaywoz/home0ps#174) |
-| Central Docker management | Dockhand-home will manage this host's Docker (≈ root here, accepted) *(planned, kaywoz/home0ps#174)* |
+| Central Docker management | None: no Hawser agent here, Dockhand-home doesn't manage this host's Docker (kaywoz, 2026-11-09). Containers are managed in MOS |
 
 ## Secrets
 
