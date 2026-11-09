@@ -4,6 +4,7 @@
 # a read-only socket proxy for Dozzle and the native Beszel agent (systemd service, hardened by
 # config-files/ubuntu/beszel-agent.sh). Docker runs with userns-remap (docker-host.sh): the proxy opts
 # out with userns_mode: host to open docker.sock — same as on the monitoring host and the infra VM.
+# Hawser lets Dockhand-home (infra VM) manage this Docker (CLAUDE.md §8); it opts out the same way.
 services:
   socketproxy:
     image: tecnativa/docker-socket-proxy:latest
@@ -35,7 +36,50 @@ services:
       timeout: 3s
       retries: 3
 
+  # Hawser (standard mode): lets Dockhand-home on the infra VM manage this host's Docker — full socket,
+  # so the token holder is ≈ root here (accepted, CLAUDE.md §8). Published on localhost only;
+  # `tailscale serve --bg --tcp=2376 tcp://localhost:2376` exposes it on the tailnet address, where only
+  # tag:infra may reach it (policy grant + tests). No stacks folder: compose stays in git, Dockhand
+  # is used for power commands, logs and inspection, not stack deploys.
+  # Docs: https://github.com/Finsys/hawser (README: Docker, Configuration, read-only containers).
+  hawser:
+    image: ghcr.io/finsys/hawser:latest
+    container_name: kr-ccp-hawser-0101
+    restart: unless-stopped
+    userns_mode: host                # must open docker.sock under userns-remap
+    user: "2102:2102"                # no entrypoint script: the binary runs as this uid directly
+    group_add:
+      - ${DOCKER_GID}                # host docker group: socket access for uid 2102
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /run/hawser                    # DOCKER_CONFIG + TMPDIR for compose/login (README, read-only)
+    pids_limit: 200
+    mem_limit: 256m
+    environment:
+      TOKEN_FILE: /run/secrets/hawser_token
+      DOCKER_CONFIG: /run/hawser
+      TMPDIR: /run/hawser
+    secrets:
+      - hawser_token
+    ports:
+      - "127.0.0.1:2376:2376"          # tailscale serve --tcp=2376 for Dockhand-home
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - proxy-hawser
+    # healthcheck: built into the image (wget /_hawser/health)
+
 networks:
   socketproxy:
     name: socketproxy
     driver: bridge
+  proxy-hawser:
+    name: proxy-hawser
+    driver: bridge
+
+secrets:
+  hawser_token:
+    file: ./hawser/token               # openssl rand -hex 32; 600, owned 2102:2102; never in git

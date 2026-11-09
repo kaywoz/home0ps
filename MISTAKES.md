@@ -695,3 +695,18 @@ mistakes, not a diary.
   capabilities (kaywoz/home0ps#249).
 - **Rule going forward:** before setting `cap_drop`/`cap_add` or uid variables for an image, read its
   entrypoint script; prefer an image's own `user:` (non-root) mode over root-then-drop setups.
+
+### 2026-11-09 — compose (Hawser scope)
+
+- **Trigger:** misunderstood request
+- **What happened:** for "do hawser next" I drafted a Hawser agent for the storage host too, with a new
+  mos-templates template (opened as kaywoz/mos-templates#9), because the earlier plan and CLAUDE.md §8
+  listed the MOS host as managed by Dockhand-home. kaywoz: Hawser is not a MOS template, and agents go to
+  the infra VM, apps VM or media LXC only unless he says otherwise.
+- **Root cause:** carried the storage host over from the planning text without confirming the host list
+  when the build started; a new MOS template was created without being asked for.
+- **Fix applied:** mos-templates#9 closed; storage host removed from the Hawser PR, CLAUDE.md §8,
+  `security/infra.md` and `security/storage.md`; the policy grant to the storage host is removed in its
+  own PR.
+- **Rule going forward:** new containers go to the infra VM, apps VM or media LXC; the storage host (MOS)
+  and new MOS templates only when kaywoz names them for that service (CLAUDE.md §8).
