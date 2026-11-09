@@ -195,11 +195,11 @@
 			"ip":  ["tcp:443"],
 		},
 		{
-			// Dockhand-home (infra VM, tier 0) manages Docker on the storage host, the apps VM and the
-			// media LXC through Hawser agents (standard mode, token, 2376) -- CLAUDE.md §8. Never the
-			// monitoring host, never the lab.
+			// Dockhand-home (infra VM, tier 0) manages Docker on the apps VM and the media LXC through
+			// Hawser agents (standard mode, token, 2376) -- CLAUDE.md §8. Not the storage host, never
+			// the monitoring host, never the lab.
 			"src": ["tag:infra"],
-			"dst": ["tag:storage", "tag:docker", "tag:media"],
+			"dst": ["tag:docker", "tag:media"],
 			"ip":  ["tcp:2376"],
 		},
 		{
@@ -282,8 +282,8 @@
 			// Dockhand reaches the Hawser agents on the managed hosts, nothing else there;
 			// never the monitoring host, never the lab
 			"src":    "tag:infra",
-			"accept": ["tag:storage:2376", "tag:docker:2376", "tag:media:2376"],
-			"deny":   ["tag:monitoring:2376", "tag:hypervisor:2376", "tag:storage:22", "tag:docker:2375", "tag:media:22"],
+			"accept": ["tag:docker:2376", "tag:media:2376"],
+			"deny":   ["tag:storage:2376", "tag:monitoring:2376", "tag:hypervisor:2376", "tag:storage:22", "tag:docker:2375", "tag:media:22"],
 		},
 		// the Dockhand UI is for admins: not for the monitoring host or the lab
 		{"src": "tag:monitoring", "deny": ["svc:dockhand:443", "tag:storage:2376"]},
