@@ -45,15 +45,14 @@ services:
     container_name: kr-ccp-dockhand-0101
     restart: unless-stopped
     userns_mode: host                # must open docker.sock under userns-remap
+    user: "2101:2101"                # entrypoint's non-root mode: no user setup, no root at any point
+                                     #   (docker-entrypoint-node.sh); data dir owned 2101:2101 on the host
     environment:
-      PUID: "2101"                   # entrypoint starts as root, fixes data ownership, drops to this
-      PGID: "2101"                   #   uid/gid (manual: docker socket permissions, option 3)
       ORIGIN: ${DOCKHAND_ORIGIN}     # https://dockhand.<tailnet>.ts.net
       DATA_DIR: /app/data
     group_add:
-      - ${DOCKER_GID}                # host docker group: socket access for the dropped uid
+      - ${DOCKER_GID}                # host docker group: socket access for uid 2101
     cap_drop: [ALL]
-    cap_add: [CHOWN, SETUID, SETGID] # entrypoint chown + privilege drop
     security_opt:
       - no-new-privileges:true
     pids_limit: 512
