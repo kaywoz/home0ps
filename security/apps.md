@@ -33,7 +33,7 @@ Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh)
 |---|---|
 | Container escape to root | `userns-remap` (base 100000), `no-new-privileges` daemon-wide, `icc: false`, no userland proxy, `live-restore` (`docker-host.sh` `daemon`) |
 | App data ownership | Bind mounts owned by the remapped UID (container 65534 → 165534); `/srv/docker` owned by the admin user, mode 750 |
-| Docker control via monitoring agents | Read-only socket proxy `kr-ccp-socketproxy-0501` (`POST=0`, `127.0.0.1:2375`, `tailscale serve --tcp=2375`) for Dozzle and the native Beszel agent. Agent found 2026-11-08 with `PORT=45876` (SSH fallback would listen on all interfaces; idle while its WebSocket is up), in `disk`, not in `docker`; hardened by [`beszel-agent.sh`](../config-files/ubuntu/beszel-agent.sh): tailnet-only `LISTEN`, `DOCKER_HOST` → proxy, out of `disk` *(untested)* |
+| Docker control via monitoring agents | Read-only socket proxy `kr-ccp-socketproxy-0501` (`POST=0`, `127.0.0.1:2375`, `tailscale serve --tcp=2375`) for Dozzle and the native Beszel agent. Agent found 2026-11-08 with `PORT=45876` (SSH fallback would listen on all interfaces; idle while its WebSocket is up), in `disk`, not in `docker`; hardened by [`beszel-agent.sh`](../config-files/ubuntu/beszel-agent.sh): tailnet-only `LISTEN`, `DOCKER_HOST` → proxy, out of `disk` (applied 2026-11-08). From the monitoring host read OK, write `POST`→403 (2026-11-08); LAN refusal *(untested)* |
 | Risky workloads | Not run here: anything untrusted or `privileged` goes to the lab |
 
 ## Platform
