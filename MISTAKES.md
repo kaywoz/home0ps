@@ -667,3 +667,18 @@ mistakes, not a diary.
   (lookups) instead of asking for them to be typed; any edit to a list in
   a config file is a full, idempotent rebuild, not an append.
 
+
+### 2026-11-09 — host steps (compose download)
+
+- **Trigger:** host command failed
+- **What happened:** the infra VM fetch `curl … -o /tmp/compose.yaml && diff …; sudo cp /tmp/compose.yaml /srv/docker/compose.yaml`
+  failed with curl (23): a `/tmp/compose.yaml` left by an earlier step was owned by another user, and
+  `fs.protected_regular` stops even root from opening it. The `;` after `diff` then let `cp` run anyway,
+  which can overwrite the live compose file with that stale copy.
+- **Root cause:** fixed, shared `/tmp` filename reused across steps and users; `;` used where only
+  success should continue (because `diff` exits 1 on any change).
+- **Fix applied:** recovery with a fresh `mktemp` file, a check of the live file, then copy only after
+  a successful download.
+- **Rule going forward:** host download commands use `T=$(mktemp)`, never a fixed `/tmp` name, and
+  every step that writes a live file is chained with `&&` on a successful download (`diff … || true`
+  for the diff, not `;`).
