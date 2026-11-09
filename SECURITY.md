@@ -45,7 +45,7 @@ Two independent planes:
 | Container escape to root | `userns-remap` daemon-wide; exemptions only where technically required, listed per role |
 | Privilege escalation, persistence | Non-root `user`, `read_only` + `tmpfs`, `cap_drop: [ALL]`, `no-new-privileges` (also daemon-wide) |
 | App-to-app spread | One bridge network per app; `internal: true` where possible; `icc: false` |
-| Docker control via tooling | Only `docker-socket-proxy` mounts `docker.sock`, `POST=0` |
+| Docker control via tooling | Only `docker-socket-proxy` mounts `docker.sock`, `POST=0` — except the tier-0 Dockhand-home and its Hawser agents ([`security/infra.md`](security/infra.md)) |
 | Resource exhaustion | `mem_limit`, `pids_limit` on every container |
 
 ## Platform
