@@ -39,6 +39,7 @@ Containers are deployed from [MOS templates](https://github.com/kaywoz/mos-templ
 |---|---|
 | Cloud credentials | rclone config with the crypt remote lives only on the host (`/boot/config`), never in git or in the LXC; `media-mount.env` host-local. Mode `600` *(unverified)* |
 | Beszel key/token | Set at deploy time in the MOS template, never in git |
+| put.io remote (rclone) | Own put.io OAuth app (not rclone's shared client ID); client secret and token only in the host's rclone config (mode `600`, never in git or chat). put.io tokens don't expire: revoke the app's authorization in put.io if one leaks, then `rclone authorize` again. Headless setup: `rclone authorize "putio" <client_id> <client_secret>` on a machine with a browser, token pasted on the host only (2026-11-09). A token exposed during setup was revoked *(unverified)* |
 
 ## Detection
 
