@@ -667,3 +667,31 @@ mistakes, not a diary.
   (lookups) instead of asking for them to be typed; any edit to a list in
   a config file is a full, idempotent rebuild, not an append.
 
+
+### 2026-11-09 — host steps (compose download)
+
+- **Trigger:** host command failed
+- **What happened:** the infra VM fetch `curl … -o /tmp/compose.yaml && diff …; sudo cp /tmp/compose.yaml /srv/docker/compose.yaml`
+  failed with curl (23): a `/tmp/compose.yaml` left by an earlier step was owned by another user, and
+  `fs.protected_regular` stops even root from opening it. The `;` after `diff` then let `cp` run anyway,
+  which can overwrite the live compose file with that stale copy.
+- **Root cause:** fixed, shared `/tmp` filename reused across steps and users; `;` used where only
+  success should continue (because `diff` exits 1 on any change).
+- **Fix applied:** recovery with a fresh `mktemp` file, a check of the live file, then copy only after
+  a successful download.
+- **Rule going forward:** host download commands use `T=$(mktemp)`, never a fixed `/tmp` name, and
+  every step that writes a live file is chained with `&&` on a successful download (`diff … || true`
+  for the diff, not `;`).
+
+### 2026-11-09 — compose (Dockhand user setup)
+
+- **Trigger:** container crash-looped on first start
+- **What happened:** Dockhand-home was set up with `PUID`/`PGID` and `cap_drop: [ALL]` + `CHOWN`/`SETUID`/`SETGID`.
+  The entrypoint then deletes and recreates its `dockhand` user and group as root; that failed
+  (`addgroup: group 'dockhand' in use`) and `set -e` restarted the container in a loop.
+- **Root cause:** the capability set was chosen from the manual's description, not from the
+  entrypoint script (`docker-entrypoint-node.sh`), which has a separate non-root mode for `user:`.
+- **Fix applied:** `user: "2101:2101"` + `group_add` docker GID, no `PUID`/`PGID`, no added
+  capabilities (kaywoz/home0ps#249).
+- **Rule going forward:** before setting `cap_drop`/`cap_add` or uid variables for an image, read its
+  entrypoint script; prefer an image's own `user:` (non-root) mode over root-then-drop setups.
