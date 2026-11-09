@@ -23,6 +23,9 @@ locals {
     # apps host (tag:observed)
     "cockpit-sexy" = "Host admin UI (apps host)"
 
+    # infra VM (tag:infra)
+    dockhand = "Docker management (home)"
+
     # media LXC (tag:media)
     jellyfin = "Media server"
     komga    = "Comics and books server"
