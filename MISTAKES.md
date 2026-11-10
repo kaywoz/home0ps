@@ -710,3 +710,11 @@ mistakes, not a diary.
   own PR.
 - **Rule going forward:** new containers go to the infra VM, apps VM or media LXC; the storage host (MOS)
   and new MOS templates only when kaywoz names them for that service (CLAUDE.md §8).
+
+### 2026-11-10 — compose (Ollama CPU limit)
+
+- **Trigger:** apply broke something (`docker compose up` refused the service)
+- **What happened:** the Ollama service set `cpus: 3` "of 4" because kaywoz mentioned 4 cores; the apps VM has 2 vCPUs, so Docker rejected the limit ("range of CPUs is from 0.01 to 2.00").
+- **Root cause:** took a resource figure from chat as the VM's size instead of checking the host (`nproc`, `free -g`) or the VM definition.
+- **Fix applied:** `cpus: 1.5` with a comment to raise it together with the VM's vCPUs.
+- **Rule going forward:** before setting `cpus`/`mem_limit`, get the host's actual `nproc` and `free -g` (ask kaywoz to run them if unknown) and size limits below those.
