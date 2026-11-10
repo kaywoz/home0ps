@@ -52,6 +52,10 @@ try:
     E = load_env(ENV_FILE)
 except OSError:
     sys.exit(f"settings file {ENV_FILE} missing (see media-sort.env.example)")
+_missing = [k for k in ("RCLONE_CONFIG", "SRC", "LIB_REMOTE", "LIBRARIES", "LOG_FILE", "CLASSIFIER_URL",
+                        "TOKEN_FILE") if not E.get(k)]
+if _missing:
+    sys.exit(f"{ENV_FILE} is missing: {', '.join(_missing)} (see media-sort.env.example)")
 RCLONE = [E.get("RCLONE_BIN", "rclone"), "--config", E["RCLONE_CONFIG"]]
 SRC = E["SRC"].rstrip("/")                                   # e.g. putio:
 LIB = E["LIB_REMOTE"]                                        # e.g. filen-crypt:
@@ -135,7 +139,9 @@ def classify(items, existing):
 
 def job_sort(run):
     now = time.time()
+    log(f"listing {src_path()} ...")
     entries = json.loads(rclone("lsjson", "--max-depth", "1", src_path()).stdout or "[]")
+    log(f"found {len(entries)} entr{'y' if len(entries) == 1 else 'ies'} on the download remote")
     items = []
     for e in entries:
         name = e["Name"]
@@ -149,6 +155,7 @@ def job_sort(run):
         if e["IsDir"]:
             files = rclone("lsf", "-R", "--files-only", src_path(name)).stdout.splitlines()
             it["files"] = files[:500]
+            log(f"listed {name}: {len(files)} file(s)")
         items.append(it)
     if not items:
         log("nothing to sort")
@@ -158,12 +165,22 @@ def job_sort(run):
         if lib.startswith("_"):
             continue
         existing[lib] = [n.rstrip("/") for n in rclone("lsf", "--max-depth", "1", lib_path(path)).stdout.splitlines()]
-    results = classify(items, existing)
+        log(f"library {lib}: {len(existing[lib])} entries")
     today = f"{datetime.date.today():%F}"
     report, errors = [], 0
-    for it, r in zip(items, results):
+    total = len(items)
+    for i, it in enumerate(items, 1):                 # one classifier call per item: progress per item
         name = it["name"]
         src = src_path(name)
+        log(f"[{i}/{total}] classifying {name} ...")
+        t0 = time.time()
+        try:
+            r = classify([it], existing)[0]
+        except Exception as e:
+            errors += 1
+            log(f"[{i}/{total}] ERROR classifier: {e}; {name} stays on the download remote")
+            continue
+        log(f"[{i}/{total}] {r.get('library')} ({r.get('source')}, {r.get('confidence')}) in {time.time() - t0:.1f} s")
         why = f"[{r.get('source')}, {r.get('confidence')}] {r.get('reason')}"
         if r.get("duplicate_of"):
             dst = lib_path(f"{HOLD}/dupes/{today}/{name}")
@@ -189,6 +206,8 @@ def job_sort(run):
                 dst = lib_path(f"{HOLD}/dupes/{today}/{name}")
         line = f"{name} {what} {why}"
         report.append(line)
+        if not r.get("duplicate_of") and r.get("library") in existing:   # later items see this one
+            existing[r["library"]].append(r.get("target") or name)
         if not run:
             log("PLAN " + line)
             continue
