@@ -8,18 +8,21 @@ service never sees files, file contents or remote credentials, and never moves o
        {"items": [{"name": "...", "is_dir": true, "files": ["a.mkv", ...]}],
         "existing": {"<library>": ["<top-level name>", ...]}}
   ->   {"results": [{"name", "kind", "title", "year", "season", "library", "target", "source",
-                     "reason", "duplicate_of"}]}
+                     "confidence", "rule_library", "llm_library", "disagreement", "reason",
+                     "duplicate_of"}]}
        target = folder name in the library ("Title (Year)"); the mover puts a single episode file
        under target/Season NN/, everything else at target/ (a lone movie file inside target/).
   GET  /health     -> 200 "ok" (no auth)
 
-Decision order per item (rules.json, in git):
-  1. no video files                         -> unsorted (non-media)
-  2. parse the name (guessit)                -> title, year, movie/episode
-  3. duplicate of an existing library entry  -> duplicate_of set (the existing copy wins)
-  4. TMDB metadata + fixed rules             -> library
-  5. rules undecided: local LLM, closed choice between the allowed libraries
-  6. still undecided / any error             -> the default library for the kind
+The local LLM is the judge on every item; the rules (rules.json, in git) are tripwires:
+  1. no video files                          -> unsorted (non-media), no LLM needed
+  2. parse the name (guessit), TMDB metadata; no match -> the LLM cleans the name, search again
+  3. duplicate of an existing library entry   -> duplicate_of set (the existing copy wins)
+  4. the LLM judges: library + confidence + a one-line reason, from name, parse, metadata and
+     the rules' suggestion
+  5. a firm rule (x-genre, anime, series) disagrees -> the rule wins (x-side), logged
+     low confidence                                -> the default library for the kind
+     LLM error                                     -> the rule, else the default library
 """
 import json, os, re, sys, time, unicodedata, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -125,7 +128,7 @@ def metadata(kind, title, year):
 
 
 def by_rules(kind, meta):
-    """(library, reason) from fixed rules, or (None, reason) when the rules can't decide."""
+    """Tripwire: (library, reason) when a firm rule applies, else (None, reason)."""
     r = RULES
     if kind == "episode":
         return r["series_library"], "series"
@@ -139,27 +142,52 @@ def by_rules(kind, meta):
         if set(meta["companies"]) & set(r["anime_exceptions"]):
             return r["plain_library"], "animation, excepted studio"
         return r["x_library"], "anime"
-    return None, "genres " + (", ".join(sorted(genres)) or "none")
+    return None, "no firm rule (genres " + (", ".join(sorted(genres)) or "none") + ")"
 
 
-def by_llm(name, meta):
-    libs = [RULES["plain_library"], RULES["x_library"]]
-    prompt = (RULES["llm_instructions"] + "\n\n"
-              f"File name: {name}\n"
-              f"Metadata: {json.dumps(meta, ensure_ascii=False) if meta else 'none found'}\n"
-              f"Choose one library from: {', '.join(libs)}. If unsure, choose {RULES['x_library']}.")
-    body = {"model": MODEL, "prompt": prompt, "stream": False, "think": False,
-            "format": {"type": "object", "properties": {"library": {"type": "string", "enum": libs},
-                                                        "reason": {"type": "string"}},
-                       "required": ["library", "reason"]},
-            "options": {"temperature": 0, "num_predict": 64, "num_thread": NUM_THREAD}}
+def ollama(prompt, schema, num_predict=160):
+    body = {"model": MODEL, "prompt": prompt, "stream": False, "think": False, "format": schema,
+            "options": {"temperature": 0, "num_predict": num_predict, "num_thread": NUM_THREAD}}
     req = urllib.request.Request(OLLAMA_URL + "/api/generate", json.dumps(body).encode(),
                                  {"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=120) as r:
-        out = json.loads(json.load(r)["response"])
+    with urllib.request.urlopen(req, timeout=180) as r:
+        return json.loads(json.load(r)["response"])
+
+
+def llm_clean_name(name):
+    """The parser and TMDB found nothing: let the LLM pull a clean title/year out of a messy name."""
+    out = ollama(
+        "Extract the real title of the film or TV series from this download name. Ignore site names, "
+        "release groups, quality, codec and language tags.\n"
+        f"Name: {name}",
+        {"type": "object", "properties": {
+            "title": {"type": "string"},
+            "year": {"type": ["integer", "null"]},
+            "kind": {"type": "string", "enum": ["movie", "episode"]}},
+         "required": ["title", "year", "kind"]}, num_predict=64)
+    return out.get("kind", "movie"), str(out.get("title") or "").strip(), out.get("year")
+
+
+def llm_judge(name, kind, title, year, meta, rule_lib, rule_reason):
+    """The verdict on every item: library, confidence and a one-line reason."""
+    libs = [RULES["plain_library"], RULES["x_library"], RULES["series_library"]]
+    facts = {"file_name": name, "parsed": {"kind": kind, "title": title, "year": year},
+             "metadata": meta or "none found", "rule_suggestion": rule_lib or "none",
+             "rule_reason": rule_reason}
+    out = ollama(
+        RULES["llm_instructions"] + "\n\n"
+        f"Libraries: {', '.join(libs)}. Series and episodes always go to {RULES['series_library']}.\n"
+        "Answer 'low' confidence when the metadata is missing, thin, or the film is borderline.\n"
+        "Reason: one short sentence a person can read in a report.\n\n"
+        "Facts: " + json.dumps(facts, ensure_ascii=False),
+        {"type": "object", "properties": {
+            "library": {"type": "string", "enum": libs},
+            "confidence": {"type": "string", "enum": ["high", "low"]},
+            "reason": {"type": "string"}},
+         "required": ["library", "confidence", "reason"]})
     if out.get("library") not in libs:
         raise ValueError("LLM answered outside the allowed libraries")
-    return out["library"], "llm: " + str(out.get("reason", ""))[:120]
+    return out["library"], out.get("confidence", "low"), str(out.get("reason", ""))[:200]
 
 
 def safe(s):
@@ -169,44 +197,64 @@ def safe(s):
 def classify(item, existing):
     name = item["name"]
     files = item.get("files") or ([name] if not item.get("is_dir") else [])
-    res = {"name": name, "kind": None, "title": None, "year": None, "library": None,
-           "season": None, "target": None, "source": None, "reason": None, "duplicate_of": None}
+    res = {"name": name, "kind": None, "title": None, "year": None, "season": None, "library": None,
+           "target": None, "source": None, "confidence": None, "rule_library": None,
+           "llm_library": None, "disagreement": False, "reason": None, "duplicate_of": None}
     if not any(os.path.splitext(f)[1].lower() in VIDEO for f in files):
-        res.update(library=RULES["unsorted_library"], target=name, source="rules", reason="no video files")
+        res.update(library=RULES["unsorted_library"], target=name, source="rules",
+                   confidence="high", reason="no video files")
         return res
     kind, title, year, season = parse(name)
-    res.update(kind=kind, title=title, year=year, season=season)
-    meta, err = None, None
+    notes = []
+    meta = None
     try:
         meta = metadata(kind, title, year)
     except Exception as e:
-        err = f"metadata error: {e}"
+        notes.append(f"metadata error: {e}")
+    if meta is None:                       # messy name? let the LLM clean it and search again
+        try:
+            k2, t2, y2 = llm_clean_name(name)
+            if t2 and (norm(t2), y2) != (norm(title), year):
+                notes.append(f"llm cleaned name to '{t2}' ({y2})")
+                kind, title, year = (k2 if kind == "movie" else kind), t2, (y2 or year)
+                meta = metadata(kind, title, year)
+        except Exception as e:
+            notes.append(f"name cleanup failed: {e}")
     if meta:
         title, year = meta["title"], meta["year"] or year
-        res.update(title=title, year=year)
-    target = safe(f"{title} ({year})" if year else title)
-    res["target"] = target
+    res.update(kind=kind, title=title, year=year, season=season)
+    res["target"] = safe(f"{title} ({year})" if year else title)
+
     # duplicate: same normalised title (+ year when both have one) anywhere in the libraries
-    k = (norm(title), year)
     for lib, names in (existing or {}).items():
         for n in names:
             nt, ny = key_of(n)
-            if nt == k[0] and (ny is None or year is None or ny == year):
+            if nt == norm(title) and (ny is None or year is None or ny == year):
                 res["duplicate_of"] = f"{lib}/{n}"
                 break
         if res["duplicate_of"]:
             break
-    lib, reason = by_rules(kind, meta)
-    source = "rules"
-    if lib is None and kind == "movie":
-        try:
-            lib, reason = by_llm(name, meta)
-            source = "llm"
-        except Exception as e:
-            reason = f"{reason}; llm error: {e}"
-    if lib is None:
-        lib, source = RULES["default_library"][kind], "fallback"
-    res.update(library=lib, source=source, reason="; ".join(x for x in (reason, err) if x))
+
+    rule_lib, rule_reason = by_rules(kind, meta)
+    res["rule_library"] = rule_lib
+    default = RULES["default_library"][kind]
+    try:
+        llm_lib, conf, why = llm_judge(name, kind, title, year, meta, rule_lib, rule_reason)
+        res.update(llm_library=llm_lib, confidence=conf)
+        if rule_lib and llm_lib != rule_lib:          # tripwire: a firm rule overrules the LLM
+            res.update(disagreement=True, library=rule_lib, source="rules (llm disagreed)")
+            notes.append(f"llm said {llm_lib}: {why}; rule: {rule_reason}")
+        elif conf == "low":                           # unsure -> the default library
+            res.update(library=default, source="fallback (llm unsure)")
+            notes.append(f"llm (low confidence) said {llm_lib}: {why}")
+        else:
+            res.update(library=llm_lib, source="llm")
+            notes.append(why)
+    except Exception as e:
+        res.update(library=rule_lib or default, source="rules" if rule_lib else "fallback",
+                   confidence="low")
+        notes.append(f"llm error: {e}; {rule_reason}")
+    res["reason"] = "; ".join(n for n in notes if n)
     return res
 
 
