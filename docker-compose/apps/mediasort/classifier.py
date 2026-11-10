@@ -70,6 +70,28 @@ def parse(name):
     return kind, str(title), (int(year) if year else None), season
 
 
+def is_junk(name):
+    """OS metadata (._*, .DS_Store, Thumbs.db) in a library listing is not a copy of anything."""
+    return name.startswith("._") or name in (".DS_Store", "Thumbs.db")
+
+
+def taste(existing, per_lib=25):
+    """A spread of clean titles from the owner's movie libraries, so the LLM judges by his taste."""
+    out = {}
+    for lib in (RULES["plain_library"], RULES["x_library"]):
+        names = sorted(n for n in (existing or {}).get(lib, []) if not is_junk(n))
+        step = max(1, len(names) // per_lib)
+        picked = []
+        for n in names[::step][:per_lib]:
+            try:
+                _, t, y, _ = parse(n)
+                picked.append(f"{t} ({y})" if y else t)
+            except Exception:
+                picked.append(n)
+        out[lib] = picked
+    return out
+
+
 def key_of(name):
     if name not in _key_cache:
         try:
@@ -173,14 +195,19 @@ def llm_clean_name(name):
     return out.get("kind", "movie"), str(out.get("title") or "").strip(), out.get("year")
 
 
-def llm_judge(name, kind, title, year, meta, rule_lib, rule_reason):
+def llm_judge(name, kind, title, year, meta, rule_lib, rule_reason, examples=None):
     """The verdict on every item: library, confidence and a one-line reason."""
     libs = [RULES["plain_library"], RULES["x_library"], RULES["series_library"]]
     facts = {"file_name": name, "parsed": {"kind": kind, "title": title, "year": year},
              "metadata": meta or "none found", "rule_suggestion": rule_lib or "none",
              "rule_reason": rule_reason}
+    shown = ""
+    if examples and any(examples.values()):
+        shown = ("The owner's taste, from what is already in each library (match it; a film like "
+                 "the xmovies examples belongs in xmovies even if its genres look mainstream):\n"
+                 + "\n".join(f"- {lib}: " + "; ".join(t) for lib, t in examples.items() if t) + "\n\n")
     out = ollama(
-        RULES["llm_instructions"] + "\n\n"
+        RULES["llm_instructions"] + "\n\n" + shown +
         f"Libraries: {', '.join(libs)}. Series and episodes always go to {RULES['series_library']}.\n"
         "Answer 'low' confidence when the metadata is missing, thin, or the film is borderline.\n"
         "Reason: one short sentence a person can read in a report.\n\n"
@@ -225,16 +252,23 @@ def classify(item, existing):
                 meta = metadata(kind, title, year)
         except Exception as e:
             notes.append(f"name cleanup failed: {e}")
+    titles, years = {norm(title)}, {year} - {None}
     if meta:
-        title, year = meta["title"], meta["year"] or year
+        titles.add(norm(meta["title"]))
+        if meta["year"]:
+            years.add(meta["year"])
+        # the file's own year wins for the folder name: TMDB's date can be a later release
+        title, year = meta["title"], year or meta["year"]
     res.update(kind=kind, title=title, year=year, season=season)
     res["target"] = safe(f"{title} ({year})" if year else title)
 
-    # duplicate: same normalised title (+ year when both have one) anywhere in the libraries
+    # duplicate: same title (parsed or TMDB) anywhere in the libraries, year within one either way
     for lib, names in (existing or {}).items():
         for n in names:
+            if is_junk(n):
+                continue
             nt, ny = key_of(n)
-            if nt == norm(title) and (ny is None or year is None or ny == year):
+            if nt in titles and (ny is None or not years or any(abs(ny - y) <= 1 for y in years)):
                 res["duplicate_of"] = f"{lib}/{n}"
                 break
         if res["duplicate_of"]:
@@ -244,7 +278,8 @@ def classify(item, existing):
     res["rule_library"] = rule_lib
     default = RULES["default_library"][kind]
     try:
-        llm_lib, conf, why = llm_judge(name, kind, title, year, meta, rule_lib, rule_reason)
+        llm_lib, conf, why = llm_judge(name, kind, title, year, meta, rule_lib, rule_reason,
+                                       taste(existing))
         res.update(llm_library=llm_lib, confidence=conf)
         if rule_lib and llm_lib != rule_lib:          # tripwire: a firm rule overrules the LLM
             res.update(disagreement=True, library=rule_lib, source="rules (llm disagreed)")
