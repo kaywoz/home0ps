@@ -41,6 +41,11 @@ TMDB_TOKEN = open(os.environ.get("TMDB_TOKEN_FILE", "/run/secrets/tmdb_token")).
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://ollama:11434")
 MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:4b-instruct")
 NUM_THREAD = int(os.environ.get("OLLAMA_NUM_THREAD", "3"))  # = the Ollama container's cpus: (#261)
+# LLM provider: "anthropic" (Claude API, key from a secret file) or "ollama" (local, #261)
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama")
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-5-5")
+ANTHROPIC_KEY_FILE = os.environ.get("ANTHROPIC_KEY_FILE", "/run/secrets/anthropic_key")
+_anthropic = None
 PORT = int(os.environ.get("PORT", "8089"))
 
 VIDEO = {e.lower() for e in RULES["video_extensions"]}
@@ -156,6 +161,33 @@ def by_rules(kind, meta):
     return None, "no firm rule (genres " + (", ".join(sorted(genres)) or "none") + ")"
 
 
+def claude(prompt, schema, max_tokens):
+    """Claude API with a JSON-schema answer (structured outputs). Low effort: a short
+    classification. The key is read from its file on first use (never an env var)."""
+    global _anthropic
+    import anthropic
+    if _anthropic is None:
+        _anthropic = anthropic.Anthropic(api_key=open(ANTHROPIC_KEY_FILE).read().strip(),
+                                         timeout=60.0, max_retries=2)
+    resp = _anthropic.messages.create(
+        model=ANTHROPIC_MODEL, max_tokens=max_tokens,
+        output_config={"effort": "low",
+                       "format": {"type": "json_schema", "schema": dict(schema, additionalProperties=False)}},
+        messages=[{"role": "user", "content": prompt}])
+    if resp.stop_reason == "refusal":
+        raise RuntimeError("Claude declined the request")
+    if resp.stop_reason == "max_tokens":
+        raise RuntimeError("Claude ran out of tokens before answering")
+    return json.loads(next(b.text for b in resp.content if b.type == "text"))
+
+
+def llm(prompt, schema, num_predict=160):
+    """The configured LLM. Errors propagate: the caller falls back to the rules / default library."""
+    if LLM_PROVIDER == "anthropic":
+        return claude(prompt, schema, max_tokens=2048)    # room for adaptive thinking at low effort
+    return ollama(prompt, schema, num_predict)
+
+
 def ollama(prompt, schema, num_predict=160):
     body = {"model": MODEL, "prompt": prompt, "stream": False, "think": False, "format": schema,
             "options": {"temperature": 0, "num_predict": num_predict, "num_thread": NUM_THREAD}}
@@ -167,23 +199,23 @@ def ollama(prompt, schema, num_predict=160):
 
 def llm_clean_name(name):
     """The parser and TMDB found nothing: let the LLM pull a clean title/year out of a messy name."""
-    out = ollama(
+    out = llm(
         "Extract the real title of the film or TV series from this download name. Ignore site names, "
         "release groups, quality, codec and language tags.\n"
         f"Name: {name}",
         {"type": "object", "properties": {
             "title": {"type": "string"},
-            "year": {"type": ["integer", "null"]},
+            "year": {"type": "integer", "description": "0 if unknown"},
             "kind": {"type": "string", "enum": ["movie", "episode"]}},
          "required": ["title", "year", "kind"]}, num_predict=64)
-    return out.get("kind", "movie"), str(out.get("title") or "").strip(), out.get("year")
+    return out.get("kind", "movie"), str(out.get("title") or "").strip(), (out.get("year") or None)
 
 
 def llm_judge(name, kind, title, year, meta, rule_lib, rule_reason):
     """The verdict on every film: one yes/no/unsure question, which small models answer far more
     reliably than "which library" (kaywoz, 2026-11-10). yes or unsure -> xmovies, no -> movies."""
     facts = {"file_name": name, "title": title, "year": year, "metadata": meta or "none found"}
-    out = ollama(
+    out = llm(
         RULES["llm_question"] + "\n\n"
         "Reason: one short sentence a person can read in a report.\n\n"
         "Facts: " + json.dumps(facts, ensure_ascii=False),
@@ -318,5 +350,6 @@ if __name__ == "__main__":
         for n in sys.argv[1:]:
             print(json.dumps(classify({"name": n, "is_dir": False}, {}), ensure_ascii=False))
         sys.exit(0)
-    log(event="start", port=PORT, model=MODEL, num_thread=NUM_THREAD)
+    log(event="start", port=PORT, provider=LLM_PROVIDER,
+        model=ANTHROPIC_MODEL if LLM_PROVIDER == "anthropic" else MODEL)
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

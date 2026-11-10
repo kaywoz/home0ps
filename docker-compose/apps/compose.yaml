@@ -119,7 +119,8 @@ services:
   # tcp://localhost:8089`, only tag:storage may reach it) and answers with a library + folder name.
   # Never sees files or remote credentials, never moves or deletes. Code and rules in git
   # (docker-compose/apps/mediasort/), copied to /srv/docker/mediasort/ and built here.
-  # Metadata: TMDB (Bearer read token); fallback decisions: the local LLM (ollama service).
+  # Metadata: TMDB (Bearer read token). LLM: the Claude API (Haiku) by default, or the local
+  # ollama service (LLM_PROVIDER=ollama). The LLM sees names + TMDB facts, never files.
   mediasort:
     build: ./mediasort
     image: home0ps/mediasort:latest
@@ -135,7 +136,10 @@ services:
     pids_limit: 64
     mem_limit: 256m
     environment:
-      OLLAMA_URL: http://ollama:11434
+      LLM_PROVIDER: anthropic           # anthropic (Claude API) | ollama (local, #261)
+      ANTHROPIC_MODEL: claude-haiku-5-5
+      ANTHROPIC_KEY_FILE: /run/secrets/anthropic_key
+      OLLAMA_URL: http://ollama:11434   # used when LLM_PROVIDER=ollama
       OLLAMA_MODEL: qwen3:4b-instruct   # benchmark: kaywoz/home0ps#261
       OLLAMA_NUM_THREAD: "3"            # = ollama's cpus:
       TOKEN_FILE: /run/secrets/mediasort_token
@@ -143,6 +147,7 @@ services:
     secrets:
       - mediasort_token
       - tmdb_token
+      - anthropic_key
     ports:
       - "127.0.0.1:8089:8089"        # tailscale serve --tcp=8089 for the mover
     networks:
@@ -173,3 +178,5 @@ secrets:
     file: ./mediasort/secrets/token    # openssl rand -hex 32; 600, owned 102104; same value on the storage host
   tmdb_token:
     file: ./mediasort/secrets/tmdb     # TMDB "API Read Access Token"; 600, owned 102104; never in git
+  anthropic_key:
+    file: ./mediasort/secrets/anthropic   # personal Anthropic API key; 600, owned 102104; never in git
