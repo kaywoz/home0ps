@@ -277,6 +277,11 @@ def job_sort(run):
             errors += 1
             log(f"[{i}/{total}] ERROR classifier: {e}; {name} stays on the download remote")
             continue
+        if r.get("deferred"):                         # LLM rate limited / unreachable: next run
+            line = f"{name} DEFERRED, stays on the download remote: {r.get('reason')}"
+            log(f"[{i}/{total}] " + line)
+            report.append(line)
+            continue
         log(f"[{i}/{total}] {r.get('library')} ({r.get('source')}, {r.get('confidence')}) in {time.time() - t0:.1f} s")
         why = f"[{r.get('source')}, {r.get('confidence')}] {r.get('reason')}"
         if r.get("duplicate_of"):
@@ -370,7 +375,7 @@ def job_digest(run):
     """Daily Slack digest of the last 24 h from the log: sorted, parked, cleaned, errors."""
     since = datetime.datetime.now() - datetime.timedelta(hours=24)
     groups = {"Sorted": [], "Parked (duplicate / collision)": [], "Would sort (dry run)": [],
-              "Cleanup": [], "Errors": []}
+              "Deferred (LLM unavailable)": [], "Cleanup": [], "Errors": []}
     try:
         lines = open(LOG_FILE).read().splitlines()
     except OSError:
@@ -388,6 +393,8 @@ def job_digest(run):
             groups["Cleanup"].append(msg)
         elif msg.startswith("PLAN "):
             groups["Would sort (dry run)"].append(msg[5:])
+        elif " DEFERRED, " in msg and msg.startswith("["):
+            groups["Deferred (LLM unavailable)"].append(msg.split("] ", 1)[1])
         elif msg.startswith("ERROR"):
             groups["Errors"].append(msg)
     total = sum(len(v) for k, v in groups.items() if k != "Cleanup")
