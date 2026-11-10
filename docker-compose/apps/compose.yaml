@@ -90,7 +90,7 @@ services:
       - no-new-privileges:true
     tmpfs:
       - /tmp
-      - /home/ollama                 # HOME: per-start key in ~/.ollama (only used for ollama.com)
+      - /home/ollama:uid=2103,gid=2103,mode=0700   # HOME, owned by the container user: per-start key in ~/.ollama (only for ollama.com)
     pids_limit: 512
     mem_limit: 8g                    # one ~4B model (2.5-3.5 GB) + context; VM has 16 GB
     cpus: 3                          # of 4: keeps the VM responsive during inference
