@@ -1,3 +1,4 @@
 # Host-local config and runtime data: never commit
 .env
 hawser/
+ollama/
