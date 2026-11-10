@@ -3,3 +3,4 @@
 hawser/
 ollama/
 mediasort/secrets/
+__pycache__/
