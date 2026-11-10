@@ -41,10 +41,13 @@ TMDB_TOKEN = open(os.environ.get("TMDB_TOKEN_FILE", "/run/secrets/tmdb_token")).
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://ollama:11434")
 MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:4b-instruct")
 NUM_THREAD = int(os.environ.get("OLLAMA_NUM_THREAD", "3"))  # = the Ollama container's cpus: (#261)
-# LLM provider: "anthropic" (Claude API, key from a secret file) or "ollama" (local, #261)
+# LLM provider: "openai" or "anthropic" (cloud APIs, key from a secret file) or "ollama" (local, #261)
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-6-luna")
+_openai = None
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-5-5")
-ANTHROPIC_KEY_FILE = os.environ.get("ANTHROPIC_KEY_FILE", "/run/secrets/anthropic_key")
+# one key file for whichever cloud provider is selected: switching provider = swap the key
+LLM_KEY_FILE = os.environ.get("LLM_KEY_FILE", "/run/secrets/llm_key")
 _anthropic = None
 PORT = int(os.environ.get("PORT", "8089"))
 
@@ -167,7 +170,7 @@ def claude(prompt, schema, max_tokens):
     global _anthropic
     import anthropic
     if _anthropic is None:
-        _anthropic = anthropic.Anthropic(api_key=open(ANTHROPIC_KEY_FILE).read().strip(),
+        _anthropic = anthropic.Anthropic(api_key=open(LLM_KEY_FILE).read().strip(),
                                          timeout=60.0, max_retries=2)
     resp = _anthropic.messages.create(
         model=ANTHROPIC_MODEL, max_tokens=max_tokens,
@@ -181,8 +184,30 @@ def claude(prompt, schema, max_tokens):
     return json.loads(next(b.text for b in resp.content if b.type == "text"))
 
 
+def gpt(prompt, schema):
+    """OpenAI Responses API with a strict JSON-schema answer (structured outputs), low reasoning
+    effort. The key is read from its file on first use (never an env var)."""
+    global _openai
+    import openai
+    if _openai is None:
+        _openai = openai.OpenAI(api_key=open(LLM_KEY_FILE).read().strip(), timeout=60.0, max_retries=2)
+    resp = _openai.responses.create(
+        model=OPENAI_MODEL, input=prompt, reasoning={"effort": "low"}, store=False,
+        text={"format": {"type": "json_schema", "name": "answer", "strict": True,
+                         "schema": dict(schema, additionalProperties=False)}})
+    for item in resp.output:                      # a refusal comes back as a content part, not JSON
+        for part in getattr(item, "content", None) or []:
+            if getattr(part, "type", "") == "refusal":
+                raise RuntimeError("OpenAI declined the request")
+    if not resp.output_text:
+        raise RuntimeError(f"OpenAI returned no answer (status {resp.status})")
+    return json.loads(resp.output_text)
+
+
 def llm(prompt, schema, num_predict=160):
     """The configured LLM. Errors propagate: the caller falls back to the rules / default library."""
+    if LLM_PROVIDER == "openai":
+        return gpt(prompt, schema)
     if LLM_PROVIDER == "anthropic":
         return claude(prompt, schema, max_tokens=2048)    # room for adaptive thinking at low effort
     return ollama(prompt, schema, num_predict)
@@ -351,5 +376,5 @@ if __name__ == "__main__":
             print(json.dumps(classify({"name": n, "is_dir": False}, {}), ensure_ascii=False))
         sys.exit(0)
     log(event="start", port=PORT, provider=LLM_PROVIDER,
-        model=ANTHROPIC_MODEL if LLM_PROVIDER == "anthropic" else MODEL)
+        model={"openai": OPENAI_MODEL, "anthropic": ANTHROPIC_MODEL}.get(LLM_PROVIDER, MODEL))
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

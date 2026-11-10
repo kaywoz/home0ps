@@ -1,6 +1,6 @@
 # Media classifier (kaywoz/home0ps#260). Built on the apps VM by compose (`build:`).
 FROM python:3.13-slim
-RUN pip install --no-cache-dir guessit anthropic
+RUN pip install --no-cache-dir guessit anthropic openai
 WORKDIR /app
 COPY --chmod=644 classifier.py rules.json /app/
 USER 2104:2104
