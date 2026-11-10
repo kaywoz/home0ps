@@ -246,6 +246,18 @@ def job_sort(run):
             continue
         existing[lib] = [n.rstrip("/") for n in rclone("lsf", "--max-depth", "1", lib_path(path)).stdout.splitlines()]
         log(f"library {lib}: {len(existing[lib])} entries")
+    # items already held back (seen, earlier duplicates, unsorted) count as existing too, so a
+    # download that is still on the remote never brings a parked item back into a library
+    held = []
+    r_held = rclone("lsf", "-R", "--max-depth", "3", lib_path(HOLD), check=False)
+    for n in r_held.stdout.splitlines() if r_held.returncode == 0 else []:
+        parts = n.rstrip("/").split("/")
+        name = parts[-1]
+        # <area>/<item> or <area>/<YYYY-MM-DD>/<item>; skip the area and date folders themselves
+        if len(parts) == 2 and not DATED.match(name) or len(parts) == 3 and DATED.match(parts[1]):
+            held.append(name)
+    existing["_held"] = sorted(set(held))
+    log(f"held back ({HOLD}): {len(existing['_held'])} entries")
     today = f"{datetime.date.today():%F}"
     report, errors = [], 0
     total = len(items)
