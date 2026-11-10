@@ -49,6 +49,21 @@ ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-5-5")
 # one key file for whichever cloud provider is selected: switching provider = swap the key
 LLM_KEY_FILE = os.environ.get("LLM_KEY_FILE", "/run/secrets/llm_key")
 _anthropic = None
+# cloud rate limits: minimum seconds between LLM calls (e.g. 6.5 for 10 requests/minute), and after a
+# 429 no further calls until the provider's retry time (at least 60 s): those items are deferred
+LLM_MIN_INTERVAL = float(os.environ.get("LLM_MIN_INTERVAL", "0"))
+_llm_last, _llm_blocked_until = 0.0, 0.0
+
+
+class TransientLLMError(Exception):
+    """Rate limit, timeout, connection or server error: try the item again on a later run."""
+
+
+def _retry_after(e):
+    try:
+        return float(e.response.headers.get("retry-after", "60"))
+    except Exception:
+        return 60.0
 PORT = int(os.environ.get("PORT", "8089"))
 
 VIDEO = {e.lower() for e in RULES["video_extensions"]}
@@ -167,16 +182,22 @@ def by_rules(kind, meta):
 def claude(prompt, schema, max_tokens):
     """Claude API with a JSON-schema answer (structured outputs). Low effort: a short
     classification. The key is read from its file on first use (never an env var)."""
-    global _anthropic
+    global _anthropic, _llm_blocked_until
     import anthropic
     if _anthropic is None:
         _anthropic = anthropic.Anthropic(api_key=open(LLM_KEY_FILE).read().strip(),
                                          timeout=60.0, max_retries=2)
-    resp = _anthropic.messages.create(
-        model=ANTHROPIC_MODEL, max_tokens=max_tokens,
-        output_config={"effort": "low",
-                       "format": {"type": "json_schema", "schema": dict(schema, additionalProperties=False)}},
-        messages=[{"role": "user", "content": prompt}])
+    try:
+        resp = _anthropic.messages.create(
+            model=ANTHROPIC_MODEL, max_tokens=max_tokens,
+            output_config={"effort": "low",
+                           "format": {"type": "json_schema", "schema": dict(schema, additionalProperties=False)}},
+            messages=[{"role": "user", "content": prompt}])
+    except anthropic.RateLimitError as e:
+        _llm_blocked_until = time.time() + max(60.0, _retry_after(e))
+        raise TransientLLMError(f"rate limited: {e}")
+    except (anthropic.APIConnectionError, anthropic.InternalServerError) as e:
+        raise TransientLLMError(str(e))
     if resp.stop_reason == "refusal":
         raise RuntimeError("Claude declined the request")
     if resp.stop_reason == "max_tokens":
@@ -187,14 +208,20 @@ def claude(prompt, schema, max_tokens):
 def gpt(prompt, schema):
     """OpenAI Responses API with a strict JSON-schema answer (structured outputs), low reasoning
     effort. The key is read from its file on first use (never an env var)."""
-    global _openai
+    global _openai, _llm_blocked_until
     import openai
     if _openai is None:
         _openai = openai.OpenAI(api_key=open(LLM_KEY_FILE).read().strip(), timeout=60.0, max_retries=2)
-    resp = _openai.responses.create(
-        model=OPENAI_MODEL, input=prompt, reasoning={"effort": "low"}, store=False,
-        text={"format": {"type": "json_schema", "name": "answer", "strict": True,
-                         "schema": dict(schema, additionalProperties=False)}})
+    try:
+        resp = _openai.responses.create(
+            model=OPENAI_MODEL, input=prompt, reasoning={"effort": "low"}, store=False,
+            text={"format": {"type": "json_schema", "name": "answer", "strict": True,
+                             "schema": dict(schema, additionalProperties=False)}})
+    except openai.RateLimitError as e:
+        _llm_blocked_until = time.time() + max(60.0, _retry_after(e))
+        raise TransientLLMError(f"rate limited: {e}")
+    except (openai.APIConnectionError, openai.InternalServerError) as e:
+        raise TransientLLMError(str(e))
     for item in resp.output:                      # a refusal comes back as a content part, not JSON
         for part in getattr(item, "content", None) or []:
             if getattr(part, "type", "") == "refusal":
@@ -205,7 +232,15 @@ def gpt(prompt, schema):
 
 
 def llm(prompt, schema, num_predict=160):
-    """The configured LLM. Errors propagate: the caller falls back to the rules / default library."""
+    """The configured LLM. TransientLLMError -> the item is deferred; other errors -> the caller
+    falls back to the rules / default library."""
+    global _llm_last
+    if time.time() < _llm_blocked_until:
+        raise TransientLLMError(f"rate limited for another {int(_llm_blocked_until - time.time())} s")
+    wait = _llm_last + LLM_MIN_INTERVAL - time.time()
+    if wait > 0:
+        time.sleep(wait)
+    _llm_last = time.time()
     if LLM_PROVIDER == "openai":
         return gpt(prompt, schema)
     if LLM_PROVIDER == "anthropic":
@@ -218,8 +253,11 @@ def ollama(prompt, schema, num_predict=160):
             "options": {"temperature": 0, "num_predict": num_predict, "num_thread": NUM_THREAD}}
     req = urllib.request.Request(OLLAMA_URL + "/api/generate", json.dumps(body).encode(),
                                  {"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=180) as r:
-        return json.loads(json.load(r)["response"])
+    try:
+        with urllib.request.urlopen(req, timeout=180) as r:
+            return json.loads(json.load(r)["response"])
+    except (urllib.error.URLError, TimeoutError) as e:
+        raise TransientLLMError(f"local LLM unreachable: {e}")
 
 
 def llm_clean_name(name):
@@ -264,7 +302,8 @@ def classify(item, existing):
     files = item.get("files") or ([name] if not item.get("is_dir") else [])
     res = {"name": name, "kind": None, "title": None, "year": None, "season": None, "library": None,
            "target": None, "source": None, "confidence": None, "rule_library": None,
-           "llm_library": None, "disagreement": False, "reason": None, "duplicate_of": None}
+           "llm_library": None, "disagreement": False, "reason": None, "duplicate_of": None,
+           "deferred": False}
     if not any(os.path.splitext(f)[1].lower() in VIDEO for f in files):
         res.update(library=RULES["unsorted_library"], target=name, source="rules",
                    confidence="high", reason="no video files")
@@ -276,6 +315,7 @@ def classify(item, existing):
         meta = metadata(kind, title, year)
     except Exception as e:
         notes.append(f"metadata error: {e}")
+    cleanup_deferred = None
     if meta is None:                       # messy name? let the LLM clean it and search again
         try:
             k2, t2, y2 = llm_clean_name(name)
@@ -283,6 +323,9 @@ def classify(item, existing):
                 notes.append(f"llm cleaned name to '{t2}' ({y2})")
                 kind, title, year = (k2 if kind == "movie" else kind), t2, (y2 or year)
                 meta = metadata(kind, title, year)
+        except TransientLLMError as e:
+            cleanup_deferred = str(e)
+            notes.append(f"name cleanup deferred: {e}")
         except Exception as e:
             notes.append(f"name cleanup failed: {e}")
     titles, years = {norm(title)}, {year} - {None}
@@ -314,6 +357,14 @@ def classify(item, existing):
         res.update(library=rule_lib, source="rules", confidence="high")
         res["reason"] = "; ".join(n for n in notes + [rule_reason] if n)
         return res
+    if res["duplicate_of"]:                           # parked anyway: don't spend an LLM call on it
+        res.update(library=rule_lib or default, source="duplicate", confidence="high")
+        res["reason"] = "; ".join(n for n in notes + ["duplicate, no verdict needed"] if n)
+        return res
+    if cleanup_deferred and not res["duplicate_of"]:  # without a clean name we may miss metadata
+        res.update(deferred=True, source="deferred",
+                   reason="; ".join(notes + ["deferred to a later run"]))
+        return res
     try:
         llm_lib, conf, why = llm_judge(name, kind, title, year, meta, rule_lib, rule_reason)
         res.update(llm_library=llm_lib, confidence=conf)
@@ -326,6 +377,14 @@ def classify(item, existing):
         else:
             res.update(library=llm_lib, source="llm")
             notes.append(why)
+    except TransientLLMError as e:
+        if res["duplicate_of"]:                       # parked anyway: the verdict doesn't matter
+            res.update(library=rule_lib or default, source="rules" if rule_lib else "fallback",
+                       confidence="low")
+            notes.append(f"llm deferred ({e}); duplicate, parked anyway")
+        else:
+            res.update(deferred=True, source="deferred")
+            notes.append(f"llm unavailable ({e}); deferred to a later run")
     except Exception as e:
         res.update(library=rule_lib or default, source="rules" if rule_lib else "fallback",
                    confidence="low")
