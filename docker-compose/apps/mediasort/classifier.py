@@ -24,13 +24,18 @@ The local LLM is the judge on every item; the rules (rules.json, in git) are tri
      low confidence                                -> the default library for the kind
      LLM error                                     -> the rule, else the default library
 """
-import json, os, re, sys, time, unicodedata, urllib.parse, urllib.request
+import hmac, json, os, re, sys, time, unicodedata, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from guessit import guessit
 
 RULES = json.load(open(os.environ.get("RULES_FILE", "/app/rules.json")))
-TOKEN = open(os.environ.get("TOKEN_FILE", "/run/secrets/mediasort_token")).read().strip()
+TOKEN_FILE = os.environ.get("TOKEN_FILE", "/run/secrets/mediasort_token")
+
+
+def token():
+    """Read on every request, so a rotated token works without restarting the container."""
+    return open(TOKEN_FILE).read().strip()
 TMDB_TOKEN = open(os.environ.get("TMDB_TOKEN_FILE", "/run/secrets/tmdb_token")).read().strip()
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://ollama:11434")
 MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:4b-instruct")
@@ -273,7 +278,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/classify":
             return self._send(404, "not found")
-        if self.headers.get("Authorization", "") != "Bearer " + TOKEN:
+        if not hmac.compare_digest(self.headers.get("Authorization", ""), "Bearer " + token()):
             return self._send(401, "unauthorized")
         try:
             n = int(self.headers.get("Content-Length", "0"))
