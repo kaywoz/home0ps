@@ -203,6 +203,13 @@
 			"ip":  ["tcp:2376"],
 		},
 		{
+			// media mover (storage host) -> media classifier on the apps VM (8089, bearer token;
+			// names in, library out) -- kaywoz/home0ps#260. Nothing else reaches the classifier.
+			"src": ["tag:storage"],
+			"dst": ["tag:docker"],
+			"ip":  ["tcp:8089"],
+		},
+		{
 			// monitoring host pulls from observed hosts: beszel agent (45876), and Dozzle reading each
 			// host's read-only docker-socket-proxy (2375, POST=0; remote-host mode, no Dozzle agent)
 			"src": ["tag:monitoring"],
@@ -290,6 +297,11 @@
 		{"src": "tag:hypervisor", "deny": ["svc:dockhand:443", "tag:storage:2376"]},
 		// the Hawser API on the apps VM and media LXC is for Dockhand only, not for admins' devices
 		{"src": "${TS_PRIVUSER}", "deny": ["tag:docker:2376", "tag:media:2376"]},
+		// the media classifier is for the mover on the storage host only
+		{"src": "tag:storage", "accept": ["tag:docker:8089"], "deny": ["tag:media:8089", "tag:docker:2376"]},
+		{"src": "tag:monitoring", "deny": ["tag:docker:8089"]},
+		{"src": "tag:hypervisor", "deny": ["tag:docker:8089"]},
+		{"src": "${TS_PRIVUSER}", "deny": ["tag:docker:8089"]},
 	],
 
 	"sshTests": [
