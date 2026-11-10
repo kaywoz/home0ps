@@ -716,5 +716,13 @@ mistakes, not a diary.
 - **Trigger:** apply broke something (`docker compose up` refused the service)
 - **What happened:** the Ollama service set `cpus: 3` "of 4" because kaywoz mentioned 4 cores; the apps VM has 2 vCPUs, so Docker rejected the limit ("range of CPUs is from 0.01 to 2.00"). The same check then showed 3 GB RAM against an 8 GB `mem_limit` sized from "16gb" in chat.
 - **Root cause:** took a resource figure from chat as the VM's size instead of checking the host (`nproc`, `free -g`) or the VM definition.
-- **Fix applied:** kaywoz raised the apps VM to 4 vCPUs; `cpus: 3` kept, with the comment stating the VM's real size.
+- **Fix applied:** kaywoz raised the apps VM to 4 vCPUs and 16 GB RAM; `cpus: 3` and `mem_limit: 8g` kept, with the comment stating the VM's real size.
 - **Rule going forward:** before setting `cpus`/`mem_limit`, get the host's actual `nproc` and `free -g` (ask kaywoz to run them if unknown) and size limits below those.
+
+### 2026-11-10 — host (media mount cache in RAM)
+
+- **Trigger:** something broke after deploy (a VM could not start)
+- **What happened:** the media mount's VFS cache was configured on the storage host's RAM rootfs (`/mnt/rclone/...`) instead of the pool; it grew to 30 GB, filled the 32 GB rootfs, and libvirt could no longer write a VM's key file at start.
+- **Root cause:** `media-mount.sh` documented "cache on the pool — never on MOS's RAM rootfs" but didn't enforce it, and the host-local env file was never checked against that rule.
+- **Fix applied:** cache cleared and moved to the pool by kaywoz; `media-mount.sh` now aborts when `CACHE_DIR` or the log directory is on the root filesystem.
+- **Rule going forward:** a script that documents a placement rule for host-local paths enforces it (compare `stat -c %d` with `/`), and host steps for such scripts include a check of the env file's paths.
