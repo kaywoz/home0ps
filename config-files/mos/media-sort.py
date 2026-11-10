@@ -27,11 +27,17 @@ Jobs:
            RUN_DIGEST!=1 or no webhook file -> printed only.
   check    print the settings and the plan for `sort` without moving anything (same as dry run).
 
+Stopping (Ctrl-C, kill, hangup): the running rclone gets one SIGINT and stops cleanly, the run logs
+INTERRUPTED, pings Healthchecks /fail and exits 130; the lock is released by the OS. A move cut
+short is recorded in STATE_FILE (on /boot, survives reboots) and finished first by the next real
+sort run, so an item is never left split between the download remote and a library. A second
+Ctrl-C kills rclone immediately.
+
 Settings: /boot/config/home0ps/media-sort.env (override with MEDIA_SORT_ENV=<file>); see
 media-sort.env.example. Healthchecks: one ping per run with a summary as the ping body
 (/fail on errors), so the last run's report is visible in Healthchecks.
 """
-import datetime, fcntl, json, os, re, subprocess, sys, time, urllib.request
+import datetime, fcntl, json, os, re, signal, subprocess, sys, time, urllib.request
 
 ENV_FILE = os.environ.get("MEDIA_SORT_ENV", "/boot/config/home0ps/media-sort.env")
 JUNK = ["._*", ".DS_Store", "Thumbs.db"]
@@ -64,6 +70,29 @@ HOLD = E.get("HOLDING", "_sort").strip("/")
 LOG_FILE = E["LOG_FILE"]
 MIN_AGE = int(E.get("MIN_AGE_MIN", "15")) * 60
 LOG_LINES = []
+STATE_FILE = E.get("STATE_FILE", "/boot/config/home0ps/media-sort.inprogress")  # survives reboots
+CHILD = None          # the rclone process currently running (own process group)
+STOP = None           # name of the signal that asked us to stop
+
+
+class Interrupted(Exception):
+    pass
+
+
+def on_signal(signum, frame):
+    """Ctrl-C / kill / hangup: let the running rclone stop cleanly, then unwind and clean up.
+    rclone runs in its own process group, so only this handler forwards the signal to it, once."""
+    global STOP
+    if STOP:                                   # second signal: stop waiting for rclone
+        if CHILD and CHILD.poll() is None:
+            CHILD.kill()
+        raise Interrupted(STOP)
+    STOP = signal.Signals(signum).name
+    print(f"\n{STOP} received: stopping after cleanup (again to force)", flush=True)
+    if CHILD and CHILD.poll() is None:
+        CHILD.send_signal(signal.SIGINT)       # rclone finishes or aborts its transfers cleanly
+    else:
+        raise Interrupted(STOP)
 
 
 def log(msg):
@@ -84,8 +113,19 @@ def lib_path(p):
 
 
 def rclone(*args, progress=False, check=True):
+    global CHILD
+    if STOP:
+        raise Interrupted(STOP)
     cmd = RCLONE + list(args) + (["-P", "--stats", "2s"] if progress else [])
-    r = subprocess.run(cmd, capture_output=not progress, text=True)
+    pipe = None if progress else subprocess.PIPE
+    CHILD = subprocess.Popen(cmd, stdout=pipe, stderr=pipe, text=True, start_new_session=True)
+    try:
+        out, err = CHILD.communicate()
+    finally:
+        rc, CHILD = CHILD.returncode, None
+    r = subprocess.CompletedProcess(cmd, rc, out, err)
+    if STOP:
+        raise Interrupted(STOP)
     if check and r.returncode:
         raise RuntimeError(f"rclone {' '.join(args[:2])} failed ({r.returncode}): {(r.stderr or '')[-300:]}")
     return r
@@ -137,8 +177,48 @@ def classify(items, existing):
         return json.load(r)["results"]
 
 
+def save_state(d):
+    with open(STATE_FILE + ".tmp", "w") as f:
+        json.dump(d, f)
+    os.replace(STATE_FILE + ".tmp", STATE_FILE)
+
+
+def clear_state():
+    for f in (STATE_FILE, STATE_FILE + ".tmp"):
+        try:
+            os.remove(f)
+        except FileNotFoundError:
+            pass
+
+
+def resume(run):
+    """A move that was interrupted (signal, crash, reboot) is finished first: running the same
+    `moveto` again moves what's left and skips what already arrived, so the item ends up whole."""
+    try:
+        st = json.load(open(STATE_FILE))
+    except (OSError, ValueError):
+        return 0
+    if not run:
+        log(f"interrupted move pending (resumes on the next real run): {st['line']}")
+        return 0
+    log(f"RESUME interrupted move: {st['line']}")
+    src_left = rclone("lsjson", "--stat", st["src"], check=False).returncode == 0
+    if src_left:
+        rclone("moveto", st["src"], st["dst"], progress=True)
+        if st["is_dir"]:
+            rclone("rmdirs", st["src"], check=False)
+    if not exists(st["dst"]):
+        log(f"ERROR resume: {st['dst']} missing and nothing left at {st['src']}; check by hand")
+        return 1
+    clear_state()
+    log(f"resumed: {st['name']} complete")
+    return 0
+
+
 def job_sort(run):
     now = time.time()
+    if resume(run):
+        return 1, ["ERROR resuming an interrupted move (see log)"]
     log(f"listing {src_path()} ...")
     entries = json.loads(rclone("lsjson", "--max-depth", "1", src_path()).stdout or "[]")
     log(f"found {len(entries)} entr{'y' if len(entries) == 1 else 'ies'} on the download remote")
@@ -213,11 +293,15 @@ def job_sort(run):
             continue
         log("MOVE " + line)
         try:
+            save_state({"name": name, "src": src, "dst": dst, "is_dir": it["is_dir"], "line": line})
             rclone("moveto", src, dst, progress=True)
             if not exists(dst):
                 raise RuntimeError("destination missing after move")
             if it["is_dir"]:                                  # only empty folders are left behind
                 rclone("rmdirs", src, check=False)
+            clear_state()
+        except Interrupted:
+            raise
         except Exception as e:
             errors += 1
             log(f"ERROR {name}: {e}")
@@ -321,8 +405,21 @@ def main():
     fn = {"sort": job_sort, "check": job_sort, "junk": job_junk, "holding": job_holding,
           "digest": job_digest}[job]
     log(f"start {job} ({'run' if run else 'dry run'})")
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, on_signal)
     try:
         errors, report = fn(run)
+    except Interrupted as e:
+        msg = f"INTERRUPTED by {e} during {job}"
+        if os.path.exists(STATE_FILE):
+            msg += f"; partial move recorded, the next real sort run finishes it: {json.load(open(STATE_FILE))['line']}"
+        log(msg)
+        for f in (LOG_FILE + ".tmp",):               # leftovers of an interrupted log trim
+            if os.path.exists(f):
+                os.remove(f)
+        if job in ("sort", "junk", "holding"):
+            ping(False, msg)
+        sys.exit(130)
     except Exception as e:
         errors, report = 1, [f"ERROR {e}"]
         log(f"ERROR {e}")
