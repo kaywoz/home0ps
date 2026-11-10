@@ -4,10 +4,36 @@
   "plain_library": "movies",
   "series_library": "xtvshows",
   "unsorted_library": "_sort/unsorted",
-  "default_library": {"movie": "xmovies", "episode": "xtvshows"},
-  "x_genres": ["Horror", "Science Fiction", "Sci-Fi & Fantasy"],
-  "anime_languages": ["ja"],
-  "anime_exceptions": ["Studio Ghibli"],
-  "llm_instructions": "You sort films into one of two libraries. 'xmovies' holds horror, science fiction, anime, cult, surreal, transgressive or otherwise weird films. 'movies' holds everything else: mainstream drama, comedy, action, thrillers, musicals, documentaries, family films. Decide from the metadata; when it is a borderline or odd film, choose xmovies.",
-  "video_extensions": [".mkv", ".mp4", ".avi", ".m4v", ".mov", ".wmv", ".mpg", ".mpeg", ".ts", ".m2ts", ".webm", ".iso", ".img", ".vob"]
+  "default_library": {
+    "movie": "xmovies",
+    "episode": "xtvshows"
+  },
+  "x_genres": [
+    "Horror",
+    "Science Fiction",
+    "Sci-Fi & Fantasy"
+  ],
+  "anime_languages": [
+    "ja"
+  ],
+  "anime_exceptions": [
+    "Studio Ghibli"
+  ],
+  "video_extensions": [
+    ".mkv",
+    ".mp4",
+    ".avi",
+    ".m4v",
+    ".mov",
+    ".wmv",
+    ".mpg",
+    ".mpeg",
+    ".ts",
+    ".m2ts",
+    ".webm",
+    ".iso",
+    ".img",
+    ".vob"
+  ],
+  "llm_question": "Does this film belong with dark, cult, surreal, transgressive, arthouse or genre-adjacent films? Answer yes if ANY of these applies: horror, science fiction or fantasy elements; a cult following; surreal, dreamlike or absurd; sexually or violently extreme or provocative; an auteur, festival or arthouse film; a dark or unsettling psychological story; a brutal or bleak crime or revenge story; a documentary about cult, genre or unmade films; a non-Hollywood genre film. Answer no only when it is clearly mainstream: studio comedy, romance, family or animated family film, musical, biopic, sports, light or conventional action and thriller, or prestige drama with nothing dark or odd about it. If you are not sure, answer unsure."
 }
