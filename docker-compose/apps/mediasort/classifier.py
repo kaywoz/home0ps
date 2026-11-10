@@ -18,8 +18,9 @@ The local LLM is the judge on every item; the rules (rules.json, in git) are tri
   1. no video files                          -> unsorted (non-media), no LLM needed
   2. parse the name (guessit), TMDB metadata; no match -> the LLM cleans the name, search again
   3. duplicate of an existing library entry   -> duplicate_of set (the existing copy wins)
-  4. the LLM judges: library + confidence + a one-line reason, from name, parse, metadata and
-     the rules' suggestion
+  4. films: the LLM answers one question (dark / cult / surreal / transgressive / arthouse /
+     genre-adjacent?) yes / no / unsure + a one-line reason; yes or unsure -> xmovies, no -> movies.
+     Series go to the series library without asking.
   5. a firm rule (x-genre, anime, series) disagrees -> the rule wins (x-side), logged
      low confidence                                -> the default library for the kind
      LLM error                                     -> the rule, else the default library
@@ -73,23 +74,6 @@ def parse(name):
 def is_junk(name):
     """OS metadata (._*, .DS_Store, Thumbs.db) in a library listing is not a copy of anything."""
     return name.startswith("._") or name in (".DS_Store", "Thumbs.db")
-
-
-def taste(existing, per_lib=25):
-    """A spread of clean titles from the owner's movie libraries, so the LLM judges by his taste."""
-    out = {}
-    for lib in (RULES["plain_library"], RULES["x_library"]):
-        names = sorted(n for n in (existing or {}).get(lib, []) if not is_junk(n))
-        step = max(1, len(names) // per_lib)
-        picked = []
-        for n in names[::step][:per_lib]:
-            try:
-                _, t, y, _ = parse(n)
-                picked.append(f"{t} ({y})" if y else t)
-            except Exception:
-                picked.append(n)
-        out[lib] = picked
-    return out
 
 
 def key_of(name):
@@ -195,31 +179,23 @@ def llm_clean_name(name):
     return out.get("kind", "movie"), str(out.get("title") or "").strip(), out.get("year")
 
 
-def llm_judge(name, kind, title, year, meta, rule_lib, rule_reason, examples=None):
-    """The verdict on every item: library, confidence and a one-line reason."""
-    libs = [RULES["plain_library"], RULES["x_library"], RULES["series_library"]]
-    facts = {"file_name": name, "parsed": {"kind": kind, "title": title, "year": year},
-             "metadata": meta or "none found", "rule_suggestion": rule_lib or "none",
-             "rule_reason": rule_reason}
-    shown = ""
-    if examples and any(examples.values()):
-        shown = ("The owner's taste, from what is already in each library (match it; a film like "
-                 "the xmovies examples belongs in xmovies even if its genres look mainstream):\n"
-                 + "\n".join(f"- {lib}: " + "; ".join(t) for lib, t in examples.items() if t) + "\n\n")
+def llm_judge(name, kind, title, year, meta, rule_lib, rule_reason):
+    """The verdict on every film: one yes/no/unsure question, which small models answer far more
+    reliably than "which library" (kaywoz, 2026-11-10). yes or unsure -> xmovies, no -> movies."""
+    facts = {"file_name": name, "title": title, "year": year, "metadata": meta or "none found"}
     out = ollama(
-        RULES["llm_instructions"] + "\n\n" + shown +
-        f"Libraries: {', '.join(libs)}. Series and episodes always go to {RULES['series_library']}.\n"
-        "Answer 'low' confidence when the metadata is missing, thin, or the film is borderline.\n"
+        RULES["llm_question"] + "\n\n"
         "Reason: one short sentence a person can read in a report.\n\n"
         "Facts: " + json.dumps(facts, ensure_ascii=False),
         {"type": "object", "properties": {
-            "library": {"type": "string", "enum": libs},
-            "confidence": {"type": "string", "enum": ["high", "low"]},
+            "answer": {"type": "string", "enum": ["yes", "no", "unsure"]},
             "reason": {"type": "string"}},
-         "required": ["library", "confidence", "reason"]})
-    if out.get("library") not in libs:
-        raise ValueError("LLM answered outside the allowed libraries")
-    return out["library"], out.get("confidence", "low"), str(out.get("reason", ""))[:200]
+         "required": ["answer", "reason"]}, num_predict=96)
+    ans = out.get("answer")
+    if ans not in ("yes", "no", "unsure"):
+        raise ValueError("LLM answered outside yes/no/unsure")
+    lib = RULES["plain_library"] if ans == "no" else RULES["x_library"]
+    return lib, ("low" if ans == "unsure" else "high"), f"{ans}: " + str(out.get("reason", ""))[:200]
 
 
 def safe(s):
@@ -277,9 +253,12 @@ def classify(item, existing):
     rule_lib, rule_reason = by_rules(kind, meta)
     res["rule_library"] = rule_lib
     default = RULES["default_library"][kind]
+    if kind == "episode":                             # series: one library, nothing to judge
+        res.update(library=rule_lib, source="rules", confidence="high")
+        res["reason"] = "; ".join(n for n in notes + [rule_reason] if n)
+        return res
     try:
-        llm_lib, conf, why = llm_judge(name, kind, title, year, meta, rule_lib, rule_reason,
-                                       taste(existing))
+        llm_lib, conf, why = llm_judge(name, kind, title, year, meta, rule_lib, rule_reason)
         res.update(llm_library=llm_lib, confidence=conf)
         if rule_lib and llm_lib != rule_lib:          # tripwire: a firm rule overrules the LLM
             res.update(disagreement=True, library=rule_lib, source="rules (llm disagreed)")
