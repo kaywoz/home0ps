@@ -2,7 +2,7 @@
 FROM python:3.13-slim
 RUN pip install --no-cache-dir guessit
 WORKDIR /app
-COPY classifier.py rules.json /app/
+COPY --chmod=644 classifier.py rules.json /app/
 USER 2104:2104
 EXPOSE 8089
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \

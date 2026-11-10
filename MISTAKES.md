@@ -726,3 +726,11 @@ mistakes, not a diary.
 - **Root cause:** `media-mount.sh` documented "cache on the pool — never on MOS's RAM rootfs" but didn't enforce it, and the host-local env file was never checked against that rule.
 - **Fix applied:** cache cleared and moved to the pool by kaywoz; `media-mount.sh` now aborts when `CACHE_DIR` or the log directory is on the root filesystem.
 - **Rule going forward:** a script that documents a placement rule for host-local paths enforces it (compare `stat -c %d` with `/`), and host steps for such scripts include a check of the env file's paths.
+
+### 2026-11-10 — host steps (mktemp file modes)
+
+- **Trigger:** apply broke something (the classifier container restart-looped, exit 2)
+- **What happened:** the verified-download one-liner (`mktemp` → `sha256sum -c` → `cp`) installed the classifier's code as mode 600 root, because `mktemp` creates 0600 files and `cp` keeps the mode for new files. The image copied them as-is and the non-root process couldn't read its own script.
+- **Root cause:** the download pattern was written for root-only config files and reused for files a non-root process must read; the Dockerfile didn't set modes on `COPY`.
+- **Fix applied:** Dockerfile `COPY --chmod=644`; on the host `chmod 644` on the code files.
+- **Rule going forward:** host download one-liners for files read by non-root processes end with an explicit `chmod` (e.g. `install -m 644`), and Dockerfiles set `--chmod` on `COPY` when the image runs as a non-root `user`.
