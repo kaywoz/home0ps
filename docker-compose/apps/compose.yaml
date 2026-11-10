@@ -138,6 +138,7 @@ services:
     environment:
       LLM_PROVIDER: openai              # openai | anthropic | ollama (local, #261)
       OPENAI_MODEL: gpt-6-luna
+      LLM_MIN_INTERVAL: "6.5"            # seconds between LLM calls: stays under 10 requests/minute
       ANTHROPIC_MODEL: claude-haiku-5-5
       LLM_KEY_FILE: /run/secrets/llm_key   # API key of the selected cloud provider
       OLLAMA_URL: http://ollama:11434   # used when LLM_PROVIDER=ollama
