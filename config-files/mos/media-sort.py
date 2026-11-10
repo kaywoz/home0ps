@@ -11,6 +11,7 @@ Cron (as root on MOS; via python3: /boot doesn't allow executing files directly)
   0 * * * *   python3 /boot/config/home0ps/media-sort.py sort
   30 4 * * *  python3 /boot/config/home0ps/media-sort.py junk
   45 4 * * *  python3 /boot/config/home0ps/media-sort.py holding
+  0 8 * * *   python3 /boot/config/home0ps/media-sort.py digest
 
 Jobs:
   sort     list the download remote, ask the classifier, `rclone moveto` each item into
@@ -21,6 +22,9 @@ Jobs:
   holding  delete dated holding folders (_sort/<area>/YYYY-MM-DD) older than HOLDING_DAYS. The date
            is the folder name (the day it was parked), never the files' modtime: moved files keep
            their original modtime, so --min-age would delete freshly parked items.
+  digest   daily Slack message (incoming webhook, URL in a secret file) of the last 24 h from the
+           log: sorted, parked, would-sort (dry runs), cleanup, errors. No message on a quiet day;
+           RUN_DIGEST!=1 or no webhook file -> printed only.
   check    print the settings and the plan for `sort` without moving anything (same as dry run).
 
 Settings: /boot/config/home0ps/media-sort.env (override with MEDIA_SORT_ENV=<file>); see
@@ -219,10 +223,57 @@ def job_holding(run):
     return errors, report or ["nothing older than the holding period"]
 
 
+def job_digest(run):
+    """Daily Slack digest of the last 24 h from the log: sorted, parked, cleaned, errors."""
+    since = datetime.datetime.now() - datetime.timedelta(hours=24)
+    groups = {"Sorted": [], "Parked (duplicate / collision)": [], "Would sort (dry run)": [],
+              "Cleanup": [], "Errors": []}
+    try:
+        lines = open(LOG_FILE).read().splitlines()
+    except OSError:
+        lines = []
+    for line in lines:
+        m = re.match(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) media-sort: (.*)$", line)
+        if not m or datetime.datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S") < since:
+            continue
+        msg = m.group(2)
+        if msg.startswith("MOVE "):
+            body = msg[5:]
+            groups["Parked (duplicate / collision)" if (" DUPLICATE of " in body or " COLLISION with " in body)
+                   else "Sorted"].append(body)
+        elif msg.startswith("PLAN delete") or msg.startswith("DELETE ") or msg.startswith("junk cleanup"):
+            groups["Cleanup"].append(msg)
+        elif msg.startswith("PLAN "):
+            groups["Would sort (dry run)"].append(msg[5:])
+        elif msg.startswith("ERROR"):
+            groups["Errors"].append(msg)
+    total = sum(len(v) for k, v in groups.items() if k != "Cleanup")
+    if not total and not groups["Cleanup"]:
+        log("digest: nothing in the last 24 h, no message")
+        return 0, ["nothing in the last 24 h"]
+    parts = [f"*Media sorter, last 24 h* ({datetime.date.today():%F})"]
+    for title, items in groups.items():
+        if items:
+            parts.append(f"*{title}* ({len(items)})\n" + "\n".join("• " + i[:300] for i in items[:60])
+                         + (f"\n… and {len(items) - 60} more" if len(items) > 60 else ""))
+    text = "\n\n".join(parts)[:35000]
+    hook = E.get("SLACK_WEBHOOK_FILE", "")
+    if not (run and hook and os.path.exists(hook)):
+        print(text)
+        log("digest printed only (RUN_DIGEST!=1 or no SLACK_WEBHOOK_FILE)")
+        return 0, ["digest printed, not sent"]
+    url = open(hook).read().strip()
+    req = urllib.request.Request(url, json.dumps({"text": text}).encode(), {"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        ok = resp.status == 200
+    log(f"digest sent to Slack ({total} item lines)" if ok else f"ERROR digest: Slack answered {resp.status}")
+    return (0 if ok else 1), [f"digest {'sent' if ok else 'failed'}"]
+
+
 def main():
     job = sys.argv[1] if len(sys.argv) > 1 else "check"
-    if job not in ("sort", "junk", "holding", "check"):
-        sys.exit("usage: media-sort.py sort|junk|holding|check")
+    if job not in ("sort", "junk", "holding", "digest", "check"):
+        sys.exit("usage: media-sort.py sort|junk|holding|digest|check")
     if os.geteuid() != 0:
         sys.exit("run as root")
     guard()
@@ -233,7 +284,8 @@ def main():
         log("another run is active, skipping")
         return
     run = job != "check" and E.get(f"RUN_{job.upper()}", "0") == "1"
-    fn = {"sort": job_sort, "check": job_sort, "junk": job_junk, "holding": job_holding}[job]
+    fn = {"sort": job_sort, "check": job_sort, "junk": job_junk, "holding": job_holding,
+          "digest": job_digest}[job]
     log(f"start {job} ({'run' if run else 'dry run'})")
     try:
         errors, report = fn(run)
@@ -242,7 +294,7 @@ def main():
         log(f"ERROR {e}")
     summary = f"{job} ({'run' if run else 'dry run'}): {len(report)} line(s), {errors} error(s)\n" + "\n".join(report)
     log(f"done {job}: {errors} error(s)")
-    if job != "check":
+    if job in ("sort", "junk", "holding"):
         ping(errors == 0, summary)
     sys.exit(1 if errors else 0)
 
