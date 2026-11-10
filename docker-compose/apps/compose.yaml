@@ -93,7 +93,7 @@ services:
       - /home/ollama:uid=2103,gid=2103,mode=0700   # HOME, owned by the container user: per-start key in ~/.ollama (only for ollama.com)
     pids_limit: 512
     mem_limit: 8g                    # one ~4B model (2.5-3.5 GB) + context; VM has 16 GB
-    cpus: 3                          # of 4: keeps the VM responsive during inference
+    cpus: 3                          # VM has 4 vCPUs (raised from 2, 2026-11-10): 1 left for the rest
     environment:
       HOME: /home/ollama
       OLLAMA_HOST: 0.0.0.0:11434     # inside the container; published on 127.0.0.1 only
