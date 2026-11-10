@@ -710,3 +710,11 @@ mistakes, not a diary.
   own PR.
 - **Rule going forward:** new containers go to the infra VM, apps VM or media LXC; the storage host (MOS)
   and new MOS templates only when kaywoz names them for that service (CLAUDE.md §8).
+
+### 2026-11-10 — host (media mount cache in RAM)
+
+- **Trigger:** something broke after deploy (a VM could not start)
+- **What happened:** the media mount's VFS cache was configured on the storage host's RAM rootfs (`/mnt/rclone/...`) instead of the pool; it grew to 30 GB, filled the 32 GB rootfs, and libvirt could no longer write a VM's key file at start.
+- **Root cause:** `media-mount.sh` documented "cache on the pool — never on MOS's RAM rootfs" but didn't enforce it, and the host-local env file was never checked against that rule.
+- **Fix applied:** cache cleared and moved to the pool by kaywoz; `media-mount.sh` now aborts when `CACHE_DIR` or the log directory is on the root filesystem.
+- **Rule going forward:** a script that documents a placement rule for host-local paths enforces it (compare `stat -c %d` with `/`), and host steps for such scripts include a check of the env file's paths.

@@ -90,6 +90,10 @@ MOUNTED_NOW=0
 if ! is_healthy; then
   if is_mounted; then log "$MNT is mounted but not readable: lazy unmount"; fuse_umount || true; fi
   mkdir -p "$MNT" "$CACHE_DIR" "$(dirname "$LOG_FILE")"
+  # MOS's rootfs is RAM: a cache or log there fills it and libvirt can't start VMs any more
+  for d in "$CACHE_DIR" "$(dirname "$LOG_FILE")"; do
+    [ "$(stat -c %d "$d")" != "$(stat -c %d /)" ] || die "$d is on the root filesystem (RAM) — put it on the pool"
+  done
   [ -z "$(ls -A "$MNT" 2>/dev/null)" ] || die "$MNT is not empty — refusing to mount over files"
   # wait for the network / remote (boot): up to ~5 minutes
   for i in $(seq 30); do
