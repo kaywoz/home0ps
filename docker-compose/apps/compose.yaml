@@ -5,7 +5,7 @@
 # config-files/ubuntu/beszel-agent.sh). Docker runs with userns-remap (docker-host.sh): the proxy opts
 # out with userns_mode: host to open docker.sock — same as on the monitoring host and the infra VM.
 # Hawser lets Dockhand-home (infra VM) manage this Docker (CLAUDE.md §8); it opts out the same way.
-# Ollama is the local LLM API for home0ps tooling (#261).
+# Ollama is the local LLM API for home0ps tooling (#261); mediasort classifies new media (#260).
 services:
   socketproxy:
     image: tecnativa/docker-socket-proxy:latest
@@ -114,6 +114,44 @@ services:
       timeout: 10s
       retries: 3
 
+  # Media classifier (kaywoz/home0ps#260): decides which library a new download goes to. Gets only
+  # item names from the mover on the storage host (tailnet, `tailscale serve --bg --tcp=8089
+  # tcp://localhost:8089`, only tag:storage may reach it) and answers with a library + folder name.
+  # Never sees files or remote credentials, never moves or deletes. Code and rules in git
+  # (docker-compose/apps/mediasort/), copied to /srv/docker/mediasort/ and built here.
+  # Metadata: TMDB (Bearer read token); fallback decisions: the local LLM (ollama service).
+  mediasort:
+    build: ./mediasort
+    image: home0ps/mediasort:latest
+    container_name: kr-ccp-mediasort-0101
+    restart: unless-stopped
+    user: "2104:2104"                # remapped to host uid 102104 (userns-remap)
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    pids_limit: 64
+    mem_limit: 256m
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: qwen3:4b-instruct   # benchmark: kaywoz/home0ps#261
+      OLLAMA_NUM_THREAD: "3"            # = ollama's cpus:
+      TOKEN_FILE: /run/secrets/mediasort_token
+      TMDB_TOKEN_FILE: /run/secrets/tmdb_token
+    secrets:
+      - mediasort_token
+      - tmdb_token
+    ports:
+      - "127.0.0.1:8089:8089"        # tailscale serve --tcp=8089 for the mover
+    networks:
+      - proxy-mediasort              # egress to TMDB
+      - proxy-ollama                 # the local LLM API
+    depends_on:
+      - ollama
+    # healthcheck: in the image (GET /health)
+
 networks:
   socketproxy:
     name: socketproxy
@@ -124,7 +162,14 @@ networks:
   proxy-ollama:
     name: proxy-ollama
     driver: bridge
+  proxy-mediasort:
+    name: proxy-mediasort
+    driver: bridge
 
 secrets:
   hawser_token:
     file: ./hawser/token               # openssl rand -hex 32; 600, owned 2102:2102; never in git
+  mediasort_token:
+    file: ./mediasort/secrets/token    # openssl rand -hex 32; 600, owned 102104; same value on the storage host
+  tmdb_token:
+    file: ./mediasort/secrets/tmdb     # TMDB "API Read Access Token"; 600, owned 102104; never in git
