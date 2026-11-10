@@ -15,11 +15,13 @@ Cron (as root on MOS; via python3: /boot doesn't allow executing files directly)
 
 Jobs:
   sort     list the download remote, ask the classifier, `rclone moveto` each item into
-           <library>/<Title (Year)>[/Season NN]/; duplicates and collisions go to a dated holding
-           folder (_sort/dupes/YYYY-MM-DD/). The download remote is emptied item by item; an item
+           <library>/<Title (Year)>[/Season NN]/; duplicates and collisions are parked in a dated
+           holding folder on the download remote itself (<src-remote>:_sort/dupes/YYYY-MM-DD/), a
+           server-side move: they are never downloaded and uploaded again. The download remote is emptied item by item; an item
            leaves it only through a successful moveto.
   junk     delete OS metadata files (._*, .DS_Store, Thumbs.db) on the library remote.
-  holding  delete dated holding folders (_sort/<area>/YYYY-MM-DD) older than HOLDING_DAYS. The date
+  holding  delete dated holding folders (_sort/<area>/YYYY-MM-DD, on the library remote and on the
+           download remote) older than HOLDING_DAYS. The date
            is the folder name (the day it was parked), never the files' modtime: moved files keep
            their original modtime, so --min-age would delete freshly parked items.
   digest   daily Slack message (incoming webhook, URL in a secret file) of the last 24 h from the
@@ -67,6 +69,9 @@ SRC = E["SRC"].rstrip("/")                                   # e.g. putio:
 LIB = E["LIB_REMOTE"]                                        # e.g. filen-crypt:
 LIBS = dict(p.split("=", 1) for p in E["LIBRARIES"].split(";") if "=" in p)  # name=path
 HOLD = E.get("HOLDING", "_sort").strip("/")
+# duplicates and collisions are parked on the download remote itself (a server-side move there),
+# so they are never downloaded and uploaded again just to be thrown away
+SRC_HOLD = E.get("SRC_HOLDING", SRC.split(":", 1)[0] + ":" + HOLD).rstrip("/")
 LOG_FILE = E["LOG_FILE"]
 MIN_AGE = int(E.get("MIN_AGE_MIN", "15")) * 60
 LOG_LINES = []
@@ -275,8 +280,8 @@ def job_sort(run):
         log(f"[{i}/{total}] {r.get('library')} ({r.get('source')}, {r.get('confidence')}) in {time.time() - t0:.1f} s")
         why = f"[{r.get('source')}, {r.get('confidence')}] {r.get('reason')}"
         if r.get("duplicate_of"):
-            dst = lib_path(f"{HOLD}/dupes/{today}/{name}")
-            what = f"DUPLICATE of {r['duplicate_of']} -> {HOLD}/dupes/{today}/"
+            dst = f"{SRC_HOLD}/dupes/{today}/{name}"
+            what = f"DUPLICATE of {r['duplicate_of']} -> {SRC_HOLD}/dupes/{today}/ (stays on the download remote)"
         else:
             path = LIBS.get(r["library"])
             if path is None:
@@ -294,8 +299,8 @@ def job_sort(run):
                 dst = lib_path(f"{path}/{r['target']}/{name}")
             what = f"-> {dst[len(LIB):]}"
             if exists(dst):                                     # never overwrite: park instead
-                what = f"COLLISION with {dst[len(LIB):]} -> {HOLD}/dupes/{today}/"
-                dst = lib_path(f"{HOLD}/dupes/{today}/{name}")
+                what = f"COLLISION with {dst[len(LIB):]} -> {SRC_HOLD}/dupes/{today}/ (stays on the download remote)"
+                dst = f"{SRC_HOLD}/dupes/{today}/{name}"
         line = f"{name} {what} {why}"
         report.append(line)
         if not r.get("duplicate_of") and r.get("library") in existing:   # later items see this one
@@ -333,23 +338,32 @@ def job_holding(run):
     days = int(E.get("HOLDING_DAYS", "30"))
     cutoff = datetime.date.today() - datetime.timedelta(days=days)
     report, errors = [], 0
-    areas = [a.rstrip("/") for a in rclone("lsf", "--dirs-only", "--max-depth", "1", lib_path(HOLD)).stdout.splitlines()]
-    for area in areas:
-        for d in rclone("lsf", "--max-depth", "1", lib_path(f"{HOLD}/{area}")).stdout.splitlines():
-            name = d.rstrip("/")
-            if not (d.endswith("/") and DATED.match(name)):
-                report.append(f"undated, left alone: {HOLD}/{area}/{name}")
-                continue
-            if datetime.date.fromisoformat(name) > cutoff:
-                continue
-            target = lib_path(f"{HOLD}/{area}/{name}")
-            line = f"{'DELETE' if run else 'PLAN delete'} {HOLD}/{area}/{name} (parked {name}, > {days} days)"
-            log(line)
-            report.append(line)
-            if run:
-                r = rclone("purge", target, progress=True, check=False)
-                errors += 1 if r.returncode else 0
+    for base in (lib_path(HOLD), SRC_HOLD):          # holding on the library and the download remote
+        r_areas = rclone("lsf", "--dirs-only", "--max-depth", "1", base, check=False)
+        if r_areas.returncode:
+            continue                                   # no holding folder there (yet)
+        for area in [a.rstrip("/") for a in r_areas.stdout.splitlines()]:
+            errors += _purge_dated(f"{base}/{area}", cutoff, days, run, report)
     return errors, report or ["nothing older than the holding period"]
+
+
+def _purge_dated(folder, cutoff, days, run, report):
+    errors = 0
+    for d in rclone("lsf", "--max-depth", "1", folder).stdout.splitlines():
+        name = d.rstrip("/")
+        if not (d.endswith("/") and DATED.match(name)):
+            report.append(f"undated, left alone: {folder}/{name}")
+            continue
+        if datetime.date.fromisoformat(name) > cutoff:
+            continue
+        target = f"{folder}/{name}"
+        line = f"{'DELETE' if run else 'PLAN delete'} {target} (parked {name}, > {days} days)"
+        log(line)
+        report.append(line)
+        if run:
+            r = rclone("purge", target, progress=True, check=False)
+            errors += 1 if r.returncode else 0
+    return errors
 
 
 def job_digest(run):
