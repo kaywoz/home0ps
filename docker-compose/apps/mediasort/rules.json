@@ -1,0 +1,13 @@
+{
+  "_doc": "Media classifier rules (kaywoz/home0ps#260). Library names are top-level folders on the library remote; the mover maps them to paths. Edit here, in git.",
+  "x_library": "xmovies",
+  "plain_library": "movies",
+  "series_library": "xtvshows",
+  "unsorted_library": "_sort/unsorted",
+  "default_library": {"movie": "xmovies", "episode": "xtvshows"},
+  "x_genres": ["Horror", "Science Fiction", "Sci-Fi & Fantasy"],
+  "anime_languages": ["ja"],
+  "anime_exceptions": ["Studio Ghibli"],
+  "llm_instructions": "You sort films into one of two libraries. 'xmovies' holds horror, science fiction, anime, cult, surreal, transgressive or otherwise weird films. 'movies' holds everything else: mainstream drama, comedy, action, thrillers, musicals, documentaries, family films. Decide from the metadata; when it is a borderline or odd film, choose xmovies.",
+  "video_extensions": [".mkv", ".mp4", ".avi", ".m4v", ".mov", ".wmv", ".mpg", ".mpeg", ".ts", ".m2ts", ".webm", ".iso", ".img", ".vob"]
+}
