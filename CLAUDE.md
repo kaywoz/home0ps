@@ -279,6 +279,11 @@ change explicitly if one no longer fits.
   Dockhand-home on its own VM and the Hawser agents it manages (see above).
 - **Images on `:latest`**, no digest/version pinning — decided, don't
   propose it. (OpenTofu providers are different: exact pins, §3.)
+- **rclone always shows progress** (kaywoz, 2026-11-10): every rclone
+  command that copies, moves, syncs, checks or deletes data carries `-P`,
+  dry runs included, in scripts (plus `--stats 2s`) and in commands handed
+  to kaywoz. Pure lookups (`lsf`, `lsjson --stat`, `about`,
+  `backend features`, `config`) are exempt.
 - **Monitoring pulls** from the monitoring host outward over the tailnet,
   one explicit grant per flow; agents listen on tailnet IPs only.
   **Exception — pushes to the monitoring host's Services:** observed hosts
