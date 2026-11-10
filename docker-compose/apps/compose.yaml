@@ -119,8 +119,8 @@ services:
   # tcp://localhost:8089`, only tag:storage may reach it) and answers with a library + folder name.
   # Never sees files or remote credentials, never moves or deletes. Code and rules in git
   # (docker-compose/apps/mediasort/), copied to /srv/docker/mediasort/ and built here.
-  # Metadata: TMDB (Bearer read token). LLM: the Claude API (Haiku) by default, or the local
-  # ollama service (LLM_PROVIDER=ollama). The LLM sees names + TMDB facts, never files.
+  # Metadata: TMDB (Bearer read token). LLM: LLM_PROVIDER picks the OpenAI API, the Claude API
+  # or the local ollama service; each cloud key is a secret file. The LLM sees names + TMDB facts, never files.
   mediasort:
     build: ./mediasort
     image: home0ps/mediasort:latest
@@ -136,9 +136,10 @@ services:
     pids_limit: 64
     mem_limit: 256m
     environment:
-      LLM_PROVIDER: anthropic           # anthropic (Claude API) | ollama (local, #261)
+      LLM_PROVIDER: openai              # openai | anthropic | ollama (local, #261)
+      OPENAI_MODEL: gpt-6-luna
       ANTHROPIC_MODEL: claude-haiku-5-5
-      ANTHROPIC_KEY_FILE: /run/secrets/anthropic_key
+      LLM_KEY_FILE: /run/secrets/llm_key   # API key of the selected cloud provider
       OLLAMA_URL: http://ollama:11434   # used when LLM_PROVIDER=ollama
       OLLAMA_MODEL: qwen3:4b-instruct   # benchmark: kaywoz/home0ps#261
       OLLAMA_NUM_THREAD: "3"            # = ollama's cpus:
@@ -147,7 +148,7 @@ services:
     secrets:
       - mediasort_token
       - tmdb_token
-      - anthropic_key
+      - llm_key
     ports:
       - "127.0.0.1:8089:8089"        # tailscale serve --tcp=8089 for the mover
     networks:
@@ -178,5 +179,6 @@ secrets:
     file: ./mediasort/secrets/token    # openssl rand -hex 32; 600, owned 102104; same value on the storage host
   tmdb_token:
     file: ./mediasort/secrets/tmdb     # TMDB "API Read Access Token"; 600, owned 102104; never in git
-  anthropic_key:
-    file: ./mediasort/secrets/anthropic   # personal Anthropic API key; 600, owned 102104; never in git
+  llm_key:
+    file: ./mediasort/secrets/llm      # API key of the provider in LLM_PROVIDER (OpenAI or Anthropic);
+                                       # 600, owned 102104; never in git. Must exist (empty is fine for ollama)
