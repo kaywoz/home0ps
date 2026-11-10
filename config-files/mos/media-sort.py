@@ -103,11 +103,25 @@ def ping(ok, body):
 
 
 def guard():
-    # MOS's rootfs is RAM: never log there (MISTAKES 2026-11-10, media mount cache)
-    d = os.path.dirname(LOG_FILE)
-    os.makedirs(d, exist_ok=True)
-    if os.stat(d).st_dev == os.stat("/").st_dev:
-        sys.exit(f"{d} is on the root filesystem (RAM) — put LOG_FILE on the pool")
+    """The log may live in /var/log (MOS UI shows it), which is RAM: keep it capped at LOG_MAX_KB
+    so it can never fill the rootfs (MISTAKES 2026-11-10, media mount cache). Trims to the newest
+    half of the cap, at a line boundary. On the RAM rootfs the log is lost on reboot."""
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+    cap = int(E.get("LOG_MAX_KB", "2048")) * 1024
+    try:
+        size = os.path.getsize(LOG_FILE)
+    except OSError:
+        return
+    if size <= cap:
+        return
+    with open(LOG_FILE, "rb") as f:
+        f.seek(size - cap // 2)
+        tail = f.read()
+    tail = tail[tail.find(b"\n") + 1:]
+    tmp = LOG_FILE + ".tmp"
+    with open(tmp, "wb") as f:
+        f.write(tail)
+    os.replace(tmp, LOG_FILE)
 
 
 def classify(items, existing):
@@ -284,6 +298,7 @@ def main():
         log("another run is active, skipping")
         return
     run = job != "check" and E.get(f"RUN_{job.upper()}", "0") == "1"
+    guard()                                  # trim again at the start of each run
     fn = {"sort": job_sort, "check": job_sort, "junk": job_junk, "holding": job_holding,
           "digest": job_digest}[job]
     log(f"start {job} ({'run' if run else 'dry run'})")
