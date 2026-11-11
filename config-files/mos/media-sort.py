@@ -28,6 +28,8 @@ Jobs:
            log: sorted, parked, would-sort (dry runs), cleanup, errors. No message on a quiet day;
            RUN_DIGEST!=1 or no webhook file -> printed only.
   check    print the settings and the plan for `sort` without moving anything (same as dry run).
+  limits   show the LLM provider's current rate limits (requests/tokens left, reset) from the
+           response headers of one minimal call made by the classifier (counts against the quota).
 
 Stopping (Ctrl-C, kill, hangup): the running rclone gets one SIGINT and stops cleanly, the run logs
 INTERRUPTED, pings Healthchecks /fail and exits 130; the lock is released by the OS. A move cut
@@ -182,6 +184,36 @@ def classify(items, existing):
         return json.load(r)["results"]
 
 
+def llm_limits(probe=False):
+    """The classifier's view of the LLM provider's rate limits (from its response headers)."""
+    token = open(E["TOKEN_FILE"]).read().strip()
+    req = urllib.request.Request(E["CLASSIFIER_URL"].rstrip("/") + "/limits" + ("?probe=1" if probe else ""),
+                                 headers={"Authorization": "Bearer " + token})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return json.load(r)
+
+
+def fmt_limits(d):
+    parts = []
+    for kind in ("requests", "tokens"):
+        v = d.get(kind) or {}
+        if v:
+            parts.append(f"{kind} {v.get('remaining', '?')}/{v.get('limit', '?')} left (resets in {v.get('reset', '?')})")
+    head = f"llm limits ({d.get('provider')}, {d.get('model') or '-'})"
+    if not parts:
+        return head + ": none seen yet" + (f"; probe error: {d['probe_error']}" if d.get("probe_error") else "")
+    tail = f"; paused {d['paused_for_s']} s" if d.get("paused_for_s") else ""
+    return head + ": " + ", ".join(parts) + tail + (f"; probe error: {d['probe_error']}" if d.get("probe_error") else "")
+
+
+def job_limits(run):
+    """Ask the classifier for one minimal LLM call (counts against the quota) and show the
+    provider's current limits from the response headers."""
+    line = fmt_limits(llm_limits(probe=True))
+    log(line)
+    return 0, [line]
+
+
 def save_state(d):
     with open(STATE_FILE + ".tmp", "w") as f:
         json.dump(d, f)
@@ -224,6 +256,10 @@ def job_sort(run):
     now = time.time()
     if resume(run):
         return 1, ["ERROR resuming an interrupted move (see log)"]
+    try:
+        log(fmt_limits(llm_limits()))                     # last known, no extra call
+    except Exception as e:
+        log(f"llm limits unavailable: {e}")
     log(f"listing {src_path()} ...")
     entries = json.loads(rclone("lsjson", "--max-depth", "1", src_path()).stdout or "[]")
     log(f"found {len(entries)} entr{'y' if len(entries) == 1 else 'ies'} on the download remote")
@@ -422,8 +458,8 @@ def job_digest(run):
 
 def main():
     job = sys.argv[1] if len(sys.argv) > 1 else "check"
-    if job not in ("sort", "junk", "holding", "digest", "check"):
-        sys.exit("usage: media-sort.py sort|junk|holding|digest|check")
+    if job not in ("sort", "junk", "holding", "digest", "check", "limits"):
+        sys.exit("usage: media-sort.py sort|junk|holding|digest|check|limits")
     if os.geteuid() != 0:
         sys.exit("run as root")
     guard()
@@ -436,7 +472,7 @@ def main():
     run = job != "check" and E.get(f"RUN_{job.upper()}", "0") == "1"
     guard()                                  # trim again at the start of each run
     fn = {"sort": job_sort, "check": job_sort, "junk": job_junk, "holding": job_holding,
-          "digest": job_digest}[job]
+          "digest": job_digest, "limits": job_limits}[job]
     log(f"start {job} ({'run' if run else 'dry run'})")
     for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, on_signal)
