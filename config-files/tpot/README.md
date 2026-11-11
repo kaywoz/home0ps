@@ -2,7 +2,7 @@
 
 Server `he-all-tpot-0101` on Hetzner Cloud, created by `iac/hetzner/server_vm.tf` (kaywoz/home0ps#291). T-Pot itself is installed by hand with its own installer. Security summary: [`security/honeypot.md`](../../security/honeypot.md).
 
-**This host is untrusted.** Connect to it only from the Mac with its own key. Never put it on the tailnet, and never give it credentials that work anywhere else.
+**This host is untrusted.** Connect to it only from the Mac, with its own key from 1Password. Never put it on the tailnet, and never give it credentials that work anywhere else.
 
 Upstream docs: T-Pot `README.md` and `env.example` on `master` (github.com/telekom-security/tpotce), plus Galah's `README.md` (github.com/0x4D31/galah).
 
@@ -10,22 +10,42 @@ Upstream docs: T-Pot `README.md` and `env.example` on `master` (github.com/telek
 
 The key and IP come from GitHub secrets, never git.
 
-Mac:
+The key lives in 1Password (its own item, used for nothing else). The 1Password SSH agent serves only the vaults listed in `~/.config/1Password/ssh/agent.toml`, so add this item there if it isn't in Private.
+
+Mac (public half to a file, picked from the agent by the item name):
 
 ```bash
-ssh-keygen -t ed25519 -f ~/.ssh/tpot -C tpot
+T=$(mktemp) && SSH_AUTH_SOCK=~/.1password/agent.sock ssh-add -L | grep "<1Password item name>" > "$T" && [ -s "$T" ] && install -m 600 "$T" ~/.ssh/tpot.pub && rm "$T" && ssh-keygen -lf ~/.ssh/tpot.pub
 ```
 
 Mac:
 
 ```bash
-gh secret set TPOT_SSH_PUBLIC_KEY < ~/.ssh/tpot.pub
+gh secret set TPOT_SSH_PUBLIC_KEY -R kaywoz/home0ps < ~/.ssh/tpot.pub
+```
+
+Mac, `~/.ssh/config`. Pointing `IdentityFile` at the public key while `IdentitiesOnly` is on makes the agent offer only this key:
+
+```text
+Host tpot
+  HostName <tpot_ipv4 from the apply log>
+  User root
+  IdentityFile ~/.ssh/tpot.pub
+  IdentitiesOnly yes
+```
+
+After step 4, change it to `User <admin user>` and add `Port 64295`.
+
+To check the key on the server, compare fingerprints in the **same format**. Hetzner's console shows MD5 (`aa:bb:…`), while 1Password and `ssh-keygen -l` show SHA256 by default. Use this for MD5:
+
+```bash
+ssh-keygen -l -E md5 -f ~/.ssh/tpot.pub
 ```
 
 Mac (home public IPv4; if it changes, set it again and re-run `deploy-hetzner.yml`):
 
 ```bash
-curl -4 -s https://ifconfig.me | gh secret set HOME_PUBLIC_IPV4
+curl -4 -s https://ifconfig.me | gh secret set HOME_PUBLIC_IPV4 -R kaywoz/home0ps
 ```
 
 ## 2. OpenAI
@@ -40,21 +60,33 @@ Until the installer runs, OpenSSH listens on tcp/22 for the world (key only). Do
 Mac:
 
 ```bash
-ssh -i ~/.ssh/tpot root@<tpot_ipv4 from the apply log>
+ssh tpot
 ```
 
-T-Pot host (root). The installer must run as a non-root user:
+T-Pot host (root). The image allows password logins, so turn them off first:
+
+```bash
+printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\n' > /etc/ssh/sshd_config.d/10-keys-only.conf && sshd -t && systemctl reload ssh && sshd -T | grep -Ei '^(passwordauthentication|kbdinteractiveauthentication)'
+```
+
+T-Pot host (root). The installer must run as a non-root user. Don't name it `tpot`: the installer creates its own `tpot` system user and group (uid/gid 2000, `installer/install/tpot.yml`). Pick any other name; it stays out of git (CLAUDE.md §4).
+
+```bash
+U=<admin user>
+```
+
+T-Pot host (root):
 
 ```bash
 apt-get update && apt-get -y full-upgrade && apt-get -y install sudo curl git \
-&& adduser --gecos "" tpot && usermod -aG sudo tpot \
-&& install -d -m 700 -o tpot -g tpot /home/tpot/.ssh \
-&& install -m 600 -o tpot -g tpot /root/.ssh/authorized_keys /home/tpot/.ssh/authorized_keys
+&& adduser --gecos "" "$U" && usermod -aG sudo "$U" \
+&& install -d -m 700 -o "$U" -g "$U" "/home/$U/.ssh" \
+&& install -m 600 -o "$U" -g "$U" /root/.ssh/authorized_keys "/home/$U/.ssh/authorized_keys"
 ```
 
 ## 4. T-Pot install
 
-T-Pot host (as `tpot`: `su - tpot`). Run it interactively, pick **(L)LM**, and set the web user when asked. That keeps the web password out of the shell history.
+T-Pot host (as the admin user: `su - <admin user>`). Run it interactively, pick **(L)LM**, and set the web user when asked. That keeps the web password out of the shell history.
 
 ```bash
 cd ~ && git clone https://github.com/telekom-security/tpotce && cd tpotce && ./install.sh
@@ -63,12 +95,14 @@ cd ~ && git clone https://github.com/telekom-security/tpotce && cd tpotce && ./i
 The installer moves OpenSSH to **tcp/64295**. Reboot when it asks. From then on, from the Mac:
 
 ```bash
-ssh -i ~/.ssh/tpot -p 64295 tpot@<tpot_ipv4>
+ssh tpot
 ```
+
+(with `User <admin user>` and `Port 64295` in the host entry)
 
 The web UI is at `https://<tpot_ipv4>:64297`. The certificate is self-signed. Both ports are open to the home IP only.
 
-T-Pot host (root): with the `tpot` login working, turn off root SSH:
+T-Pot host (root): with the admin user's login working, turn off root SSH:
 
 ```bash
 printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/10-no-root.conf && sshd -t && systemctl reload ssh

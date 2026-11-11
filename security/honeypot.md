@@ -11,7 +11,7 @@ Build: [`iac/hetzner/server_vm.tf`](../iac/hetzner/server_vm.tf); host steps: [`
 | Risk | Control |
 |---|---|
 | Compromise spreads to home0ps | No Tailscale and no grants. Nothing in home0ps trusts or reaches it, and it holds no credentials that work elsewhere. Admin only from the Mac |
-| Reused SSH key | A key used only for this host (`~/.ssh/tpot`), public half from the `TPOT_SSH_PUBLIC_KEY` secret |
+| Reused SSH key | A key used only for this host, kept in 1Password and served by its agent (`IdentitiesOnly` host entry); public half from the `TPOT_SSH_PUBLIC_KEY` secret |
 | Cloud account abuse from the host | No Hetzner token on the host. Server, firewall and key are managed only by `deploy-hetzner.yml` |
 
 ## Network exposure
@@ -26,7 +26,7 @@ Build: [`iac/hetzner/server_vm.tf`](../iac/hetzner/server_vm.tf); host steps: [`
 
 | Risk | Control |
 |---|---|
-| SSH | Key only; root login off after install *(planned)*; non-root `tpot` user |
+| SSH | Key only (password login turned off on the host, since the image allows it) *(planned)*; root login off after install *(planned)*; non-root admin user (not `tpot`, which T-Pot reserves for its services) |
 | Web UI | T-Pot's nginx basic auth (`WEB_USER`), set interactively so it stays out of the shell history *(planned)* |
 
 ## LLM backend
