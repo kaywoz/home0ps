@@ -750,3 +750,11 @@ mistakes, not a diary.
 - **Root cause:** I picked the account name from the product name without reading what the installer creates. I had read only the README.
 - **Fix applied:** kaywoz used a different name. The host steps now take any name except `tpot` as `<admin user>` and keep it out of git (§4).
 - **Rule going forward:** before naming a user, group or path for a third-party installer, grep its install scripts/playbooks for the users, groups and uids it creates.
+
+### 2026-11-11 — hetzner (empty key file from a failed redirect)
+
+- **Trigger:** command failed on the admin Mac
+- **What happened:** I handed over `op item get … > ~/.ssh/tpot.pub && ssh-keygen -lf …`. `op` wasn't installed, but zsh still created the redirect target, so the file was empty. Later `ssh -i ~/.ssh/tpot.pub` matched no agent key and fell back to a password prompt.
+- **Root cause:** a `>` redirect truncates or creates its target before the command runs, so a failed command still leaves a file behind. Chaining with `&&` doesn't prevent that.
+- **Fix applied:** the file was rewritten from the 1Password agent (`ssh-add -L | grep …`) and the fingerprint checked against the agent.
+- **Rule going forward:** commands for kaywoz that write a file from another command's output write to `T=$(mktemp)`, check that it isn't empty (`[ -s "$T" ]`), then `mv` it into place.

@@ -15,7 +15,7 @@ The key lives in 1Password (its own item, used for nothing else). The 1Password 
 Mac (public half to a file, picked from the agent by the item name):
 
 ```bash
-SSH_AUTH_SOCK=~/.1password/agent.sock ssh-add -L | grep "<1Password item name>" > ~/.ssh/tpot.pub && ssh-keygen -lf ~/.ssh/tpot.pub
+T=$(mktemp) && SSH_AUTH_SOCK=~/.1password/agent.sock ssh-add -L | grep "<1Password item name>" > "$T" && [ -s "$T" ] && install -m 600 "$T" ~/.ssh/tpot.pub && rm "$T" && ssh-keygen -lf ~/.ssh/tpot.pub
 ```
 
 Mac:
