@@ -26,8 +26,8 @@ Build: [`iac/hetzner/server_vm.tf`](../iac/hetzner/server_vm.tf); host steps: [`
 
 | Risk | Control |
 |---|---|
-| SSH | Key only (password login turned off on the host, since the image allows it) *(planned)*; root login off after install *(planned)*; non-root admin user (not `tpot`, which T-Pot reserves for its services) |
-| Web UI | T-Pot's nginx basic auth (`WEB_USER`), set interactively so it stays out of the shell history *(planned)* |
+| SSH | OpenSSH on tcp/64295 only, key only: `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `PermitRootLogin no` as drop-ins in `/etc/ssh/sshd_config.d/`, which win over the main config's `prohibit-password` because sshd keeps the first value. Verified from outside 2026-11-11: root is refused with a valid key, the admin user gets in, and only `publickey` is offered. Non-root admin user (not `tpot`, which T-Pot reserves for its services) |
+| Web UI | T-Pot's nginx basic auth (`WEB_USER`), set interactively during the install, so it stays out of the shell history. Unauthenticated requests get `401` (verified 2026-11-11) |
 
 ## LLM backend
 
@@ -46,4 +46,5 @@ Build: [`iac/hetzner/server_vm.tf`](../iac/hetzner/server_vm.tf); host steps: [`
 
 ## Open issues
 
-- Host install, LLM wiring and verification — kaywoz/home0ps#291
+- IPv6: the admin ports have no IPv6 rule, so they should be closed over IPv6. That's untested, because the admin Mac has no IPv6.
+- Parked (proposed 2026-11-11, not approved): off-host copies of the Galah/Beelzebub logs with a write-only token; a golden snapshot with a daily rebuild; a scheduled up/down that deletes and recreates the server, since a powered-off server is still billed
