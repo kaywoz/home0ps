@@ -742,3 +742,11 @@ mistakes, not a diary.
 - **Root cause:** I asked for a fingerprint comparison without checking that both sides used the same format. Hetzner's console shows MD5, 1Password and `ssh-keygen -l` show SHA256. Before calling the key wrong, I also didn't check which keys the agent offered: the `ssh -v` log only listed other keys.
 - **Fix applied:** no rebuild. The vault was added to `agent.toml`. The host steps now say how to compare fingerprints in one format (`ssh-keygen -l -E md5`) and use an `IdentitiesOnly` host entry.
 - **Rule going forward:** when comparing key fingerprints across tools, state the format and give the command for it. Before blaming the server's key, check in `ssh -v` that the intended key was offered at all.
+
+### 2026-11-11 — hetzner (T-Pot reserved username)
+
+- **Trigger:** script failed on the host
+- **What happened:** the host steps had kaywoz create a non-root admin user named `tpot` for running T-Pot's installer. T-Pot rejects that name, because its installer creates its own `tpot` system user and group (uid/gid 2000, `installer/install/tpot.yml`).
+- **Root cause:** I picked the account name from the product name without reading what the installer creates. I had read only the README.
+- **Fix applied:** kaywoz used a different name. The host steps now take any name except `tpot` as `<admin user>` and keep it out of git (§4).
+- **Rule going forward:** before naming a user, group or path for a third-party installer, grep its install scripts/playbooks for the users, groups and uids it creates.

@@ -34,7 +34,7 @@ Host tpot
   IdentitiesOnly yes
 ```
 
-After step 4, change it to `User tpot` and add `Port 64295`.
+After step 4, change it to `User <admin user>` and add `Port 64295`.
 
 To check the key on the server, compare fingerprints in the **same format**. Hetzner's console shows MD5 (`aa:bb:…`), while 1Password and `ssh-keygen -l` show SHA256 by default. Use this for MD5:
 
@@ -69,18 +69,24 @@ T-Pot host (root). The image allows password logins, so turn them off first:
 printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\n' > /etc/ssh/sshd_config.d/10-keys-only.conf && sshd -t && systemctl reload ssh && sshd -T | grep -Ei '^(passwordauthentication|kbdinteractiveauthentication)'
 ```
 
-T-Pot host (root). The installer must run as a non-root user:
+T-Pot host (root). The installer must run as a non-root user. Don't name it `tpot`: the installer creates its own `tpot` system user and group (uid/gid 2000, `installer/install/tpot.yml`). Pick any other name; it stays out of git (CLAUDE.md §4).
+
+```bash
+U=<admin user>
+```
+
+T-Pot host (root):
 
 ```bash
 apt-get update && apt-get -y full-upgrade && apt-get -y install sudo curl git \
-&& adduser --gecos "" tpot && usermod -aG sudo tpot \
-&& install -d -m 700 -o tpot -g tpot /home/tpot/.ssh \
-&& install -m 600 -o tpot -g tpot /root/.ssh/authorized_keys /home/tpot/.ssh/authorized_keys
+&& adduser --gecos "" "$U" && usermod -aG sudo "$U" \
+&& install -d -m 700 -o "$U" -g "$U" "/home/$U/.ssh" \
+&& install -m 600 -o "$U" -g "$U" /root/.ssh/authorized_keys "/home/$U/.ssh/authorized_keys"
 ```
 
 ## 4. T-Pot install
 
-T-Pot host (as `tpot`: `su - tpot`). Run it interactively, pick **(L)LM**, and set the web user when asked. That keeps the web password out of the shell history.
+T-Pot host (as the admin user: `su - <admin user>`). Run it interactively, pick **(L)LM**, and set the web user when asked. That keeps the web password out of the shell history.
 
 ```bash
 cd ~ && git clone https://github.com/telekom-security/tpotce && cd tpotce && ./install.sh
@@ -92,11 +98,11 @@ The installer moves OpenSSH to **tcp/64295**. Reboot when it asks. From then on,
 ssh tpot
 ```
 
-(with `User tpot` and `Port 64295` in the host entry)
+(with `User <admin user>` and `Port 64295` in the host entry)
 
 The web UI is at `https://<tpot_ipv4>:64297`. The certificate is self-signed. Both ports are open to the home IP only.
 
-T-Pot host (root): with the `tpot` login working, turn off root SSH:
+T-Pot host (root): with the admin user's login working, turn off root SSH:
 
 ```bash
 printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/10-no-root.conf && sshd -t && systemctl reload ssh

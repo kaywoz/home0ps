@@ -26,7 +26,7 @@ Build: [`iac/hetzner/server_vm.tf`](../iac/hetzner/server_vm.tf); host steps: [`
 
 | Risk | Control |
 |---|---|
-| SSH | Key only (password login turned off on the host, since the image allows it) *(planned)*; root login off after install *(planned)*; non-root `tpot` user |
+| SSH | Key only (password login turned off on the host, since the image allows it) *(planned)*; root login off after install *(planned)*; non-root admin user (not `tpot`, which T-Pot reserves for its services) |
 | Web UI | T-Pot's nginx basic auth (`WEB_USER`), set interactively so it stays out of the shell history *(planned)* |
 
 ## LLM backend
