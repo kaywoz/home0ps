@@ -57,10 +57,16 @@ curl -4 -s https://ifconfig.me | gh secret set HOME_PUBLIC_IPV4 -R kaywoz/home0p
 
 Until the installer runs, OpenSSH listens on tcp/22 for the world (key only). Do this step and step 4 in one go.
 
-Mac:
+Mac. After a rebuild, Hetzner may hand out the same IPv4, so clear the old host keys first:
 
 ```bash
-ssh tpot
+ssh-keygen -R <tpot_ipv4> && ssh-keygen -R '[<tpot_ipv4>]:64295'
+```
+
+Mac (until the install, as root on port 22):
+
+```bash
+ssh -p 22 -i ~/.ssh/tpot.pub -o IdentitiesOnly=yes root@<tpot_ipv4>
 ```
 
 T-Pot host (root). The image allows password logins, so turn them off first:
@@ -71,17 +77,18 @@ printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\n' > /etc/ssh
 
 T-Pot host (root). The installer must run as a non-root user. Don't name it `tpot`: the installer creates its own `tpot` system user and group (uid/gid 2000, `installer/install/tpot.yml`). Pick any other name; it stays out of git (CLAUDE.md §4).
 
+T-Pot host (root). `adduser` asks for a password, which `sudo` needs during the install, so store it in 1Password. Group and home are looked up, not assumed:
+
 ```bash
-U=<admin user>
+U=<admin user> && apt-get update && apt-get -y install sudo git curl && adduser --gecos "" "$U" && usermod -aG sudo "$U" && G=$(id -gn "$U") && H=$(getent passwd "$U" | cut -d: -f6) && install -d -m 700 -o "$U" -g "$G" "$H/.ssh" && install -m 600 -o "$U" -g "$G" /root/.ssh/authorized_keys "$H/.ssh/authorized_keys" && id "$U" && ls -l "$H/.ssh/authorized_keys"
 ```
 
-T-Pot host (root):
+Expect `uid=1000(<admin user>) gid=1000(<admin user>)` with `27(sudo)`, and `authorized_keys` owned by the admin user.
+
+Mac. Check the key login before installing; `BatchMode` never falls back to a password prompt:
 
 ```bash
-apt-get update && apt-get -y full-upgrade && apt-get -y install sudo curl git \
-&& adduser --gecos "" "$U" && usermod -aG sudo "$U" \
-&& install -d -m 700 -o "$U" -g "$U" "/home/$U/.ssh" \
-&& install -m 600 -o "$U" -g "$U" /root/.ssh/authorized_keys "/home/$U/.ssh/authorized_keys"
+ssh -p 22 -i ~/.ssh/tpot.pub -o IdentitiesOnly=yes -o BatchMode=yes <admin user>@<tpot_ipv4> true && echo OK
 ```
 
 ## 4. T-Pot install
@@ -98,14 +105,20 @@ The installer moves OpenSSH to **tcp/64295**. Reboot when it asks. From then on,
 ssh tpot
 ```
 
-(with `User <admin user>` and `Port 64295` in the host entry)
+(with `User <admin user>` and `Port 64295` in the host entry), or directly:
+
+```bash
+ssh -p 64295 -i ~/.ssh/tpot.pub -o IdentitiesOnly=yes <admin user>@<tpot_ipv4>
+```
+
+On port 22 you now reach the SSH honeypot: a host-key warning or a password prompt there means wrong port. Never type a real password there.
 
 The web UI is at `https://<tpot_ipv4>:64297`. The certificate is self-signed. Both ports are open to the home IP only.
 
 T-Pot host (root): with the admin user's login working, turn off root SSH:
 
 ```bash
-printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/10-no-root.conf && sshd -t && systemctl reload ssh
+printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/10-no-root.conf && sshd -t && systemctl reload ssh && sshd -T | grep -Ei '^(permitrootlogin|passwordauthentication|kbdinteractiveauthentication)'
 ```
 
 ## 5. LLM backend (OpenAI)
