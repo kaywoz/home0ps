@@ -136,11 +136,12 @@ services:
     pids_limit: 64
     mem_limit: 256m
     environment:
-      LLM_PROVIDER: openai              # openai | anthropic | ollama (local, #261)
+      LLM_PROVIDER: anthropic           # openai | anthropic | ollama (local, #261)
       OPENAI_MODEL: gpt-6-luna
-      LLM_MIN_INTERVAL: "6.5"            # seconds between LLM calls: stays under 10 requests/minute
+      OPENAI_MIN_INTERVAL: "6.5"        # seconds between LLM calls: stays under 10 requests/minute
       ANTHROPIC_MODEL: claude-haiku-5-5
-      LLM_KEY_FILE: /run/secrets/llm_key   # API key of the selected cloud provider
+      ANTHROPIC_MIN_INTERVAL: "1"       # 1000 requests/minute: only a courtesy gap
+      LLM_KEY_FILE: /run/secrets/llm_key   # API key of the selected provider: only the key, one line
       OLLAMA_URL: http://ollama:11434   # used when LLM_PROVIDER=ollama
       OLLAMA_MODEL: qwen3:4b-instruct   # benchmark: kaywoz/home0ps#261
       OLLAMA_NUM_THREAD: "3"            # = ollama's cpus:

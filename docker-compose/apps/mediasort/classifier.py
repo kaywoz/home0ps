@@ -49,9 +49,10 @@ ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-5-5")
 # one key file for whichever cloud provider is selected: switching provider = swap the key
 LLM_KEY_FILE = os.environ.get("LLM_KEY_FILE", "/run/secrets/llm_key")
 _anthropic = None
-# cloud rate limits: minimum seconds between LLM calls (e.g. 6.5 for 10 requests/minute), and after a
-# 429 no further calls until the provider's retry time (at least 60 s): those items are deferred
-LLM_MIN_INTERVAL = float(os.environ.get("LLM_MIN_INTERVAL", "0"))
+# cloud rate limits: minimum seconds between LLM calls, per provider (<PROVIDER>_MIN_INTERVAL, e.g.
+# OPENAI_MIN_INTERVAL=6.5 for 10 requests/minute), and after a 429 no further calls until the
+# provider's retry time (at least 60 s): those items are deferred
+LLM_MIN_INTERVAL = float(os.environ.get(f"{LLM_PROVIDER.upper()}_MIN_INTERVAL", "0"))
 _llm_last, _llm_blocked_until = 0.0, 0.0
 
 
@@ -78,6 +79,30 @@ def _duration(v):
                          - _dt.datetime.now(_dt.timezone.utc)).total_seconds())
     except ValueError:
         return None
+
+
+def _reset_in(v):
+    """Anthropic reports the reset as an RFC 3339 time, OpenAI as a duration: show both as a duration."""
+    if not v or "T" not in v:
+        return v
+    d = _duration(v)
+    if d is None:
+        return v
+    d = int(d)
+    return f"{d // 3600}h{d % 3600 // 60}m{d % 60}s" if d >= 3600 else f"{d // 60}m{d % 60}s" if d >= 60 else f"{d}s"
+
+
+def _llm_key():
+    """The cloud API key from its file. Anything besides the key (a second line, a comment, spaces,
+    non-ASCII) would end up in the HTTP header, and the SDK reports that only as "Connection error"."""
+    try:
+        k = open(LLM_KEY_FILE).read().strip()
+    except OSError as e:
+        raise TransientLLMError(f"key file {LLM_KEY_FILE} not readable: {e.strerror}")
+    if not k or not k.isascii() or any(c.isspace() or not c.isprintable() for c in k):
+        raise TransientLLMError(f"key file {LLM_KEY_FILE} must contain only the API key "
+                                "(one line, no comments or spaces)")
+    return k
 
 
 def note_limits(headers, provider, model):
@@ -244,7 +269,7 @@ def claude(prompt, schema, max_tokens):
     global _anthropic, _llm_blocked_until
     import anthropic
     if _anthropic is None:
-        _anthropic = anthropic.Anthropic(api_key=open(LLM_KEY_FILE).read().strip(),
+        _anthropic = anthropic.Anthropic(api_key=_llm_key(),
                                          timeout=60.0, max_retries=2)
     try:
         raw = _anthropic.messages.with_raw_response.create(
@@ -273,7 +298,7 @@ def gpt(prompt, schema, max_output_tokens=None):
     global _openai, _llm_blocked_until
     import openai
     if _openai is None:
-        _openai = openai.OpenAI(api_key=open(LLM_KEY_FILE).read().strip(), timeout=60.0, max_retries=2)
+        _openai = openai.OpenAI(api_key=_llm_key(), timeout=60.0, max_retries=2)
     try:
         raw = _openai.responses.with_raw_response.create(
             model=OPENAI_MODEL, input=prompt, reasoning={"effort": "low"}, store=False,
@@ -485,6 +510,9 @@ class Handler(BaseHTTPRequestHandler):
                 probe_error = str(e)[:300]
         out = dict(LIMITS, provider=LIMITS["provider"] or LLM_PROVIDER,
                    paused_for_s=max(0, int(_llm_blocked_until - time.time())))
+        for kind in ("requests", "tokens"):
+            if out.get(kind):
+                out[kind] = dict(out[kind], reset=_reset_in(out[kind].get("reset")))
         if probe_error:
             out["probe_error"] = probe_error
         self._send(200, out)
@@ -518,6 +546,12 @@ if __name__ == "__main__":
         for n in sys.argv[1:]:
             print(json.dumps(classify({"name": n, "is_dir": False}, {}), ensure_ascii=False))
         sys.exit(0)
-    log(event="start", port=PORT, provider=LLM_PROVIDER,
+    log(event="start", port=PORT, provider=LLM_PROVIDER, min_interval_s=LLM_MIN_INTERVAL,
         model={"openai": OPENAI_MODEL, "anthropic": ANTHROPIC_MODEL}.get(LLM_PROVIDER, MODEL))
+    if LLM_PROVIDER in ("openai", "anthropic"):
+        try:
+            _llm_key()
+        except TransientLLMError as e:    # say so at start, not as a "Connection error" per item
+            log(event="error", error=str(e))
+            sys.exit(1)
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
