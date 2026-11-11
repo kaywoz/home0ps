@@ -38,7 +38,7 @@ Build: [`iac/hetzner/server_vm.tf`](../iac/hetzner/server_vm.tf); host steps: [`
 
 ## Accepted risks
 
-- `cpx22` is below T-Pot's 8 GB guidance (kaywoz, 2026-11-11). Expect slow Elasticsearch/Kibana, and resize when the load shows it's needed.
+- `cpx32` (4 vCPU, 8 GB RAM, 80 GB disk kept from `cpx22`, so the server can still be resized back down) is below T-Pot's hive guidance of 16 GB RAM / 256 GB SSD (kaywoz, 2026-11-11). Watch Elasticsearch memory and disk use; logs persist 30 days (`TPOT_PERSISTENCE_CYCLES`).
 - Captured data goes to T-Pot's community backend (ewsposter, opted in).
 - Upstream `llm.yml` needs local edits for API keys, and `update.sh` may undo them.
 - The home public IPv4 sits in the Hetzner firewall and in OpenTofu state (marked `sensitive`, so it isn't shown in plan output).
