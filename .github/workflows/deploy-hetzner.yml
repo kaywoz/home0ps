@@ -7,6 +7,11 @@ on:
     branches: [main]
     paths: ["iac/hetzner/**", ".github/workflows/deploy-hetzner.yml"]
   workflow_dispatch:
+    inputs:
+      replace:
+        description: "Resource address to rebuild (tofu apply -replace), e.g. hcloud_server.honeypot. Empty = normal apply."
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -67,4 +72,15 @@ jobs:
         run: tofu init -backend-config="endpoint=$S3_ENDPOINT" -backend-config="bucket=$S3_BUCKET"
 
       - name: Apply changes
-        run: tofu apply -auto-approve -no-color
+        env:
+          REPLACE: ${{ inputs.replace }} # passed via env, never interpolated into the script
+        run: |
+          if [ -z "$REPLACE" ]; then
+            tofu apply -auto-approve -no-color
+          elif [[ "$REPLACE" =~ ^hcloud_[a-z_]+\.[a-z0-9_]+$ ]]; then
+            echo "Rebuilding: $REPLACE"
+            tofu apply -auto-approve -no-color -replace="$REPLACE"
+          else
+            echo "replace must look like hcloud_<type>.<name>" >&2
+            exit 1
+          fi
