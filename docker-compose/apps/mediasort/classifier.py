@@ -59,6 +59,55 @@ class TransientLLMError(Exception):
     """Rate limit, timeout, connection or server error: try the item again on a later run."""
 
 
+# the provider's rate limits as last reported in its response headers (OpenAI: x-ratelimit-*,
+# Anthropic: anthropic-ratelimit-*); GET /limits shows them, the mover logs them per run
+LIMITS = {"provider": None, "model": None, "seen_at": None, "requests": {}, "tokens": {}}
+
+
+def _duration(v):
+    """OpenAI reset format ("1s", "6m0s", "17ms", "1h2m3s") or an RFC 3339 time -> seconds."""
+    if not v:
+        return None
+    m = re.fullmatch(r"(?:(\d+)h)?(?:(\d+)m(?!s))?(?:(\d+(?:\.\d+)?)s)?(?:(\d+)ms)?", v.strip())
+    if m and any(m.groups()):
+        h, mi, se, ms = m.groups()
+        return int(h or 0) * 3600 + int(mi or 0) * 60 + float(se or 0) + int(ms or 0) / 1000
+    try:
+        import datetime as _dt
+        return max(0.0, (_dt.datetime.fromisoformat(v.replace("Z", "+00:00"))
+                         - _dt.datetime.now(_dt.timezone.utc)).total_seconds())
+    except ValueError:
+        return None
+
+
+def note_limits(headers, provider, model):
+    """Record rate-limit headers; when no requests are left, pause until the reset."""
+    global _llm_blocked_until
+    if headers is None:
+        return
+    h = {k.lower(): v for k, v in dict(headers).items()}
+    pre = "x-ratelimit-" if provider == "openai" else "anthropic-ratelimit-"
+    new = {}
+    for kind in ("requests", "tokens"):
+        if provider == "openai":
+            vals = {f: h.get(f"{pre}{f}-{kind}") for f in ("limit", "remaining", "reset")}
+        else:
+            vals = {f: h.get(f"{pre}{kind}-{f}") for f in ("limit", "remaining", "reset")}
+        if any(vals.values()):
+            new[kind] = vals
+    if not new:
+        return
+    changed = any(LIMITS.get(k) != v for k, v in new.items())
+    LIMITS.update(new, provider=provider, model=model, seen_at=time.strftime("%Y-%m-%dT%H:%M:%S"))
+    if changed:
+        log(event="ratelimits", provider=provider, model=model, **new)
+    req = new.get("requests", {})
+    if req.get("remaining") == "0":
+        wait = _duration(req.get("reset"))
+        if wait:
+            _llm_blocked_until = max(_llm_blocked_until, time.time() + wait)
+
+
 def _retry_after(e):
     try:
         return float(e.response.headers.get("retry-after", "60"))
@@ -188,12 +237,15 @@ def claude(prompt, schema, max_tokens):
         _anthropic = anthropic.Anthropic(api_key=open(LLM_KEY_FILE).read().strip(),
                                          timeout=60.0, max_retries=2)
     try:
-        resp = _anthropic.messages.create(
+        raw = _anthropic.messages.with_raw_response.create(
             model=ANTHROPIC_MODEL, max_tokens=max_tokens,
             output_config={"effort": "low",
                            "format": {"type": "json_schema", "schema": dict(schema, additionalProperties=False)}},
             messages=[{"role": "user", "content": prompt}])
+        note_limits(raw.headers, "anthropic", ANTHROPIC_MODEL)
+        resp = raw.parse()
     except anthropic.RateLimitError as e:
+        note_limits(getattr(e.response, "headers", None), "anthropic", ANTHROPIC_MODEL)
         _llm_blocked_until = time.time() + max(60.0, _retry_after(e))
         raise TransientLLMError(f"rate limited: {e}")
     except (anthropic.APIConnectionError, anthropic.InternalServerError) as e:
@@ -213,11 +265,14 @@ def gpt(prompt, schema):
     if _openai is None:
         _openai = openai.OpenAI(api_key=open(LLM_KEY_FILE).read().strip(), timeout=60.0, max_retries=2)
     try:
-        resp = _openai.responses.create(
+        raw = _openai.responses.with_raw_response.create(
             model=OPENAI_MODEL, input=prompt, reasoning={"effort": "low"}, store=False,
             text={"format": {"type": "json_schema", "name": "answer", "strict": True,
                              "schema": dict(schema, additionalProperties=False)}})
+        note_limits(raw.headers, "openai", OPENAI_MODEL)
+        resp = raw.parse()
     except openai.RateLimitError as e:
+        note_limits(getattr(e.response, "headers", None), "openai", OPENAI_MODEL)
         _llm_blocked_until = time.time() + max(60.0, _retry_after(e))
         raise TransientLLMError(f"rate limited: {e}")
     except (openai.APIConnectionError, openai.InternalServerError) as e:
@@ -403,7 +458,25 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        self._send(200, "ok") if self.path == "/health" else self._send(404, "not found")
+        if self.path == "/health":
+            return self._send(200, "ok")
+        if self.path.split("?")[0] != "/limits":
+            return self._send(404, "not found")
+        if not hmac.compare_digest(self.headers.get("Authorization", ""), "Bearer " + token()):
+            return self._send(401, "unauthorized")
+        # ?probe=1: one minimal LLM call (counts against the quota) to read fresh headers
+        probe_error = None
+        if "probe=1" in self.path and LLM_PROVIDER in ("openai", "anthropic"):
+            try:
+                llm("Answer ok.", {"type": "object", "properties": {"ok": {"type": "string"}},
+                                   "required": ["ok"]}, num_predict=8)
+            except Exception as e:
+                probe_error = str(e)[:300]
+        out = dict(LIMITS, provider=LIMITS["provider"] or LLM_PROVIDER,
+                   paused_for_s=max(0, int(_llm_blocked_until - time.time())))
+        if probe_error:
+            out["probe_error"] = probe_error
+        self._send(200, out)
 
     def do_POST(self):
         if self.path != "/classify":
