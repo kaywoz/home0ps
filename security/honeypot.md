@@ -33,7 +33,7 @@ Build: [`iac/hetzner/server_vm.tf`](../iac/hetzner/server_vm.tf); host steps: [`
 
 | Risk | Control |
 |---|---|
-| Denial of wallet (attackers drive API calls) | A separate OpenAI project and key on **prepaid credits, auto-recharge off**, so spend ends when the credits run out; that is the only cap. Galah (OpenAI, small model) caches answers for 24 h, verified 2026-11-11. Beelzebub at T-Pot's pinned commit has **no rate limit**, a fixed `gpt-4o` model and accepts any SSH password, so every attacker command is one gpt-4o call |
+| Denial of wallet (attackers drive API calls) | A separate OpenAI project and key on **prepaid credits, auto-recharge off**, so spend ends when the credits run out; that is the only cap. Galah (OpenAI, small model) caches answers for 24 h. Both honeypots were verified answering through OpenAI on 2026-11-11 (Galah `source: llm` then a cache hit; Beelzebub answered `uname -a` over SSH). Beelzebub at T-Pot's pinned commit has **no rate limit**, a fixed `gpt-4o` model and accepts any SSH password, so every attacker command is one gpt-4o call |
 | API key stolen from the host | Assumed to happen. The key works only for that project and is bounded by its credits. Rotate it after any sign of compromise |
 | Key exposure on the host | `.env` set to `600` (the installer leaves it `664`). The key also sits in both containers' environment (`docker inspect`): accepted, because the host is assumed compromised anyway |
 
