@@ -28,6 +28,9 @@ Jobs:
            log: sorted, parked, would-sort (dry runs), cleanup, errors. No message on a quiet day;
            RUN_DIGEST!=1 or no webhook file -> printed only.
   check    print the settings and the plan for `sort` without moving anything (same as dry run).
+  selftest classify a made-up download (default Alien, 1979; or `selftest "<name>"`) through the
+           whole path (parse, TMDB, LLM, rules) without touching any remote; PASS = xmovies by the
+           LLM or a rule. Exit 1 on FAIL. Then the provider's rate limits. Uses 1-2 LLM requests.
   limits   show the LLM provider's current rate limits (requests/tokens left, reset) from the
            response headers of one minimal call made by the classifier (counts against the quota).
 
@@ -212,6 +215,34 @@ def job_limits(run):
     line = fmt_limits(llm_limits(probe=True))
     log(line)
     return 0, [line]
+
+
+SELFTEST_ITEM = "Alien.1979.Directors.Cut.1080p.BluRay.x264.mkv"   # a known answer: sci-fi horror -> xmovies
+
+
+def job_selftest(run):
+    """End-to-end check of the whole decision path without touching any remote: send a made-up
+    download (default: Alien, 1979) to the classifier with empty library listings, so it is
+    parsed, looked up on TMDB and judged by the LLM. Passes when it lands in xmovies by the LLM
+    or the rules (not deferred, not a fallback). Then shows the provider's rate limits."""
+    name = sys.argv[2] if len(sys.argv) > 2 else SELFTEST_ITEM
+    t0 = time.time()
+    r = classify([{"name": name, "is_dir": False}], {})[0]
+    took = time.time() - t0
+    ok = (r.get("library") == "xmovies" and not r.get("deferred")
+          and r.get("source") in ("llm", "rules", "rules (llm disagreed)"))
+    line = (f"SELFTEST {'PASS' if ok else 'FAIL'} in {took:.1f} s: {name} -> {r.get('library')} "
+            f"[{r.get('source')}, {r.get('confidence')}] title={r.get('title')!r} year={r.get('year')} "
+            f"llm={r.get('llm_library')} rule={r.get('rule_library')} | {r.get('reason')}")
+    log(line)
+    report = [line]
+    try:
+        lim = fmt_limits(llm_limits())
+        log(lim)
+        report.append(lim)
+    except Exception as e:
+        log(f"llm limits unavailable: {e}")
+    return (0 if ok else 1), report
 
 
 def save_state(d):
@@ -458,8 +489,8 @@ def job_digest(run):
 
 def main():
     job = sys.argv[1] if len(sys.argv) > 1 else "check"
-    if job not in ("sort", "junk", "holding", "digest", "check", "limits"):
-        sys.exit("usage: media-sort.py sort|junk|holding|digest|check|limits")
+    if job not in ("sort", "junk", "holding", "digest", "check", "limits", "selftest"):
+        sys.exit("usage: media-sort.py sort|junk|holding|digest|check|limits|selftest [name]")
     if os.geteuid() != 0:
         sys.exit("run as root")
     guard()
@@ -472,7 +503,7 @@ def main():
     run = job != "check" and E.get(f"RUN_{job.upper()}", "0") == "1"
     guard()                                  # trim again at the start of each run
     fn = {"sort": job_sort, "check": job_sort, "junk": job_junk, "holding": job_holding,
-          "digest": job_digest, "limits": job_limits}[job]
+          "digest": job_digest, "limits": job_limits, "selftest": job_selftest}[job]
     log(f"start {job} ({'run' if run else 'dry run'})")
     for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, on_signal)
