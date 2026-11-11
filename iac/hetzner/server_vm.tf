@@ -61,7 +61,7 @@ resource "hcloud_firewall" "tpot" {
 resource "hcloud_server" "honeypot" {
   name         = "he-all-tpot-0101"
   image        = "debian-13"
-  server_type  = "cpx22" # below T-Pot's 8 GB guidance; resize when load shows it's needed
+  server_type  = "cpx32" # resized from cpx22 in the console, 2026-11-11
   location     = "hel1"
   ssh_keys     = [hcloud_ssh_key.tpot.id]
   firewall_ids = [hcloud_firewall.tpot.id]
