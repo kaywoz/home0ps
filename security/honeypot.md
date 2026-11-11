@@ -33,14 +33,15 @@ Build: [`iac/hetzner/server_vm.tf`](../iac/hetzner/server_vm.tf); host steps: [`
 
 | Risk | Control |
 |---|---|
-| Denial of wallet (attackers drive API calls) | A separate OpenAI project and key on **prepaid credits, auto-recharge off**, so spend ends when the credits run out. Galah caches answers for 24 h. Beelzebub rate limit on *(untested)* |
+| Denial of wallet (attackers drive API calls) | A separate OpenAI project and key on **prepaid credits, auto-recharge off**, so spend ends when the credits run out; that is the only cap. Galah (OpenAI, small model) caches answers for 24 h, verified 2026-11-11. Beelzebub at T-Pot's pinned commit has **no rate limit**, a fixed `gpt-4o` model and accepts any SSH password, so every attacker command is one gpt-4o call |
 | API key stolen from the host | Assumed to happen. The key works only for that project and is bounded by its credits. Rotate it after any sign of compromise |
+| Key exposure on the host | `.env` set to `600` (the installer leaves it `664`). The key also sits in both containers' environment (`docker inspect`): accepted, because the host is assumed compromised anyway |
 
 ## Accepted risks
 
 - `cpx32` (4 vCPU, 8 GB RAM, 80 GB disk kept from `cpx22`, so the server can still be resized back down) is below T-Pot's hive guidance of 16 GB RAM / 256 GB SSD (kaywoz, 2026-11-11). Watch Elasticsearch memory and disk use; logs persist 30 days (`TPOT_PERSISTENCE_CYCLES`).
 - Captured data goes to T-Pot's community backend (ewsposter, opted in).
-- Upstream `llm.yml` needs local edits for API keys, and `update.sh` may undo them.
+- Upstream `llm.yml` needs local edits for API keys (three compose lines, plus a Beelzebub SSH decoy config mounted over the one in the image), and `update.sh` may undo them.
 - The home public IPv4 sits in the Hetzner firewall and in OpenTofu state (marked `sensitive`, so it isn't shown in plan output).
 
 ## Open issues

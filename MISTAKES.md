@@ -758,3 +758,11 @@ mistakes, not a diary.
 - **Root cause:** a `>` redirect truncates or creates its target before the command runs, so a failed command still leaves a file behind. Chaining with `&&` doesn't prevent that.
 - **Fix applied:** the file was rewritten from the 1Password agent (`ssh-add -L | grep …`) and the fingerprint checked against the agent.
 - **Rule going forward:** commands for kaywoz that write a file from another command's output write to `T=$(mktemp)`, check that it isn't empty (`[ -s "$T" ]`), then `mv` it into place.
+
+### 2026-11-11 — tpot (idempotency check matched a comment)
+
+- **Trigger:** apply broke something (Galah exited with "API key is required")
+- **What happened:** the compose patch for T-Pot ran `grep -q 'LLM_API_KEY: ${GALAH_LLM_API_KEY}' || sed … a\ LLM_API_KEY…`. Upstream already had that line commented out (`# LLM_API_KEY: …`), so the grep matched the comment, the line was never added, and Galah started without a key.
+- **Root cause:** the "already present?" check didn't anchor to uncommented lines. I hadn't read the target file's existing lines before writing the patch.
+- **Fix applied:** the commented line was uncommented on the host. The host steps' patch now anchors every check (`^\s+KEY:`), uncomments an existing commented line before adding one, and ends with a length-only check of the rendered variables.
+- **Rule going forward:** idempotency checks in config patches match only active lines (anchor `^\s*` without `#`). Before patching a third-party file, read its current lines for the keys being added, including commented ones.
