@@ -734,3 +734,11 @@ mistakes, not a diary.
 - **Root cause:** the download pattern was written for root-only config files and reused for files a non-root process must read; the Dockerfile didn't set modes on `COPY`.
 - **Fix applied:** Dockerfile `COPY --chmod=644`; on the host `chmod 644` on the code files.
 - **Rule going forward:** host download one-liners for files read by non-root processes end with an explicit `chmod` (e.g. `install -m 644`), and Dockerfiles set `--chmod` on `COPY` when the image runs as a non-root `user`.
+
+### 2026-11-11 — hetzner (SSH key fingerprint formats)
+
+- **Trigger:** wrong assumption — a needless rebuild was proposed
+- **What happened:** SSH to the new honeypot failed. kaywoz compared the key's fingerprint in Hetzner's console with the one in 1Password, and they didn't match. I took that to mean the secret held the wrong key and proposed replacing the key and the server. The rerun showed the key unchanged: it had been right all along. The real cause was that the 1Password agent didn't serve the key's vault.
+- **Root cause:** I asked for a fingerprint comparison without checking that both sides used the same format. Hetzner's console shows MD5, 1Password and `ssh-keygen -l` show SHA256. Before calling the key wrong, I also didn't check which keys the agent offered: the `ssh -v` log only listed other keys.
+- **Fix applied:** no rebuild. The vault was added to `agent.toml`. The host steps now say how to compare fingerprints in one format (`ssh-keygen -l -E md5`) and use an `IdentitiesOnly` host entry.
+- **Rule going forward:** when comparing key fingerprints across tools, state the format and give the command for it. Before blaming the server's key, check in `ssh -v` that the intended key was offered at all.
