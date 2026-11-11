@@ -766,3 +766,11 @@ mistakes, not a diary.
 - **Root cause:** the "already present?" check didn't anchor to uncommented lines. I hadn't read the target file's existing lines before writing the patch.
 - **Fix applied:** the commented line was uncommented on the host. The host steps' patch now anchors every check (`^\s+KEY:`), uncomments an existing commented line before adding one, and ends with a length-only check of the rendered variables.
 - **Rule going forward:** idempotency checks in config patches match only active lines (anchor `^\s*` without `#`). Before patching a third-party file, read its current lines for the keys being added, including commented ones.
+
+### 2026-11-11 — workflow (pushed to a merged PR again)
+
+- **Trigger:** commit missed `main` (repeat of 2026-11-03, "commits pushed to an already-merged PR")
+- **What happened:** a follow-up commit for PR 298 was pushed after kaywoz had merged it. My command ran `gh pr view 298 --json state` but carried on when it printed `MERGED`, so the commit landed only on the dead branch.
+- **Root cause:** the state check printed the state but didn't gate the push. I ran the check without acting on its result.
+- **Fix applied:** the commit was cherry-picked onto a new branch from `main` with a new PR.
+- **Rule going forward:** the state check is a gate in the same command: `[ "$(gh pr view N --json state --jq .state)" = OPEN ] && git push …`. A non-`OPEN` state stops the push.
