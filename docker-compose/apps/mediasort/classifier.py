@@ -109,10 +109,20 @@ def note_limits(headers, provider, model):
 
 
 def _retry_after(e):
+    """Seconds to wait after a 429: the Retry-After header, else the wait OpenAI names in the
+    message (e.g. "Please try again in 28m48s" for a daily cap), else 60 s."""
     try:
-        return float(e.response.headers.get("retry-after", "60"))
+        v = e.response.headers.get("retry-after")
+        if v:
+            return float(v)
     except Exception:
-        return 60.0
+        pass
+    m = re.search(r"try again in ((?:\d+h)?(?:\d+m(?!s))?(?:\d+(?:\.\d+)?s)?(?:\d+ms)?)", str(e))
+    if m and m.group(1):
+        d = _duration(m.group(1))
+        if d:
+            return d
+    return 60.0
 PORT = int(os.environ.get("PORT", "8089"))
 
 VIDEO = {e.lower() for e in RULES["video_extensions"]}
@@ -257,7 +267,7 @@ def claude(prompt, schema, max_tokens):
     return json.loads(next(b.text for b in resp.content if b.type == "text"))
 
 
-def gpt(prompt, schema):
+def gpt(prompt, schema, max_output_tokens=None):
     """OpenAI Responses API with a strict JSON-schema answer (structured outputs), low reasoning
     effort. The key is read from its file on first use (never an env var)."""
     global _openai, _llm_blocked_until
@@ -267,6 +277,7 @@ def gpt(prompt, schema):
     try:
         raw = _openai.responses.with_raw_response.create(
             model=OPENAI_MODEL, input=prompt, reasoning={"effort": "low"}, store=False,
+            **({"max_output_tokens": max_output_tokens} if max_output_tokens else {}),
             text={"format": {"type": "json_schema", "name": "answer", "strict": True,
                              "schema": dict(schema, additionalProperties=False)}})
         note_limits(raw.headers, "openai", OPENAI_MODEL)
@@ -286,7 +297,7 @@ def gpt(prompt, schema):
     return json.loads(resp.output_text)
 
 
-def llm(prompt, schema, num_predict=160):
+def llm(prompt, schema, num_predict=160, probe=False):
     """The configured LLM. TransientLLMError -> the item is deferred; other errors -> the caller
     falls back to the rules / default library."""
     global _llm_last
@@ -297,7 +308,7 @@ def llm(prompt, schema, num_predict=160):
         time.sleep(wait)
     _llm_last = time.time()
     if LLM_PROVIDER == "openai":
-        return gpt(prompt, schema)
+        return gpt(prompt, schema, max_output_tokens=256 if probe else None)
     if LLM_PROVIDER == "anthropic":
         return claude(prompt, schema, max_tokens=2048)    # room for adaptive thinking at low effort
     return ollama(prompt, schema, num_predict)
@@ -469,7 +480,7 @@ class Handler(BaseHTTPRequestHandler):
         if "probe=1" in self.path and LLM_PROVIDER in ("openai", "anthropic"):
             try:
                 llm("Answer ok.", {"type": "object", "properties": {"ok": {"type": "string"}},
-                                   "required": ["ok"]}, num_predict=8)
+                                   "required": ["ok"]}, num_predict=8, probe=True)
             except Exception as e:
                 probe_error = str(e)[:300]
         out = dict(LIMITS, provider=LIMITS["provider"] or LLM_PROVIDER,
