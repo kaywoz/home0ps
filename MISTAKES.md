@@ -774,3 +774,12 @@ mistakes, not a diary.
 - **Root cause:** the state check printed the state but didn't gate the push. I ran the check without acting on its result.
 - **Fix applied:** the commit was cherry-picked onto a new branch from `main` with a new PR.
 - **Rule going forward:** the state check is a gate in the same command: `[ "$(gh pr view N --json state --jq .state)" = OPEN ] && git push …`. A non-`OPEN` state stops the push.
+
+### 2026-11-12 — planning (hardware role swap misread)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** kaywoz asked "what if I keep the CWWK but replace [the monitoring host] with it?". I read "it" as the new F4 SSD and planned the F4 as the new monitoring host. kaywoz meant: the F4 SSD runs MOS as the storage host, the CWWK (today's storage host) becomes the monitoring host, and the Pi 5 retires.
+- **Root cause:** I resolved an ambiguous pronoun to the most recently discussed object, without restating the mapping before a long answer.
+- **Fix applied:** the plan was redone with the correct roles before anything was changed.
+- **Rule going forward:** when a request moves hardware between roles, restate the full mapping (box → role, for every box involved) in one line and get it confirmed before planning around it.
+
