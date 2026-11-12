@@ -2,7 +2,9 @@
 
 Hetzner Cloud server `he-all-tpot-0101`, Debian 13, **T-Pot LLM edition** (Beelzebub SSH, Galah HTTP, OpenAI backend), kaywoz/home0ps#291. **Untrusted by design:** it invites attacks, so assume it gets compromised. It is not a home0ps host. It doesn't follow the home baseline in [`SECURITY.md`](../SECURITY.md) (no Tailscale, no Fluent Bit, no container standard). This file lists what applies instead.
 
-Build: [`iac/hetzner/server_vm.tf`](../iac/hetzner/server_vm.tf); host steps: [`config-files/tpot/README.md`](../config-files/tpot/README.md).
+> **Status 2026-11-12:** the Hetzner server is retired (logs exported first, see `config-files/tpot/README.md` §7). Its OpenTofu config is archived in [`archive/iac/hetzner-tpot/`](../archive/iac/hetzner-tpot/server_vm.tf). The honeypot is being rebuilt at HOSTKEY, and this file will be updated with that change. Until then the controls below describe the retired Hetzner setup.
+
+Build (retired): [`archive/iac/hetzner-tpot/server_vm.tf`](../archive/iac/hetzner-tpot/server_vm.tf); host steps: [`config-files/tpot/README.md`](../config-files/tpot/README.md).
 
 **Status legend:** controls without a marker are in place and verified; *(planned)* items are tracked in the linked issue; *(untested)* items are configured but not yet confirmed on the host.
 

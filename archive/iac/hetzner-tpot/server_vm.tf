@@ -1,4 +1,11 @@
 ##############################################################################
+# ARCHIVED 2026-11-12: the T-Pot honeypot left Hetzner Cloud (moving to
+# HOSTKEY, which is cheaper). Kept for reference only; nothing in iac/ reads
+# this file. The variables it used (tpot_ssh_public_key, admin_ipv4) were
+# removed from iac/hetzner/variables.tf at the same time.
+##############################################################################
+
+##############################################################################
 # T-Pot honeypot, LLM edition (kaywoz/home0ps#291).
 #
 # Untrusted by design: it has its own SSH key and no Tailscale, and it has no
