@@ -24,8 +24,6 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.HETZNER_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_SECRET_ACCESS_KEY }}
   TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
-  TF_VAR_tpot_ssh_public_key: ${{ secrets.TPOT_SSH_PUBLIC_KEY }}
-  TF_VAR_admin_ipv4: ${{ secrets.HOME_PUBLIC_IPV4 }}
 
 jobs:
   plan:
