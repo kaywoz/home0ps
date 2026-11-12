@@ -39,6 +39,13 @@ Build (retired): [`archive/iac/hetzner-tpot/server_vm.tf`](../archive/iac/hetzne
 | API key stolen from the host | Assumed to happen. The key works only for that project and is bounded by its credits. Rotate it after any sign of compromise |
 | Key exposure on the host | `.env` set to `600` (the installer leaves it `664`). The key also sits in both containers' environment (`docker inspect`): accepted, because the host is assumed compromised anyway |
 
+## Log export
+
+| Risk | Control |
+|---|---|
+| Logs lost on rebuild or teardown | `config-files/tpot/export.sh` pulls both LLM honeypots' logs to the admin Mac before any rebuild (first run 2026-11-12). Automated off-host shipping is #301 |
+| Attacker data on the admin Mac | Stored in `~/tpot-exports/` (`700`), never in git. The summary escapes all values and defangs URLs; nothing from the logs is executed |
+
 ## Accepted risks
 
 - `cpx32` (4 vCPU, 8 GB RAM, 80 GB disk kept from `cpx22`, so the server can still be resized back down) is below T-Pot's hive guidance of 16 GB RAM / 256 GB SSD (kaywoz, 2026-11-11). Watch Elasticsearch memory and disk use; logs persist 30 days (`TPOT_PERSISTENCE_CYCLES`).

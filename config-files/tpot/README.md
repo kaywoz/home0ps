@@ -183,3 +183,28 @@ ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 22 root@127.0
 ## 6. Community data
 
 Opted in (kaywoz, 2026-11-11): leave the `ewsposter` service as installed.
+
+## 7. Export logs before a rebuild or teardown
+
+A rebuild (`replace=hcloud_server.honeypot`) or deletion wipes the disk. Export the honeypot logs to the Mac first.
+
+Mac (repo checkout), from the Host entry in §1 or as `<admin user>@<tpot_ipv4>`:
+
+```bash
+config-files/tpot/export.sh tpot
+```
+
+It pulls `~/tpotce/data/{beelzebub,galah}/log` (rotated `.gz` files included) as one archive and checks it isn't empty or corrupt. It unpacks it into its own directory, refusing absolute or `..` paths, and runs `summarize.py`.
+
+Results go to `~/tpot-exports/<UTC timestamp>/` (mode `700`):
+- `summary.md`: overview, event types, top sources, top 50 commands, credentials, LLM error reasons, HTTP paths and response sources, user agents, and defanged URLs
+- `commands.csv`, `credentials.csv`, `http.csv`: the full lists
+
+The export is attacker data (IPs, credentials, payloads), so it **never goes into git**. `summarize.py` only parses the logs as JSON and escapes everything it writes. Open the raw files with care: they can contain terminal escape sequences.
+
+**If the box is overloaded and SSH stalls:** power-cycle it in the Hetzner console and win the race after boot. Retry SSH every 2 s, and as soon as it answers stop the containers (`cd ~/tpotce && docker compose stop -t 5`, no `sudo` needed). Then run the export.
+
+```bash
+until ssh -p 64295 -i ~/.ssh/tpot.pub -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=4 <admin user>@<tpot_ipv4> 'cd ~/tpotce && docker compose stop -t 5'; do sleep 2; done && config-files/tpot/export.sh <admin user>@<tpot_ipv4>
+```
+
