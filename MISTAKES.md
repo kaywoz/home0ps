@@ -783,3 +783,11 @@ mistakes, not a diary.
 - **Fix applied:** the plan was redone with the correct roles before anything was changed.
 - **Rule going forward:** when a request moves hardware between roles, restate the full mapping (box → role, for every box involved) in one line and get it confirmed before planning around it.
 
+
+### 2026-11-13 — planning (management portal rule paraphrased as "one Cockpit per host")
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** when listing what CLAUDE.md §8 covers, I wrote "one Cockpit per host". kaywoz's rule is one hardware management portal per host, which can be Cockpit or the MOS UI.
+- **Root cause:** I took the bullet heading ("Cockpit: one per host") as the rule. I didn't read it together with the proportionality line ("one admin UI per host").
+- **Fix applied:** corrected in chat. The §8 bullet heading should say "one management portal per host (Cockpit or MOS UI)". That change is proposed to kaywoz, not made.
+- **Rule going forward:** when summarizing a CLAUDE.md rule, quote its wording, not a heading. If two bullets overlap, state the broader one.
