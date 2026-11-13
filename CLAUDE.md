@@ -238,7 +238,9 @@ change explicitly if one no longer fits.
   (`svc:<app>` on 443); user-facing apps via Cloudflare Tunnel + Access.
   Tailscale is break-glass. No certificates to manage, no DNS API tokens on
   hosts.
-- **Cockpit: one per host** (decided 2026-10-20), each its own Tailscale
+- **One hardware management portal per host** (decided 2026-10-20,
+  clarified 2026-11-13): Cockpit, or the MOS UI on the storage host.
+  Cockpit, where used, is its own Tailscale
   Service `svc:cockpit-<device>` (§4 Service-name exception) on `127.0.0.1:9091`, `LoginTo = false`,
   `AllowMultiHost` off. No multi-host Cockpit hub: it would hold SSH to every
   host and share one browser origin across them. The home side has no
