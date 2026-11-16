@@ -2,18 +2,18 @@
 
 > **Status: proposal — nothing is deployed or built.** kaywoz OKs (or changes) this before anything runs. The four compose files next to this README are drafts that validate (`docker compose config --quiet`), not deploy instructions.
 
-Four separate stacks for MOS on the replacement storage host (the 4-bay NVMe box tested in kaywoz/home0ps#310). The app lineup is kaywoz's (2026-11-16):
+Four separate stacks for MOS on the replacement storage host (the 4-bay NVMe box tested in kaywoz/home0ps#310). The app lineup is kaywoz's (2026-11-16, extended the same day from `kaywoz/mos-templates`):
 
 | Stack | File | Apps | Replaces | Zone |
 |---|---|---|---|---|
 | **media** | [`media/compose.yaml`](media/compose.yaml) | Jellyfin, Komga, Homey | the media LXC | VLAN 13 (IoT) |
 | **infra** | [`infra/compose.yaml`](infra/compose.yaml) | cloudflared | the infra VM | VLAN 24 (infra, tier 0) |
-| **apps** | [`apps/compose.yaml`](apps/compose.yaml) | mediasort, paperless-ngx, FileBrowser Quantum, Immich | the apps VM | VLAN 31 (apps) |
-| **storage** | [`storage/compose.yaml`](storage/compose.yaml) | Kopia, Time Machine, RustFS | new (#43, #39) | the storage host's own network |
+| **apps** | [`apps/compose.yaml`](apps/compose.yaml) | mediasort, paperless-ngx, FileBrowser Quantum, Immich, ArchiveBox, ArchiveTeam Warrior, Atuin, Dillinger, Filestash, RackPeek | the apps VM | VLAN 31 (apps) |
+| **storage** | [`storage/compose.yaml`](storage/compose.yaml) | Kopia, Time Machine, RustFS, Scrutiny, plus the box's socket proxy and Beszel agent | new (#43, #39, #103); the proxy and agent move from MOS-template deploys | the storage host's own network |
 
 This follows the scenario in kaywoz/home0ps#314: Docker runs **directly on MOS**, one stack per zone, the zone stacks on a macvlan network on their VLAN sub-interface **with no host IP on those VLANs**. The MOS UI is the storage host's only management portal (#312). kaywoz asked for the media stack to replace the media LXC and to "do the same" for the infra VM and the apps VM. I read that as all of them moving onto the new box (G1).
 
-The candidates came from the 2026-11-13 discussion: a long list from kaywoz's GitHub stars, `kaywoz/mos-templates`, the MOS Hub catalogue (mos-official.net) and generic homeserver apps, then a short list checked against the Hub. kaywoz picked the four stacks above from it. Off the table for now: Pocket ID, Ollama, copyparty, the S3 alternatives to RustFS. The git-pull deployer (#314) isn't a stack: it deploys the stacks, and stays its own entry pending the socket decision there.
+The candidates came from the 2026-11-13 discussion: a long list from kaywoz's GitHub stars, `kaywoz/mos-templates`, the MOS Hub catalogue (mos-official.net) and generic homeserver apps, then a short list checked against the Hub. kaywoz picked the four stacks above from it and added the rest from his MOS templates. Off the table for now: Pocket ID, Ollama, copyparty, the S3 alternatives to RustFS. The git-pull deployer (#314) isn't a stack: it deploys the stacks, and stays its own entry pending the socket decision there.
 
 ## Common design
 
@@ -39,13 +39,14 @@ The candidates came from the 2026-11-13 discussion: a long list from kaywoz's Gi
 | Range | Stack | uids |
 |---|---|---|
 | 20xx | media | 2001 Jellyfin, 2002 Komga, 2010 Tailscale sidecar (Homey: see M-Q1) |
-| 21xx | apps | 2104 mediasort (as today), 2105 paperless, 2106 paperless Redis, 2107 FileBrowser Quantum, 2110 Tailscale sidecar, 2111 Immich server, 2112 Immich ML, 2113 Immich Postgres, 2114 Immich Valkey |
+| 21xx | apps | 2104 mediasort (as today), 2105 paperless, 2106 paperless Redis, 2107 FileBrowser Quantum, 2110 Tailscale sidecar, 2111 Immich server, 2112 Immich ML, 2113 Immich Postgres, 2114 Immich Valkey, 2121 Atuin, 2122 Atuin Postgres |
+| image uids | apps | ArchiveBox 911, ArchiveTeam Warrior 1000, RackPeek 1654, Filestash and Dillinger their images' own users (uids unverified; Filestash likely 1000). These images only work with their own uid. **Warrior and Filestash may share 1000** (A-Q10) |
 | 22xx | infra | 2201 cloudflared |
-| 23xx | storage | 2301 Kopia, 2302 RustFS, 2303 Time Machine share owner (the process is root) |
+| 23xx | storage | 2301 Kopia, 2302 RustFS, 2303 Time Machine share owner (the process is root); Beszel agent 65534 (as today); Scrutiny root |
 
 - **Paths:** MOS's root filesystem is RAM. All data lives under variables pointing at the pool (`${APPDATA}`, `${PHOTOS}`, `${BACKUPS}`, …). There's no `/srv/docker`, and no relative paths, so the files work wherever the stack's checkout sits (#314: same path inside and outside the deployer).
 - **One file per stack, not one per host:** asked for explicitly; §8's host layout is one file per host (G2).
-- **Monitoring needs nothing new:** one Docker daemon serves all stacks, so the existing read-only socket proxy (`kr-ccp-socketproxy-0301`, `POST=0`) and Beszel agent (`kr-ccp-beszelagent-0201`) see every container; Dozzle reads it remotely. The guests' proxies, Hawser agents and native Beszel agents retire with the guests.
+- **Monitoring:** one Docker daemon serves all stacks, so one read-only socket proxy (`kr-ccp-socketproxy-0301`, `POST=0`) and one Beszel agent (`kr-ccp-beszelagent-0201`) see every container. Both move from MOS-template deploys into the storage stack under the same names (`observed-hosts.md`: compose hosts keep them in their compose). **No Dozzle agent:** Dozzle already reads this host in remote-host mode through the proxy (verified 2026-11-08); an agent would need the full socket and allows exec (MISTAKES.md 2026-10-18). The guests' proxies, Hawser agents and native Beszel agents retire with the guests.
 - **Logs:** MOS has no journald (Devuan). Container logs stay in Docker's default driver and Dozzle until log shipping is revived (G5).
 
 ## Stack 1 — media (VLAN 13), replaces the media LXC
@@ -127,7 +128,13 @@ Healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (exec form; th
 | paperless-ngx | `kr-ccp-paperless-0101` + `kr-ccp-paperlessredis-0101` | SQLite + Redis, no Postgres, no Tika/Gotenberg |
 | FileBrowser Quantum | `kr-ccp-filebrowser-0101` | files through a browser; OIDC capable |
 | Immich | `kr-ccp-immich-0101`, `-immichml-0101`, `-immichdb-0101`, `-immichredis-0101` | photos; as the upstream release compose |
-| Tailscale sidecar | `kr-ccp-tailscale-0201` | serves `svc:paperless`, `svc:filebrowser`, `svc:immich` and the mover's `tcp:8089` (tag:docker) |
+| ArchiveBox | `kr-ccp-archivebox-0101` | archives web pages |
+| ArchiveTeam Warrior | `kr-ccp-archivewarrior-0101` | contributes to ArchiveTeam projects |
+| Atuin | `kr-ccp-atuin-0101` + `kr-ccp-atuindb-0101` | shell history sync server; Postgres as in the template |
+| Dillinger | `kr-ccp-dillinger-0101` | Markdown editor |
+| Filestash | `kr-ccp-filestash-0101` | file manager with storage backends (next to FileBrowser Quantum) |
+| RackPeek | `kr-ccp-rackpeek-0101` | homelab inventory |
+| Tailscale sidecar | `kr-ccp-tailscale-0201` | serves `svc:paperless`, `svc:filebrowser`, `svc:immich`, `svc:archivebox`, `svc:archivewarrior`, `svc:atuin`, `svc:dillinger`, `svc:filestash`, `svc:rackpeek` and the mover's `tcp:8089` (tag:docker) |
 
 | Service | Deviation | Why |
 |---|---|---|
@@ -146,11 +153,27 @@ Healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (exec form; th
 | Immich DB password | two files with the same value (server 2111, database 2113) | a 600 file has one owner. Both images export the value into the process environment at start (`start.sh`, `set-env.sh`), so the file only keeps it out of `docker inspect` |
 | Immich ML | no egress (internal only); models need egress on first use | its API (3003) has no auth, so it never sits on a VLAN. Models: connect it to `apps-vlan31` while they download, then disconnect (A-Q4) |
 | Immich Valkey | `valkey/valkey:latest` with a password file | upstream pins `valkey:9` by digest; `:latest` per §8, so a major version bump can arrive unannounced |
+| ArchiveBox | on `apps-vlan31`: **UI (5797) open on VLAN 31** | it fetches whatever it's given; it has its own login, and the public index/snapshots/add view are turned off (the image defaults the index to public) |
+| ArchiveBox | uid 911 (the image's), **not `read_only`** | its dirs are owned 911 (an arbitrary uid exits 3); `/opt/archivebox` holds the browser and plugin binaries and must be writable, so a tmpfs won't do and a volume would keep stale binaries across updates |
+| ArchiveBox | admin account by a one-off `createsuperuser` | no `*_FILE` support; `ADMIN_PASSWORD` in env would be readable through the socket proxy |
+| ArchiveTeam Warrior | **runs code it downloads**: project pipelines are `git pull`ed from GitHub and executed in-process | that is a risky workload under §8 (A-Q7) |
+| ArchiveTeam Warrior | on `apps-vlan31`; **UI (8001) has no auth** unless `http_password` is set | the password goes in a pre-made `projects/config.json` (600), not env |
+| ArchiveTeam Warrior | uid 1000 (the image's), not `read_only` | `/home/warrior/data` holds its baked-in `wget-at` binaries and must be writable; `no-new-privileges` also blocks the image's passwordless `sudo` |
+| Atuin | `:latest` | upstream's `latest` lags (18.24.2 vs 18.24.8) and its docs warn against it; the moving release tag is `18.24` (A-Q8) |
+| Atuin Postgres | `postgres:latest` (the template uses `postgres:18`), data mounted at `/var/lib/postgresql` | on a new major version the image uses a new PGDATA subfolder and starts an **empty** cluster next to the old one, which then needs `pg_upgrade` (A-Q8) |
+| Atuin / its Postgres | the DB password as two files (2121, 2122) | as for Immich: one owner per 600 file |
+| Dillinger | **version tag `3.39.1` (2021)**, image's own user | no `latest`; newer tags are arm64-only; upstream dropped its Dockerfile; the linuxserver image is deprecated; the MOS template was removed as broken (A-Q9) |
+| Dillinger | `read_only` unverified | the image chowns `/public`, so the app may write there |
+| Filestash | image's own user (uid unverified), no `user:` override | its binary is mode 730: another uid can't execute it |
+| Filestash | `/admin/setup` is open until an admin password is set | set it right after the first start; only reachable through the sidecar. The password is stored as a bcrypt hash in `config.json` |
+| Filestash | no egress | backends on other hosts (SFTP, S3) would need it |
+| RackPeek | uid 1654 (the image's); **no authentication on its UI** | Tailscale only, admins only |
 
-**Secrets:** a Tailscale auth key for `tag:docker`. mediasort: `token`, `tmdb`, `llm` (as today). paperless: `secret_key`, `redis_url`, `redis.conf`. FileBrowser Quantum: `config.yaml`. Immich: `db_password` (two copies), `redis_password`, `valkey.conf`.
+**Secrets:** a Tailscale auth key for `tag:docker`. mediasort: `token`, `tmdb`, `llm` (as today). paperless: `secret_key`, `redis_url`, `redis.conf`. FileBrowser Quantum: `config.yaml`. Immich: `db_password` (two copies), `redis_password`, `valkey.conf`. Atuin: `db_password` (two copies). ArchiveTeam Warrior: `projects/config.json` with `http_password`. Filestash: admin hash in its `config.json`. ArchiveBox: its superuser in its database.
 
 **Tailscale follow-ups** (own PRs, not built):
-- `iac/tailscale-services/`: add `svc:paperless`, `svc:filebrowser` and `svc:immich`.
+- `iac/tailscale-services/`: add `svc:paperless`, `svc:filebrowser`, `svc:immich`, `svc:atuin`, `svc:dillinger`, `svc:filestash` and `svc:rackpeek`. `svc:archivebox` and `svc:archivewarrior` exist for `tag:storage`; they move to `tag:docker`.
+- Atuin's clients (every machine that syncs shell history) need a grant to `svc:atuin`.
 - `policy.hujson`: auto-approve them for `tag:docker`, plus a grant per Service.
 - The mover's grant (`tag:storage` → `tag:docker:8089`) and its tests stay; `CLASSIFIER_URL` becomes the sidecar's MagicDNS name.
 - Retire the Hawser grant to `tag:docker`, the apps VM's monitoring grants and its Cockpit Service.
@@ -168,6 +191,10 @@ Healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (exec form; th
 - **A-Q4:** Immich ML on the N95: CPU (as drafted), OpenVINO (`release-openvino` + `/dev/dri`; upstream warns about integrated GPUs on low-RAM hosts), or ML off (Immich needs 6 GB minimum, 4 GB without ML)? Models need egress the first time; accept a permanent VLAN 31 address for ML instead?
 - **A-Q5:** The Immich Postgres version tag. Accept this one exception to `:latest`, updated with each Immich release?
 - **A-Q6:** paperless: how do scans reach `consume/` (FileBrowser upload, an SMB share, scanner e-mail)?
+- **A-Q7 — ArchiveTeam Warrior on home hardware.** It downloads and executes ArchiveTeam's project code, the "risky workload" §8 sends to the XCP-ng lab. The earlier long list also placed it in the lab. Keep it here as asked, or put it in the lab?
+- **A-Q8 — Atuin.** (a) `:latest` (lags releases) or the `18.24` release tag? (b) Postgres as in the template (`:latest` and the major-version PGDATA trap above), or Atuin's SQLite backend (`sqlite:///config/atuin.db`, server support since 18.7–18.8), which drops the database container entirely? My pick: SQLite.
+- **A-Q9 — Dillinger.** Upstream has no current Docker image: the only amd64 build is 3.39.1 from 2021, and the template was removed as broken. Keep it on that old version, or drop it?
+- **A-Q10 — two file managers and shared uids.** Filestash next to FileBrowser Quantum: both, as asked? Filestash's and Warrior's image uids may both be 1000; same uid means one compromised app can read the other's files where permissions allow. Check `docker run --rm --entrypoint id machines/filestash` at build.
 
 ## Stack 4 — storage (the storage host's own network)
 
@@ -177,6 +204,9 @@ The host's own storage services. They're served by the host's own tailscaled (`t
 |---|---|---|
 | Kopia | `kr-ccp-kopia-0101` | repository server for the other machines' backups (#43), repository on the pool |
 | Time Machine | `kr-ccp-timemachine-0101` | SMB share for the Macs' backups |
+| Scrutiny | `kr-ccp-scrutiny-0101` | SMART health of the four NVMe drives (#103); omnibus as in the template |
+| socket proxy | `kr-ccp-socketproxy-0301` | read-only Docker API for Dozzle and Beszel; moves from its MOS-template deploy |
+| Beszel agent | `kr-ccp-beszelagent-0201` | host metrics and container stats; moves from its MOS-template deploy |
 | RustFS | `kr-ccp-rustfs-0101` | local S3 (#39) |
 
 | Service | Deviation | Why |
@@ -190,18 +220,25 @@ The host's own storage services. They're served by the host's own tailscaled (`t
 | Time Machine | own macvlan address on the host's network (`storage-lan`) | MOS's own Samba holds 445 on the host, so host networking or a published 445 would clash. The image's author runs it on macvlan, and avahi then advertises it on that segment |
 | RustFS | keys as files (`RUSTFS_*_KEY_FILE`) | never the built-in default `rustfsadmin`/`rustfsadmin` (it only warns) |
 | RustFS | console CORS limited to its Service URL | the image defaults to `*` |
+| Scrutiny | **root, not `read_only`, `SYS_RAWIO` + `SYS_ADMIN`**, the four NVMe devices, `/run/udev` read-only | the omnibus image runs InfluxDB, the web app and cron as root under s6. NVMe SMART needs `SYS_ADMIN`, which Scrutiny's own docs say allows host compromise (S-Q4) |
+| Scrutiny | **no authentication** on its UI and API | Tailscale only (`svc:scrutiny`, admins); InfluxDB (8086) not published |
+| socket proxy | not `cap_drop`/non-root | as deployed and verified today: it needs root to open `docker.sock`; `POST=0` is the control |
+| Beszel agent | `network_mode: host` | upstream requirement for interface stats; `LISTEN` on the tailnet IP only, as today. Key and token now as files (`KEY_FILE`, `TOKEN_FILE`), where the template has them in MOS's variables |
 
 **Secrets:**
 - **Kopia:** the repository password (stored by Kopia itself), `htpasswd`, and the TLS key and certificate (`openssl`, once).
 - **Time Machine:** `password` (root-owned, 600).
+- **Beszel agent:** `key` and `token` from the hub's "Add system" (owned 65534).
 - **RustFS:** `access_key` and `secret_key`.
 
 **Tailscale follow-ups** (own PRs, not built):
-- `svc:kopia` and `svc:rustfs` exist already. Add a Service for the S3 API, or decide it stays local (S-Q3).
+- `svc:kopia`, `svc:rustfs` and `svc:scrutiny` exist already. Add a Service for the S3 API, or decide it stays local (S-Q3).
+- The socket proxy's `tailscale serve --tcp=2375` and its `tag:monitoring` grant stay as they are.
 - Grants per backup client to `svc:kopia`.
 - Time Machine over the tailnet isn't covered: the host can't reach the macvlan address (S-Q2).
 
 **Migration:**
+- **Socket proxy and Beszel agent:** remove the MOS-template containers, then start the stack. Same names, same data folder; the agent needs its key and token as files first.
 - **Kopia and RustFS** are new on this box. If the current storage host runs either from a MOS template (#136 mentions RustFS), it has no registered container name. Its data is migrated or retired separately.
 - **Time Machine:** existing Mac backups start fresh, or are copied over with the share's owner changed to 2303.
 
@@ -212,6 +249,10 @@ The host's own storage services. They're served by the host's own tailscaled (`t
   - Over the tailnet it would need its own sidecar.
   - The alternative is MOS's own Samba with a Time Machine share, if MOS supports `fruit:time machine` (unverified).
 - **S-Q3:** RustFS's S3 API. Is it local only (the box's own backups, #30), or a Tailscale Service for other hosts (#28 "secure s3 endpoint")?
+- **S-Q4 — Scrutiny with `SYS_ADMIN` as root on the storage host.**
+  - (a) Accept, as in the template.
+  - (b) Keep only the collector here (also root, also `SYS_ADMIN`, but no web UI and no InfluxDB) and put the hub on the monitoring host. That's where the earlier long list put it, and it matches "monitoring reads everything".
+  - (c) Skip Scrutiny and use the SMART data Beszel and the MOS UI already show.
 
 ## General open questions
 
@@ -221,13 +262,15 @@ The host's own storage services. They're served by the host's own tailscaled (`t
 - **G4:** Build before #310 §7b–§7e are done? They decide whether the MOS UI manages compose stacks, whether macvlan with a VLAN parent works from MOS, and whether userns-remap is possible. My pick: **wait**.
 - **G5:** Container logs off-box on MOS (no journald). Use Docker's `syslog` driver to the monitoring host, or wait for log shipping?
 - **G6:** VLANs 13/24/31 tagged on the storage host's switch port, and a small address block per VLAN outside DHCP for the macvlans. Today the guests' VLANs come from PCI passthrough and the LXC's own NIC.
-- **G7:** RAM and CPU. Immich (6–8 GB recommended), paperless OCR and Jellyfin transcoding share a 4-core N95 with the storage role. The `mem_limit`s here add up to about 25 GB of the 64 GB. The CPU is the tighter resource. Check with `nproc` and `free -g` on the box before sizing further (MISTAKES.md 2026-11-10).
+- **G7:** RAM and CPU. Immich (6–8 GB recommended), paperless OCR and Jellyfin transcoding share a 4-core N95 with the storage role. The `mem_limit`s here add up to about 31 GB of the 64 GB. The CPU is the tighter resource. Check with `nproc` and `free -g` on the box before sizing further (MISTAKES.md 2026-11-10).
 
 ## Unverified (checked at build, before anything goes live)
 
 - **Tailscale sidecar:** non-root with `read_only`, and whether it serves Services in userspace mode to another container's IP. The containerboot source supports the config; the behaviour hasn't been tested.
 - **`read_only`** for cloudflared, paperless-ngx (rootless), FileBrowser Quantum, Kopia, RustFS and all four Immich containers. Every writable path listed comes from reading the code, not from upstream docs.
 - **Running as a non-root uid:** Immich Postgres with an arbitrary uid (nss_wrapper), and Kopia as non-root.
+- **Image uids:** Filestash's and Dillinger's (not read from the image layers).
+- **Capability sets:** Scrutiny's under s6. ArchiveTeam Warrior's per-project needs and target hosts.
 - **Time Machine:** its capability set.
 - **Networking:** Homey's discovery on a macvlan address, and Komga without egress.
 - **MOS (#310 §7b):** macvlan with a VLAN parent, the Docker version, and whether the MOS UI manages stacks started from these files.

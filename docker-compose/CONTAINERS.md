@@ -51,9 +51,19 @@ Names reserved by the storage-host stacks proposal ([`storage/README.md`](storag
 | `kr-ccp-immichml-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
 | `kr-ccp-immichdb-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
 | `kr-ccp-immichredis-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-archivebox-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-archivewarrior-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-atuin-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-atuindb-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-dillinger-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-filestash-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-rackpeek-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
 | `kr-ccp-kopia-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
 | `kr-ccp-timemachine-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
 | `kr-ccp-rustfs-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
+| `kr-ccp-scrutiny-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
+| `kr-ccp-socketproxy-0301` | storage host (MOS), storage stack | moves from the MOS template deploy (same name, row above) |
+| `kr-ccp-beszelagent-0201` | storage host (MOS), storage stack | moves from the MOS template deploy (same name, row above) |
 
 Not containers: the Beszel agent on the infra VM and the apps VM runs natively (systemd), so it has no container name.
 

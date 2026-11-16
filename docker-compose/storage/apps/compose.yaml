@@ -30,7 +30,7 @@ services:
       TS_SOCKET: /tmp/tailscaled.sock      # set explicitly: docs and source disagree on the default
       TS_AUTHKEY: file:/run/secrets/ts_authkey
       TS_EXTRA_ARGS: --advertise-tags=tag:docker
-      TS_SERVE_CONFIG: /config/serve.json   # svc:paperless, svc:filebrowser, svc:immich; tcp:8089 -> mediasort (the mover)
+      TS_SERVE_CONFIG: /config/serve.json   # svc:paperless, filebrowser, immich, archivebox, archivewarrior, atuin, dillinger, filestash, rackpeek; tcp:8089 -> mediasort (the mover)
       TS_ENABLE_HEALTH_CHECK: "true"
       TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
     secrets:
@@ -43,6 +43,10 @@ services:
       - proxy-paperless
       - proxy-filebrowser
       - proxy-immich
+      - proxy-atuin
+      - proxy-dillinger
+      - proxy-filestash
+      - proxy-rackpeek
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9002/healthz"]
       interval: 30s
@@ -292,6 +296,192 @@ services:
       timeout: 5s
       retries: 3
 
+  # ArchiveBox: archives web pages. Fetches anything it's given, so it sits on apps-vlan31: its UI (5797) is
+  # then open on VLAN 31 (it has its own login; public index/snapshots/add view off).
+  archivebox:
+    image: ghcr.io/archivebox/archivebox:latest
+    container_name: kr-ccp-archivebox-0101
+    restart: unless-stopped
+    user: "911:911"                    # the image's own uid: its dirs are owned 911, an arbitrary uid fails (exit 3)
+    # Not read_only: the entrypoint needs /opt/archivebox writable, and it holds the browser and plugin
+    # binaries, so a tmpfs won't do and a volume would keep stale binaries across image updates.
+    cap_drop: [ALL]                    # Chromium runs with --no-sandbox (image sets CHROME_SANDBOX=false)
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=1g
+    shm_size: 1gb                      # as upstream's compose
+    pids_limit: 2048                   # as upstream's compose (Chromium)
+    mem_limit: 2g
+    environment:
+      PUBLIC_INDEX: "False"            # the image defaults to True
+      PUBLIC_SNAPSHOTS: "False"
+      PUBLIC_ADD_VIEW: "False"
+      TIMEOUT: "60"
+    # Admin account: once, `docker compose run --rm archivebox archivebox manage createsuperuser`
+    # (no *_FILE support; ADMIN_PASSWORD in env would be readable through the socket proxy).
+    volumes:
+      - ${APPDATA}/archivebox/data:/data   # owned 911
+    networks:
+      - apps-vlan31
+    # healthcheck: built into the image (/health/ on 5797)
+
+  # ArchiveTeam Warrior: downloads and runs ArchiveTeam's project code (git pull from GitHub, then exec'd
+  # in-process) — a risky workload under CLAUDE.md §8 (README A-Q7). Its UI has no auth unless http_password
+  # is set in projects/config.json (pre-made in the volume, 600; env vars would be readable via the proxy).
+  archivewarrior:
+    image: atdr.meo.ws/archiveteam/warrior-dockerfile:latest
+    container_name: kr-ccp-archivewarrior-0101
+    restart: unless-stopped
+    user: "1000:1000"                  # the image's own uid (/home/warrior owned 1000)
+    # Not read_only: /home/warrior/data holds the baked-in wget-at binaries and must be writable.
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true         # also blocks the image's passwordless sudo
+    tmpfs:
+      - /tmp:size=256m
+    pids_limit: 500
+    mem_limit: 1g
+    volumes:
+      - ${APPDATA}/archivewarrior/projects:/home/warrior/projects   # config.json, project checkouts, item data
+    networks:
+      - apps-vlan31                    # egress: warriorhq, GitHub, trackers, upload targets, archived sites
+    # healthcheck: built into the image (wget-at on 8001)
+
+  # Atuin: shell history sync server. Clients reach it as svc:atuin. Registration closed after the first
+  # account (ATUIN_OPEN_REGISTRATION=true once, then false).
+  atuin:
+    image: ghcr.io/atuinsh/atuin:latest   # upstream's latest lags releases (README A-Q8)
+    container_name: kr-ccp-atuin-0101
+    restart: unless-stopped
+    user: "2121:2121"                  # no entrypoint script: any uid with a writable /config
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m
+    pids_limit: 100
+    mem_limit: 256m
+    command: ["start"]
+    environment:
+      ATUIN_HOST: 0.0.0.0              # defaults to 127.0.0.1
+      ATUIN_OPEN_REGISTRATION: "false"
+      ATUIN_DB_URI: postgres://atuin@atuindb/atuin   # no password in the URI
+      ATUIN_DB_PASSWORD_FILE: /run/secrets/atuin_db_password   # Atuin >= 18.24.0
+    secrets:
+      - atuin_db_password
+    volumes:
+      - ${APPDATA}/atuin/config:/config
+    networks:
+      - proxy-atuin                    # internal: atuin + sidecar
+      - atuin-backend                  # internal: atuin + db
+    depends_on:
+      - atuindb
+    # healthcheck: built into the image (/healthz)
+
+  # Atuin's database, as in the template (Postgres). On :latest a new major version uses a new PGDATA
+  # subfolder and starts an empty cluster next to the old one (README A-Q8: SQLite instead?).
+  atuindb:
+    image: postgres:latest
+    container_name: kr-ccp-atuindb-0101
+    restart: unless-stopped
+    user: "2122:2122"                  # arbitrary uid: entrypoint uses nss_wrapper (needs /tmp)
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /var/run/postgresql:size=8m,uid=2122,gid=2122
+      - /tmp:size=64m
+    pids_limit: 200
+    mem_limit: 512m
+    environment:
+      POSTGRES_USER: atuin
+      POSTGRES_DB: atuin
+      POSTGRES_PASSWORD_FILE: /run/secrets/atuin_db_password_pg
+    secrets:
+      - atuin_db_password_pg
+    volumes:
+      - ${APPDATA}/atuin/postgres:/var/lib/postgresql   # 18+: mount the parent, PGDATA is <major>/docker
+    networks:
+      - atuin-backend
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "atuin", "-d", "atuin"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Dillinger: Markdown editor. Upstream has no Dockerfile any more and no `latest`; 3.39.1 (2021) is the
+  # newest amd64 image, and the MOS template was removed as broken (README A-Q9).
+  dillinger:
+    image: joemccann/dillinger:3.39.1
+    container_name: kr-ccp-dillinger-0101
+    restart: unless-stopped
+    # runs as the image's own non-root user `dillinger` (uid unverified); no `user:` override
+    read_only: true                    # unverified: the image chowns /public, so the app may write there
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m
+    pids_limit: 100
+    mem_limit: 256m
+    networks:
+      - proxy-dillinger                # internal: no egress (cloud plugins unused)
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
+  # Filestash: file manager with storage backends. Until an admin password is set, /admin/setup is open:
+  # set it right after the first start (only reachable through the sidecar).
+  filestash:
+    image: machines/filestash:latest
+    container_name: kr-ccp-filestash-0101
+    restart: unless-stopped
+    # runs as the image's own user `filestash` (uid unverified, likely 1000): the binary is mode 730, so an
+    # arbitrary uid can't execute it. No `user:` override.
+    read_only: true                    # to verify at build
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /app/data/cache:size=512m
+      - /tmp:size=256m
+    pids_limit: 200
+    mem_limit: 512m
+    volumes:
+      - ${APPDATA}/filestash/state:/app/data/state   # config.json (admin bcrypt hash), db, logs
+    networks:
+      - proxy-filestash                # internal: no egress (backends on other hosts would need it)
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8334/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # RackPeek: homelab inventory. Its web UI has no authentication: Tailscale only (svc:rackpeek, admins).
+  rackpeek:
+    image: aptacode/rackpeek:latest
+    container_name: kr-ccp-rackpeek-0101
+    restart: unless-stopped
+    user: "1654:1654"                  # the image's own uid; its dirs are owned 1654
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /app/tmp:size=64m,uid=1654,gid=1654   # TMPDIR
+    pids_limit: 200
+    mem_limit: 512m
+    volumes:
+      - ${APPDATA}/rackpeek/config:/app/config   # config.yaml, data-protection keys
+    networks:
+      - proxy-rackpeek                 # internal: no egress
+    # healthcheck: built into the image (/health)
+
 networks:
   apps-vlan31:
     name: apps-vlan31
@@ -324,6 +514,26 @@ networks:
     driver: bridge
     internal: true
 
+  proxy-atuin:
+    name: proxy-atuin
+    driver: bridge
+    internal: true
+  atuin-backend:
+    name: atuin-backend
+    driver: bridge
+    internal: true
+  proxy-dillinger:
+    name: proxy-dillinger
+    driver: bridge
+    internal: true
+  proxy-filestash:
+    name: proxy-filestash
+    driver: bridge
+    internal: true
+  proxy-rackpeek:
+    name: proxy-rackpeek
+    driver: bridge
+    internal: true
 secrets:
   ts_authkey:
     file: ${APPDATA}/tailscale-apps/authkey          # 600, owned 2110; delete after the node has joined
@@ -343,3 +553,7 @@ secrets:
     file: ${APPDATA}/immich/secrets/db_password_pg   # same value, second copy: 600, owned 2113 (the db's uid)
   immich_redis_password:
     file: ${APPDATA}/immich/secrets/redis_password   # same value as requirepass in valkey.conf; 600, owned 2111
+  atuin_db_password:
+    file: ${APPDATA}/atuin/secrets/db_password       # 600, owned 2121
+  atuin_db_password_pg:
+    file: ${APPDATA}/atuin/secrets/db_password_pg    # same value, second copy: 600, owned 2122
