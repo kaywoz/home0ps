@@ -2,7 +2,8 @@
 # media-mount.sh — read-only rclone mount of the media library on the MOS host, then start the
 # LXCs that bind it (kaywoz/home0ps#197, #174). Idempotent: run it at boot and as a watchdog.
 #
-# Cron (as root on MOS):
+# Cron: add the lines in the MOS UI's cron jobs section. `crontab` entries are lost at reboot on MOS
+# (verified 2026-11-16):
 #   @reboot      bash /boot/config/home0ps/media-mount.sh
 #   */5 * * * *  bash /boot/config/home0ps/media-mount.sh     # watchdog: remounts if the mount died
 # (via bash: /boot on MOS doesn't allow executing files directly)
