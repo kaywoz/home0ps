@@ -41,14 +41,19 @@ Names reserved by the storage-host stacks proposal ([`storage/README.md`](storag
 | `kr-ccp-jellyfin-0201` | storage host (MOS), media stack | [`storage/media/compose.yaml`](storage/media/compose.yaml) |
 | `kr-ccp-komga-0201` | storage host (MOS), media stack | [`storage/media/compose.yaml`](storage/media/compose.yaml) |
 | `kr-ccp-homey-0201` | storage host (MOS), media stack | [`storage/media/compose.yaml`](storage/media/compose.yaml) |
-| `kr-ccp-pocketid-0101` | storage host (MOS), infra stack | [`storage/infra/compose.yaml`](storage/infra/compose.yaml) |
 | `kr-ccp-cloudflared-0101` | storage host (MOS), infra stack | [`storage/infra/compose.yaml`](storage/infra/compose.yaml) |
 | `kr-ccp-tailscale-0201` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
 | `kr-ccp-mediasort-0201` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
-| `kr-ccp-ollama-0201` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
 | `kr-ccp-paperless-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
 | `kr-ccp-paperlessredis-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
-| `kr-ccp-copyparty-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-filebrowser-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-immich-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-immichml-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-immichdb-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-immichredis-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-kopia-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
+| `kr-ccp-timemachine-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
+| `kr-ccp-rustfs-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
 
 Not containers: the Beszel agent on the infra VM and the apps VM runs natively (systemd), so it has no container name.
 

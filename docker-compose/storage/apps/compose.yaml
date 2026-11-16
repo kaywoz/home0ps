@@ -4,8 +4,8 @@
 # Zone: VLAN 31 (apps). Trusted, well-known apps only (CLAUDE.md §8).
 # - apps-vlan31: macvlan on the VLAN 31 sub-interface, no host IP on it: egress for the containers that
 #   need it (mediasort, the sidecar). The MOS host can't reach macvlan containers, and they can't reach it.
-# - proxy-<app>: internal bridges for everything that needs no egress (paperless + its Redis, copyparty,
-#   ollama). No egress, no published ports; the sidecar joins the ones it serves.
+# - proxy-<app>: internal bridges for everything that needs no egress (paperless + its Redis,
+#   FileBrowser Quantum, Immich's database and Redis). No published ports; the sidecar joins the ones it serves.
 # - No `ports:` anywhere: Tailscale Services (and the mover's tcp:8089) are served by this stack's own
 #   Tailscale sidecar (tag:docker, as the apps VM is today).
 # No userns-remap assumed on MOS (#310 §7c open): `user:` uids are host uids, data folders owned by them.
@@ -30,7 +30,7 @@ services:
       TS_SOCKET: /tmp/tailscaled.sock      # set explicitly: docs and source disagree on the default
       TS_AUTHKEY: file:/run/secrets/ts_authkey
       TS_EXTRA_ARGS: --advertise-tags=tag:docker
-      TS_SERVE_CONFIG: /config/serve.json   # svc:paperless, svc:copyparty; tcp:8089 -> mediasort (the mover)
+      TS_SERVE_CONFIG: /config/serve.json   # svc:paperless, svc:filebrowser, svc:immich; tcp:8089 -> mediasort (the mover)
       TS_ENABLE_HEALTH_CHECK: "true"
       TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
     secrets:
@@ -39,9 +39,10 @@ services:
       - ${APPDATA}/tailscale-apps/state:/var/lib/tailscale
       - ${APPDATA}/tailscale-apps/serve.json:/config/serve.json:ro
     networks:
-      apps-vlan31: {}
-      proxy-paperless: {}
-      proxy-copyparty: {}
+      - apps-vlan31
+      - proxy-paperless
+      - proxy-filebrowser
+      - proxy-immich
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9002/healthz"]
       interval: 30s
@@ -65,15 +66,12 @@ services:
     pids_limit: 64
     mem_limit: 256m
     environment:
-      LLM_PROVIDER: anthropic           # openai | anthropic | ollama
+      LLM_PROVIDER: anthropic           # openai | anthropic (no local LLM in this stack: Ollama dropped)
       OPENAI_MODEL: gpt-6-luna
       OPENAI_MIN_INTERVAL: "6.5"
       ANTHROPIC_MODEL: claude-haiku-5-5
       ANTHROPIC_MIN_INTERVAL: "1"
       LLM_KEY_FILE: /run/secrets/llm_key
-      OLLAMA_URL: http://ollama:11434   # only with the ollama profile
-      OLLAMA_MODEL: qwen3:4b-instruct
-      OLLAMA_NUM_THREAD: "2"
       TOKEN_FILE: /run/secrets/mediasort_token
       TMDB_TOKEN_FILE: /run/secrets/tmdb_token
     secrets:
@@ -81,46 +79,8 @@ services:
       - tmdb_token
       - llm_key
     networks:
-      apps-vlan31: {}
-      proxy-ollama: {}
+      - apps-vlan31
     # healthcheck: in the image (GET /health)
-
-  # Local LLM (#261). Off by default (profile): the N95 has 4 cores and the storage role overheated under
-  # local inference before (#270); mediasort uses the Claude API. Start with `--profile ollama`.
-  ollama:
-    image: ollama/ollama:latest
-    container_name: kr-ccp-ollama-0201
-    profiles: [ollama]
-    restart: unless-stopped
-    user: "2103:2103"
-    read_only: true
-    cap_drop: [ALL]
-    security_opt:
-      - no-new-privileges:true
-    tmpfs:
-      - /tmp
-      - /home/ollama:uid=2103,gid=2103,mode=0700
-    pids_limit: 512
-    mem_limit: 8g
-    cpus: 2                            # half the N95: the NAS keeps serving while a model runs
-    environment:
-      HOME: /home/ollama
-      OLLAMA_HOST: 0.0.0.0:11434
-      OLLAMA_MODELS: /models
-      OLLAMA_MAX_LOADED_MODELS: "1"
-      OLLAMA_NUM_PARALLEL: "1"
-      OLLAMA_KEEP_ALIVE: 10m
-      OLLAMA_CONTEXT_LENGTH: "4096"
-    networks:
-      - proxy-ollama                   # internal: the API has no auth, so it never sits on a VLAN.
-                                       # Model pulls: docker network connect apps-vlan31 <container>, pull, disconnect.
-    volumes:
-      - ${APPDATA}/ollama/models:/models
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # paperless-ngx: scan, OCR and archive documents. SQLite + Redis (no Postgres); no Tika/Gotenberg
   # (Office files and mail parsing parked). No egress.
@@ -155,7 +115,8 @@ services:
       - ${APPDATA}/paperless/consume:/usr/src/paperless/consume
       - ${APPDATA}/paperless/export:/usr/src/paperless/export
     networks:
-      - proxy-paperless                # internal: no egress (no mail fetch)
+      - proxy-paperless                # internal: paperless + sidecar; no egress (no mail fetch)
+      - paperless-backend              # internal: paperless + Redis
     depends_on:
       - paperlessredis
     # healthcheck: built into the image (curl http://localhost:8000)
@@ -169,8 +130,8 @@ services:
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
-    # Password (requirepass) from a config file: Redis has no *_FILE support. The sidecar shares this
-    # network, so Redis isn't left open to it.
+    # Password (requirepass) from a config file: Redis has no *_FILE support. Only paperless shares its
+    # network; the password is defence in depth.
     command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
     pids_limit: 64
     mem_limit: 256m
@@ -178,35 +139,155 @@ services:
       - ${APPDATA}/paperless/redis:/data
       - ${APPDATA}/paperless/secrets/redis.conf:/usr/local/etc/redis/redis.conf:ro   # requirepass <pw>; save 60 1
     networks:
-      - proxy-paperless
+      - paperless-backend
     healthcheck:                       # reads the password from the file at run time: never in env or inspect
       test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$(sed -n 's/^requirepass //p' /usr/local/etc/redis/redis.conf)\" ping | grep -q PONG"]
       interval: 30s
       timeout: 5s
       retries: 3
 
-  copyparty:
-    image: copyparty/ac:latest
-    container_name: kr-ccp-copyparty-0101
+  # FileBrowser Quantum: files through a browser. Secrets have no *_FILE support, so the admin password and
+  # any OIDC secret live in config.yaml in the data folder (600, owned 2107), not in env.
+  filebrowser:
+    image: gtstef/filebrowser:latest
+    container_name: kr-ccp-filebrowser-0101
     restart: unless-stopped
-    user: "2107:2107"                  # no USER, no entrypoint user setup: any uid works (README: -u 1000)
-    read_only: true                    # not documented upstream; writes go to /cfg and /w (to verify at build)
+    user: "2107:2107"                  # image runs as uid 1000 with no entrypoint script: any uid works
+    read_only: true                    # not documented upstream; to verify at build
+    cap_drop: [ALL]                    # config.yaml sets http.port 8080, so no NET_BIND_SERVICE for port 80
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m
+      - /home/filebrowser/tmp:size=1g,uid=2107,gid=2107   # server.cacheDir (default "tmp"); must be fast
+    pids_limit: 200
+    mem_limit: 1g
+    environment:
+      FILEBROWSER_CONFIG: /home/filebrowser/data/config.yaml
+    volumes:
+      - ${APPDATA}/filebrowser/data:/home/filebrowser/data   # config.yaml, database.sqlite
+      - ${SHARES}:/folder                                    # what it serves (source path in config.yaml)
+    networks:
+      - proxy-filebrowser              # internal: no egress
+    healthcheck:                       # the image's own check is hard-coded to port 80
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Immich: photos. Four containers as in the upstream release compose. Server and ML use the moving
+  # `release` tag (Immich publishes no `latest`). No egress for the server; the sidecar sees only the server.
+  immich:
+    image: ghcr.io/immich-app/immich-server:release
+    container_name: kr-ccp-immich-0101
+    restart: unless-stopped
+    user: "2111:2111"                  # start.sh does no user switching (FAQ: non-root via user:)
+    group_add:
+      - ${RENDER_GID}                  # Quick Sync transcoding
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+    read_only: true                    # not documented upstream; to verify at build
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=1g
+    pids_limit: 500
+    mem_limit: 4g
+    environment:
+      DB_HOSTNAME: immichdb
+      DB_USERNAME: immich
+      DB_DATABASE_NAME: immich
+      DB_PASSWORD_FILE: /run/secrets/immich_db_password   # start.sh exports it into the process env
+      REDIS_HOSTNAME: immichredis
+      REDIS_PASSWORD_FILE: /run/secrets/immich_redis_password
+      IMMICH_MACHINE_LEARNING_URL: http://immichml:3003
+    secrets:
+      - immich_db_password
+      - immich_redis_password
+    volumes:
+      - ${PHOTOS}:/data                # UPLOAD_LOCATION: originals, thumbs, encoded video; owned 2111
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - proxy-immich                   # internal: server + sidecar
+      - immich-backend                 # internal: server + db + redis + ML
+    depends_on:
+      - immichdb
+      - immichredis
+    # healthcheck: built into the image (immich-healthcheck)
+
+  # Machine learning (search, faces). CPU by default; the OpenVINO variant (`release-openvino` + /dev/dri)
+  # is an option on the N95 (README A-Q4). Models download on first use: needs egress then (README).
+  immichml:
+    image: ghcr.io/immich-app/immich-machine-learning:release
+    container_name: kr-ccp-immichml-0101
+    restart: unless-stopped
+    user: "2112:2112"
+    read_only: true                    # not documented upstream; to verify at build
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
     tmpfs:
       - /tmp:size=256m
-    pids_limit: 200
-    mem_limit: 512m
-    # Config in /cfg/*.conf (in the data folder, not git): [accounts] with argon2-hashed passwords
-    # (--ah-alg argon2), hist: /cfg/hists/ so nothing is written into the share's .hist folders.
+    pids_limit: 300
+    mem_limit: 4g
     volumes:
-      - ${APPDATA}/copyparty/cfg:/cfg  # config, salts, sessions.db, shares.db: must persist
-      - ${SHARES}:/w                   # what it serves
+      - ${APPDATA}/immich/model-cache:/cache   # HF_HOME + JIT caches; bind mount (named volumes break non-root)
     networks:
-      - proxy-copyparty                # internal: no egress
-    healthcheck:                       # as in upstream's compose example
-      test: ["CMD", "wget", "--spider", "-q", "127.0.0.1:3923/?reset=/._"]
+      - immich-backend                 # internal: its API (3003) has no auth
+    # healthcheck: built into the image (healthcheck.py)
+
+  # Database: Immich's own Postgres + VectorChord image. It has no `latest` or moving tag; upstream ties the
+  # extension version to each Immich release, so this tag follows the release compose (README A-Q5).
+  immichdb:
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+    container_name: kr-ccp-immichdb-0101
+    restart: unless-stopped
+    user: "2113:2113"                  # arbitrary uid: upstream postgres entrypoint uses nss_wrapper (to verify)
+    read_only: true                    # to verify at build
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /etc/postgresql:size=8m,uid=2113,gid=2113   # entrypoint copies and edits postgresql.conf here
+      - /var/run/postgresql:size=8m,uid=2113,gid=2113
+      - /tmp:size=64m
+    shm_size: 128mb
+    pids_limit: 300
+    mem_limit: 2g                      # docs: at least 2 GB when limits are set
+    environment:
+      POSTGRES_USER: immich
+      POSTGRES_DB: immich
+      POSTGRES_PASSWORD_FILE: /run/secrets/immich_db_password_pg
+      POSTGRES_INITDB_ARGS: --data-checksums
+      DB_STORAGE_TYPE: SSD
+    secrets:
+      - immich_db_password_pg
+    volumes:
+      - ${APPDATA}/immich/postgres:/var/lib/postgresql/data   # local pool only, never a network share
+    networks:
+      - immich-backend
+    # healthcheck: built into the image (pg_isready + checksum failures)
+
+  immichredis:
+    image: valkey/valkey:latest        # upstream pins valkey:9 by digest; :latest per §8 (README A-Q5)
+    container_name: kr-ccp-immichredis-0101
+    restart: unless-stopped
+    user: "2114:2114"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    command: ["valkey-server", "/usr/local/etc/valkey/valkey.conf"]
+    pids_limit: 64
+    mem_limit: 256m
+    volumes:
+      - ${APPDATA}/immich/redis:/data
+      - ${APPDATA}/immich/secrets/valkey.conf:/usr/local/etc/valkey/valkey.conf:ro   # requirepass <pw>
+    networks:
+      - immich-backend
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli --no-auth-warning -a \"$$(sed -n 's/^requirepass //p' /usr/local/etc/valkey/valkey.conf)\" ping | grep -q PONG"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -222,16 +303,24 @@ networks:
         - subnet: ${VLAN31_SUBNET}
           gateway: ${VLAN31_GATEWAY}
           ip_range: ${VLAN31_RANGE}
-  proxy-ollama:
-    name: proxy-ollama
-    driver: bridge
-    internal: true
   proxy-paperless:
     name: proxy-paperless
     driver: bridge
     internal: true
-  proxy-copyparty:
-    name: proxy-copyparty
+  paperless-backend:
+    name: paperless-backend
+    driver: bridge
+    internal: true
+  proxy-filebrowser:
+    name: proxy-filebrowser
+    driver: bridge
+    internal: true
+  proxy-immich:
+    name: proxy-immich
+    driver: bridge
+    internal: true
+  immich-backend:
+    name: immich-backend
     driver: bridge
     internal: true
 
@@ -243,8 +332,14 @@ secrets:
   tmdb_token:
     file: ${APPDATA}/mediasort/secrets/tmdb          # 600, owned 2104
   llm_key:
-    file: ${APPDATA}/mediasort/secrets/llm           # 600, owned 2104; must exist (empty is fine for ollama)
+    file: ${APPDATA}/mediasort/secrets/llm           # 600, owned 2104; the selected provider's API key
   paperless_secret_key:
     file: ${APPDATA}/paperless/secrets/secret_key    # openssl rand -hex 32, no trailing newline; 600, owned 2105
   paperless_redis_url:
     file: ${APPDATA}/paperless/secrets/redis_url     # redis://:<password>@paperlessredis:6379; 600, owned 2105
+  immich_db_password:
+    file: ${APPDATA}/immich/secrets/db_password      # letters and digits only (Immich docs); 600, owned 2111
+  immich_db_password_pg:
+    file: ${APPDATA}/immich/secrets/db_password_pg   # same value, second copy: 600, owned 2113 (the db's uid)
+  immich_redis_password:
+    file: ${APPDATA}/immich/secrets/redis_password   # same value as requirepass in valkey.conf; 600, owned 2111
