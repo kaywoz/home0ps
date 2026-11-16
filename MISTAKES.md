@@ -782,3 +782,11 @@ mistakes, not a diary.
 - **Root cause:** treated "pick from the earlier discussion" as licence to narrow the scope by my own placement rules (a deployer and storage services "don't belong in a stack") instead of putting the cut to kaywoz.
 - **Fix applied:** PR 321 reworked to the four stacks kaywoz named.
 - **Rule going forward:** when a request says to build from an earlier list, every item on it is in scope unless kaywoz drops it; an item I'd leave out or move goes to him as a one-line question before the draft, not as a decision in the draft.
+
+### 2026-11-16 — compose ("risky workload" misread)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** the stack proposal (PR 321) called ArchiveTeam Warrior a "risky workload" under CLAUDE.md §8, because it runs project code it fetches at run time, and asked whether it belongs in the lab. kaywoz: a risky workload means security work (malware, analysis, forensics and similar), not an app that runs third-party code.
+- **Root cause:** read "risky" in §8 by its everyday meaning instead of asking what kaywoz meant by it; the lab placement in an earlier long list was taken as support.
+- **Fix applied:** the Warrior stays in the apps stack; the lab question was dropped from the proposal. Its real gaps (no read-only root, UI without auth by default) are handled as a registered exception with mitigations.
+- **Rule going forward:** "risky workloads go to the lab" (CLAUDE.md §8) means security tooling: malware, analysis, forensics and similar. Don't move ordinary apps to the lab on that rule; flag their specific gaps instead.

@@ -8,7 +8,7 @@ Four separate stacks for MOS on the replacement storage host (the 4-bay NVMe box
 |---|---|---|---|---|
 | **media** | [`media/compose.yaml`](media/compose.yaml) | Jellyfin, Komga, Homey | the media LXC | VLAN 13 (IoT) |
 | **infra** | [`infra/compose.yaml`](infra/compose.yaml) | cloudflared | the infra VM | VLAN 24 (infra, tier 0) |
-| **apps** | [`apps/compose.yaml`](apps/compose.yaml) | mediasort, paperless-ngx, FileBrowser Quantum, Immich, ArchiveBox, ArchiveTeam Warrior, Atuin, Dillinger, Filestash, RackPeek | the apps VM | VLAN 31 (apps) |
+| **apps** | [`apps/compose.yaml`](apps/compose.yaml) | mediasort, paperless-ngx, FileBrowser Quantum, Immich, ArchiveBox, ArchiveTeam Warrior, Atuin, HedgeDoc, Filestash, RackPeek | the apps VM | VLAN 31 (apps) |
 | **storage** | [`storage/compose.yaml`](storage/compose.yaml) | Kopia, Time Machine, RustFS, Scrutiny, plus the box's socket proxy and Beszel agent | new (#43, #39, #103); the proxy and agent move from MOS-template deploys | the storage host's own network |
 
 This follows the scenario in kaywoz/home0ps#314: Docker runs **directly on MOS**, one stack per zone, the zone stacks on a macvlan network on their VLAN sub-interface **with no host IP on those VLANs**. The MOS UI is the storage host's only management portal (#312). kaywoz asked for the media stack to replace the media LXC and to "do the same" for the infra VM and the apps VM. I read that as all of them moving onto the new box (G1).
@@ -39,8 +39,8 @@ The candidates came from the 2026-11-13 discussion: a long list from kaywoz's Gi
 | Range | Stack | uids |
 |---|---|---|
 | 20xx | media | 2001 Jellyfin, 2002 Komga, 2010 Tailscale sidecar (Homey: see M-Q1) |
-| 21xx | apps | 2104 mediasort (as today), 2105 paperless, 2106 paperless Redis, 2107 FileBrowser Quantum, 2110 Tailscale sidecar, 2111 Immich server, 2112 Immich ML, 2113 Immich Postgres, 2114 Immich Valkey, 2121 Atuin, 2122 Atuin Postgres |
-| image uids | apps | ArchiveBox 911, ArchiveTeam Warrior 1000, RackPeek 1654, Filestash and Dillinger their images' own users (uids unverified; Filestash likely 1000). These images only work with their own uid. **Warrior and Filestash may share 1000** (A-Q10) |
+| 21xx | apps | 2104 mediasort (as today), 2105 paperless, 2106 paperless Redis, 2107 FileBrowser Quantum, 2110 Tailscale sidecar, 2111 Immich server, 2112 Immich ML, 2113 Immich Postgres, 2114 Immich Valkey, 2121 Atuin, 2123 HedgeDoc |
+| image uids | apps | ArchiveBox 911, ArchiveTeam Warrior 1000, RackPeek 1654, Filestash its image's own user (uid unverified, likely 1000). These images only work with their own uid. **Warrior and Filestash may share 1000** (A-Q10) |
 | 22xx | infra | 2201 cloudflared |
 | 23xx | storage | 2301 Kopia, 2302 RustFS, 2303 Time Machine share owner (the process is root); Beszel agent 65534 (as today); Scrutiny root |
 
@@ -130,11 +130,11 @@ Healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (exec form; th
 | Immich | `kr-ccp-immich-0101`, `-immichml-0101`, `-immichdb-0101`, `-immichredis-0101` | photos; as the upstream release compose |
 | ArchiveBox | `kr-ccp-archivebox-0101` | archives web pages |
 | ArchiveTeam Warrior | `kr-ccp-archivewarrior-0101` | contributes to ArchiveTeam projects |
-| Atuin | `kr-ccp-atuin-0101` + `kr-ccp-atuindb-0101` | shell history sync server; Postgres as in the template |
-| Dillinger | `kr-ccp-dillinger-0101` | Markdown editor |
+| Atuin | `kr-ccp-atuin-0101` | shell history sync server; SQLite, one container |
+| HedgeDoc | `kr-ccp-hedgedoc-0101` | collaborative Markdown editor, the open-source line of HackMD (replaces Dillinger: A-Q9) |
 | Filestash | `kr-ccp-filestash-0101` | file manager with storage backends (next to FileBrowser Quantum) |
 | RackPeek | `kr-ccp-rackpeek-0101` | homelab inventory |
-| Tailscale sidecar | `kr-ccp-tailscale-0201` | serves `svc:paperless`, `svc:filebrowser`, `svc:immich`, `svc:archivebox`, `svc:archivewarrior`, `svc:atuin`, `svc:dillinger`, `svc:filestash`, `svc:rackpeek` and the mover's `tcp:8089` (tag:docker) |
+| Tailscale sidecar | `kr-ccp-tailscale-0201` | serves `svc:paperless`, `svc:filebrowser`, `svc:immich`, `svc:archivebox`, `svc:archivewarrior`, `svc:atuin`, `svc:hedgedoc`, `svc:filestash`, `svc:rackpeek` and the mover's `tcp:8089` (tag:docker) |
 
 | Service | Deviation | Why |
 |---|---|---|
@@ -154,25 +154,25 @@ Healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (exec form; th
 | Immich ML | no egress (internal only); models need egress on first use | its API (3003) has no auth, so it never sits on a VLAN. Models: connect it to `apps-vlan31` while they download, then disconnect (A-Q4) |
 | Immich Valkey | `valkey/valkey:latest` with a password file | upstream pins `valkey:9` by digest; `:latest` per §8, so a major version bump can arrive unannounced |
 | ArchiveBox | on `apps-vlan31`: **UI (5797) open on VLAN 31** | it fetches whatever it's given; it has its own login, and the public index/snapshots/add view are turned off (the image defaults the index to public) |
-| ArchiveBox | uid 911 (the image's), **not `read_only`** | its dirs are owned 911 (an arbitrary uid exits 3); `/opt/archivebox` holds the browser and plugin binaries and must be writable, so a tmpfs won't do and a volume would keep stale binaries across updates |
+| ArchiveBox | uid 911 (the image's), **not `read_only`: exception E1** | its dirs are owned 911 (an arbitrary uid exits 3); `/opt/archivebox` holds the browser and plugin binaries and must be writable, so a tmpfs won't do and a volume would keep stale binaries across updates |
 | ArchiveBox | admin account by a one-off `createsuperuser` | no `*_FILE` support; `ADMIN_PASSWORD` in env would be readable through the socket proxy |
-| ArchiveTeam Warrior | **runs code it downloads**: project pipelines are `git pull`ed from GitHub and executed in-process | that is a risky workload under §8 (A-Q7) |
 | ArchiveTeam Warrior | on `apps-vlan31`; **UI (8001) has no auth** unless `http_password` is set | the password goes in a pre-made `projects/config.json` (600), not env |
-| ArchiveTeam Warrior | uid 1000 (the image's), not `read_only` | `/home/warrior/data` holds its baked-in `wget-at` binaries and must be writable; `no-new-privileges` also blocks the image's passwordless `sudo` |
+| ArchiveTeam Warrior | uid 1000 (the image's), **not `read_only`: exception E2** | `/home/warrior/data` holds its baked-in `wget-at` binaries and must be writable; `no-new-privileges` also blocks the image's passwordless `sudo` |
 | Atuin | `:latest` | upstream's `latest` lags (18.24.2 vs 18.24.8) and its docs warn against it; the moving release tag is `18.24` (A-Q8) |
-| Atuin Postgres | `postgres:latest` (the template uses `postgres:18`), data mounted at `/var/lib/postgresql` | on a new major version the image uses a new PGDATA subfolder and starts an **empty** cluster next to the old one, which then needs `pg_upgrade` (A-Q8) |
-| Atuin / its Postgres | the DB password as two files (2121, 2122) | as for Immich: one owner per 600 file |
-| Dillinger | **version tag `3.39.1` (2021)**, image's own user | no `latest`; newer tags are arm64-only; upstream dropped its Dockerfile; the linuxserver image is deprecated; the MOS template was removed as broken (A-Q9) |
-| Dillinger | `read_only` unverified | the image chowns `/public`, so the app may write there |
+| Atuin | SQLite (`sqlite:///config/atuin.db`) | kaywoz's choice; server support since 18.7/18.8. No database container, no password |
+| HedgeDoc | uid 2123, `read_only` (to verify) | the entrypoint drops to its user only when started as root, so `user:` works; uploads and the DB folder are pre-owned |
+| HedgeDoc | SQLite; session secret as a Docker secret named `sessionsecret` | HedgeDoc reads secrets by name from `/run/secrets/` (no `*_FILE` env) |
+| HedgeDoc | `latest` = 1.12.0 | upstream withdrew 1.12.1 and 1.12.2 (a migration bug); its docs example still shows 1.12.2 |
 | Filestash | image's own user (uid unverified), no `user:` override | its binary is mode 730: another uid can't execute it |
 | Filestash | `/admin/setup` is open until an admin password is set | set it right after the first start; only reachable through the sidecar. The password is stored as a bcrypt hash in `config.json` |
 | Filestash | no egress | backends on other hosts (SFTP, S3) would need it |
 | RackPeek | uid 1654 (the image's); **no authentication on its UI** | Tailscale only, admins only |
 
-**Secrets:** a Tailscale auth key for `tag:docker`. mediasort: `token`, `tmdb`, `llm` (as today). paperless: `secret_key`, `redis_url`, `redis.conf`. FileBrowser Quantum: `config.yaml`. Immich: `db_password` (two copies), `redis_password`, `valkey.conf`. Atuin: `db_password` (two copies). ArchiveTeam Warrior: `projects/config.json` with `http_password`. Filestash: admin hash in its `config.json`. ArchiveBox: its superuser in its database.
+**Secrets:** a Tailscale auth key for `tag:docker`. mediasort: `token`, `tmdb`, `llm` (as today). paperless: `secret_key`, `redis_url`, `redis.conf`. FileBrowser Quantum: `config.yaml`. Immich: `db_password` (two copies), `redis_password`, `valkey.conf`. HedgeDoc: `session_secret`. ArchiveTeam Warrior: `projects/config.json` with `http_password`. Filestash: admin hash in its `config.json`. ArchiveBox: its superuser in its database.
 
 **Tailscale follow-ups** (own PRs, not built):
-- `iac/tailscale-services/`: add `svc:paperless`, `svc:filebrowser`, `svc:immich`, `svc:atuin`, `svc:dillinger`, `svc:filestash` and `svc:rackpeek`. `svc:archivebox` and `svc:archivewarrior` exist for `tag:storage`; they move to `tag:docker`.
+- `iac/tailscale-services/`: add `svc:paperless`, `svc:filebrowser`, `svc:immich`, `svc:atuin`, `svc:hedgedoc`, `svc:filestash` and `svc:rackpeek`.
+- `svc:archivebox` and `svc:archivewarrior` already exist. Today the policy auto-approves them only when a `tag:storage` node advertises them, because they were planned on the storage host. Here, the apps stack's sidecar (a `tag:docker` node) advertises them. So their `autoApprovers.services` entries in `policy.hujson` change from `tag:storage` to `tag:docker`; the names, URLs and the Service definitions in `iac/tailscale-services/` stay.
 - Atuin's clients (every machine that syncs shell history) need a grant to `svc:atuin`.
 - `policy.hujson`: auto-approve them for `tag:docker`, plus a grant per Service.
 - The mover's grant (`tag:storage` → `tag:docker:8089`) and its tests stay; `CLASSIFIER_URL` becomes the sidecar's MagicDNS name.
@@ -191,9 +191,22 @@ Healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (exec form; th
 - **A-Q4:** Immich ML on the N95: CPU (as drafted), OpenVINO (`release-openvino` + `/dev/dri`; upstream warns about integrated GPUs on low-RAM hosts), or ML off (Immich needs 6 GB minimum, 4 GB without ML)? Models need egress the first time; accept a permanent VLAN 31 address for ML instead?
 - **A-Q5:** The Immich Postgres version tag. Accept this one exception to `:latest`, updated with each Immich release?
 - **A-Q6:** paperless: how do scans reach `consume/` (FileBrowser upload, an SMB share, scanner e-mail)?
-- **A-Q7 — ArchiveTeam Warrior on home hardware.** It downloads and executes ArchiveTeam's project code, the "risky workload" §8 sends to the XCP-ng lab. The earlier long list also placed it in the lab. Keep it here as asked, or put it in the lab?
-- **A-Q8 — Atuin.** (a) `:latest` (lags releases) or the `18.24` release tag? (b) Postgres as in the template (`:latest` and the major-version PGDATA trap above), or Atuin's SQLite backend (`sqlite:///config/atuin.db`, server support since 18.7–18.8), which drops the database container entirely? My pick: SQLite.
-- **A-Q9 — Dillinger.** Upstream has no current Docker image: the only amd64 build is 3.39.1 from 2021, and the template was removed as broken. Keep it on that old version, or drop it?
+- **A-Q8 — Atuin's tag:** `:latest` (lags releases, as drafted) or the `18.24` release tag?
+- **A-Q9 — Markdown editor: HedgeDoc (drafted) or another?** Dillinger is dropped (no current image). Candidates checked:
+  - **HedgeDoc 1.x:** HackMD's open-source line. One container, SQLite, local accounts or OIDC, collaborative. HedgeDoc 2 is still alpha.
+  - **SilverBullet:** one container, Markdown files in a folder (no DB), its own login. A personal notes app rather than shared documents.
+  - **Memos:** one container, SQLite. A notes timeline, not a document editor.
+  - **Outline / Docmost:** need Postgres + Redis (Outline also needs an external sign-in): too heavy for 8 GB.
+  - **StackEdit:** unmaintained since 2019–2023.
+  - HackMD itself is a hosted SaaS (hackmd.io), not self-hostable.
+- **A-Q11 — tinyauth for UIs without a login** (RackPeek, Scrutiny's UI, the Warrior without `http_password`).
+  - What tinyauth needs:
+    - It's forward-auth only, so it needs a reverse proxy (Caddy, Traefik, nginx) between `tailscale serve` and the app. That's one more container per stack.
+    - Its session cookie goes on the parent domain of `APP_URL`. With `tinyauth.<tailnet>.ts.net` that's `<tailnet>.ts.net`. That works without a public domain: `ts.net` is on the Public Suffix List, so `<tailnet>.ts.net` is a valid cookie domain. But the cookie then reaches every host and Service in the tailnet.
+    - It runs as root by default.
+    - Its own docs say it's "not designed for production".
+  - What we have today: each Service has a grant, so only the named admins' devices reach it. `tailscale serve` also passes the user's identity (`Tailscale-User-Login`) for user devices, though these apps can't use it.
+  - My pick: **no tinyauth in this phase.** Limit those Services to admins by grant (with ACL tests), set the Warrior's `http_password`, and revisit with public hostnames, where Cloudflare Access does this job.
 - **A-Q10 — two file managers and shared uids.** Filestash next to FileBrowser Quantum: both, as asked? Filestash's and Warrior's image uids may both be 1000; same uid means one compromised app can read the other's files where permissions allow. Check `docker run --rm --entrypoint id machines/filestash` at build.
 
 ## Stack 4 — storage (the storage host's own network)
@@ -249,10 +262,62 @@ The host's own storage services. They're served by the host's own tailscaled (`t
   - Over the tailnet it would need its own sidecar.
   - The alternative is MOS's own Samba with a Time Machine share, if MOS supports `fruit:time machine` (unverified).
 - **S-Q3:** RustFS's S3 API. Is it local only (the box's own backups, #30), or a Tailscale Service for other hosts (#28 "secure s3 endpoint")?
-- **S-Q4 — Scrutiny with `SYS_ADMIN` as root on the storage host.**
-  - (a) Accept, as in the template.
-  - (b) Keep only the collector here (also root, also `SYS_ADMIN`, but no web UI and no InfluxDB) and put the hub on the monitoring host. That's where the earlier long list put it, and it matches "monitoring reads everything".
-  - (c) Skip Scrutiny and use the SMART data Beszel and the MOS UI already show.
+- **S-Q4 — Scrutiny.** Reading NVMe SMART needs root with `SYS_RAWIO` + `SYS_ADMIN` and the device nodes in every variant. The question is how long that runs, and next to what.
+
+  | Option | What runs on the storage host | Cost / gain |
+  |---|---|---|
+  | **(a) Omnibus here** (drafted, as the template) | one always-on container: InfluxDB, web UI, cron, all root with `SYS_ADMIN`, ~100 MB idle | simplest. The root + `SYS_ADMIN` container also serves a UI without auth (Tailscale-only, admins) |
+  | **(b) Hub on the monitoring host, collector one-shot here** | nothing always-on. MOS cron (UI cron jobs) runs `docker compose run --rm scrutiny-collector scrutiny-collector-metrics run --api-endpoint …` daily; the root + `SYS_ADMIN` container lives for seconds | hub (web + InfluxDB) needs no device access and fits "monitoring reads everything". New push flow storage host → hub (`svc:scrutiny` on the monitoring host), one grant + ACL test, like the Beszel push exception. One-shot use isn't a documented mode (works by overriding the image's cron command); `/run/udev` optional |
+  | **(c) Beszel's SMART instead** | the always-on Beszel agent switches to its `:alpine` image (smartctl) and becomes root with `SYS_RAWIO` + `SYS_ADMIN` and the devices, on host networking | no new app, and SMART alerts come with the hub (Beszel ≥ 0.17). But it turns today's non-root, read-only agent into the box's most privileged always-on container: the worst trade |
+  | **(d) No container** | MOS's own SMART view, plus optionally a small host cron script (`smartctl -H`) that pings Healthchecks | least privilege, no history graphs |
+
+  My pick: **(b)**, or **(d)** if the history isn't needed.
+
+## Exception register
+
+Named exceptions to the container standard (CLAUDE.md §8). They go into the security summaries when built. Smaller deviations, like a tmpfs with `exec`, stay in the per-stack tables.
+
+| # | Service | Exception | Why it can't meet the standard |
+|---|---|---|---|
+| **E1** | ArchiveBox | not `read_only`; fixed image uid 911 | `/opt/archivebox` holds the browser and plugin binaries and must be writable; its directories are owned 911 |
+| **E2** | ArchiveTeam Warrior | not `read_only`; fixed image uid 1000; UI has no login unless `http_password` is set | `/home/warrior/data` holds its `wget-at` binaries and must be writable |
+| E3 | Homey | core runs as uid 0, four capabilities | tested in #229 (M-Q1) |
+| E4 | Time Machine | root, not `read_only`, six capabilities | its entrypoint writes users and the Samba config into `/etc` |
+| E5 | Scrutiny | root, `SYS_RAWIO` + `SYS_ADMIN`, devices, not `read_only`, UI has no login | SMART on NVMe (S-Q4) |
+| E6 | socket proxy | root (no `user:`) | needs to open `docker.sock`; `POST=0` is the control, as today |
+| E7 | Immich Postgres | a version tag instead of `:latest` | no moving tag exists (A-Q5) |
+
+### Mitigations for E1 and E2 (and what else is available)
+
+**Already in the draft:**
+- **Hardening that still applies:**
+  - each runs as its image's non-root uid
+  - `cap_drop: [ALL]`
+  - `no-new-privileges` (which also blocks the Warrior's passwordless `sudo`)
+  - Docker's default seccomp profile
+  - memory and pid limits
+- **Network isolation:** each sits on a macvlan, so neither can reach the MOS host at all: not its UI, its shares, or the rclone remote control.
+- **Data:** each gets one data folder of its own, owned by its uid.
+
+**Proposed, to add when built:**
+1. **Read-only root anyway (to test):**
+   - Set `read_only: true` and put only the binaries folder (`/opt/archivebox`, `/home/warrior/data`) on an **anonymous volume**. Docker seeds an anonymous volume from the image when it's created.
+   - Renew it on every image update with `docker compose up -d --renew-anon-volumes <service>`, so the binaries never go stale.
+   - Everything else stays read-only.
+   - Unverified for both images. If it works, E1 and E2 shrink to one writable folder each.
+2. **Egress filtering in UniFi** (the strongest control here; both have fixed addresses on VLAN 31): these two addresses may reach the internet only.
+   - Block RFC1918 and the other VLANs, so a compromised archiver can't move sideways in the home network.
+   - Turn on IDS/IPS for VLAN 31 if the gateway's throughput allows it (#202).
+3. **Monitoring:**
+   - **Beszel:** per-container CPU, memory and network graphs, with alerts to Slack on sustained spikes, for example a crawler gone wild or a miner.
+   - **Dozzle:** for their logs.
+   - **Diun (#101) and Trivy (#102):** image update notices and scheduled vulnerability scans of both images.
+   - **Healthchecks:** for their health status.
+4. **OS level:**
+   - **userns-remap** (#310 §7c) is the one OS feature that changes the picture. With it, uid 0 or 911 inside a container is an unprivileged uid on the host, which helps E3–E5 most.
+   - **AppArmor/SELinux** are not available on MOS's kernel (#174: "no AppArmor layer"; to re-check on the new box: `cat /sys/module/apparmor/parameters/enabled`).
+   - **Pool mount options:** if the data pool can be mounted `nosuid,nodev`, a planted setuid file in a data folder is harmless. To check on MOS.
+5. **Not proposed (proportionality):** runtime detection with Falco or Tetragon. They need privileged eBPF agents, and the kernel support on MOS is unknown.
 
 ## General open questions
 
@@ -262,14 +327,31 @@ The host's own storage services. They're served by the host's own tailscaled (`t
 - **G4:** Build before #310 §7b–§7e are done? They decide whether the MOS UI manages compose stacks, whether macvlan with a VLAN parent works from MOS, and whether userns-remap is possible. My pick: **wait**.
 - **G5:** Container logs off-box on MOS (no journald). Use Docker's `syslog` driver to the monitoring host, or wait for log shipping?
 - **G6:** VLANs 13/24/31 tagged on the storage host's switch port, and a small address block per VLAN outside DHCP for the macvlans. Today the guests' VLANs come from PCI passthrough and the LXC's own NIC.
-- **G7:** RAM and CPU. Immich (6–8 GB recommended), paperless OCR and Jellyfin transcoding share a 4-core N95 with the storage role. The `mem_limit`s here add up to about 31 GB of the 64 GB. The CPU is the tighter resource. Check with `nproc` and `free -g` on the box before sizing further (MISTAKES.md 2026-11-10).
+- **G7 — 8 GB of RAM** (kaywoz, 2026-11-16). Limits were cut for it; they are caps, not reservations.
+
+  | Stack | Sum of `mem_limit`s |
+  |---|---|
+  | media | 2.9 GB (Jellyfin 1.5 GB, Komga 768 MB with a 512 MB heap, Homey 512 MB) |
+  | infra | 0.1 GB |
+  | apps | 5.5 GB without Immich ML (+1.5 GB with it) |
+  | storage | 2.0 GB |
+  | **total** | **≈ 10.5 GB of caps** on an 8 GB box, before MOS itself, its RAM root filesystem and the rclone mount's buffers |
+
+  - Caps over physical RAM are normal as long as the peaks don't line up. The peaks here are Jellyfin transcoding, paperless OCR (one worker now), ArchiveBox's Chromium and Immich imports. Real usage is unmeasured: watch it in Beszel for the first weeks and alert near the top.
+  - Already done for 8 GB:
+    - **Immich ML** is off by default (compose profile `immich-ml`). Immich needs 6 GB with ML and 4 GB without. ML could run on another machine instead, e.g. the Mac mini, since Immich takes a remote ML URL (A-Q4).
+    - **paperless** uses one worker.
+    - **Komga's** heap is 512 MB.
+  - If it's still tight, the next cuts are ArchiveBox and the Warrior (start them only when needed), then Filestash, which duplicates FileBrowser Quantum.
+  - MOS's root filesystem is RAM. With 8 GB, anything writing to `/` (logs, a misplaced cache: MISTAKES.md 2026-11-10) eats into the same memory.
+  - Check `nproc` and `free -g` on the box before going live.
 
 ## Unverified (checked at build, before anything goes live)
 
 - **Tailscale sidecar:** non-root with `read_only`, and whether it serves Services in userspace mode to another container's IP. The containerboot source supports the config; the behaviour hasn't been tested.
 - **`read_only`** for cloudflared, paperless-ngx (rootless), FileBrowser Quantum, Kopia, RustFS and all four Immich containers. Every writable path listed comes from reading the code, not from upstream docs.
 - **Running as a non-root uid:** Immich Postgres with an arbitrary uid (nss_wrapper), and Kopia as non-root.
-- **Image uids:** Filestash's and Dillinger's (not read from the image layers).
+- **Image uids:** Filestash's (not read from the image layers).
 - **Capability sets:** Scrutiny's under s6. ArchiveTeam Warrior's per-project needs and target hosts.
 - **Time Machine:** its capability set.
 - **Networking:** Homey's discovery on a macvlan address, and Komga without egress.

@@ -29,7 +29,7 @@ services:
     tmpfs:
       - /tmp:size=16m
     pids_limit: 100
-    mem_limit: 256m
+    mem_limit: 128m
     environment:
       TS_USERSPACE: "true"
       TS_STATE_DIR: /var/lib/tailscale
@@ -69,7 +69,7 @@ services:
     tmpfs:
       - /tmp:size=256m
     pids_limit: 500
-    mem_limit: 4g
+    mem_limit: 1536m
     environment:
       JELLYFIN_PublishedServerUrl: http://${JELLYFIN_IP}:8096   # what LAN discovery hands out
     networks:
@@ -93,9 +93,9 @@ services:
     tmpfs:
       - /tmp:size=256m,exec                   # exec: the SQLite JDBC driver loads its native library from /tmp
     pids_limit: 300
-    mem_limit: 1536m
+    mem_limit: 768m
     environment:
-      JAVA_TOOL_OPTIONS: -Xmx1g
+      JAVA_TOOL_OPTIONS: -Xmx512m        # 8 GB box: heap capped below mem_limit
     networks:
       - proxy-komga                           # internal: no egress (to verify, see README)
     volumes:
@@ -124,7 +124,7 @@ services:
       - /tmp:size=128m
       - /run:size=16m
     pids_limit: 300
-    mem_limit: 768m
+    mem_limit: 512m
     environment:
       HOMEY_LOCAL_ADDRESS: ${HOMEY_IP}
     networks:

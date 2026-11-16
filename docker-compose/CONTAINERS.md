@@ -54,8 +54,7 @@ Names reserved by the storage-host stacks proposal ([`storage/README.md`](storag
 | `kr-ccp-archivebox-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
 | `kr-ccp-archivewarrior-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
 | `kr-ccp-atuin-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
-| `kr-ccp-atuindb-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
-| `kr-ccp-dillinger-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-hedgedoc-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
 | `kr-ccp-filestash-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
 | `kr-ccp-rackpeek-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
 | `kr-ccp-kopia-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |

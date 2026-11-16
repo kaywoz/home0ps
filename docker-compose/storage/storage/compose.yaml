@@ -94,7 +94,7 @@ services:
     tmpfs:
       - /tmp:size=256m
     pids_limit: 300
-    mem_limit: 2g
+    mem_limit: 512m
     environment:
       KOPIA_CONFIG_PATH: /app/config/repository.config
       KOPIA_PERSIST_CREDENTIALS_ON_CONNECT: "true"   # repository password in /app/config/*.kopia-password
@@ -146,7 +146,7 @@ services:
         soft: 65536
         hard: 65536
     pids_limit: 200
-    mem_limit: 512m
+    mem_limit: 256m
     environment:
       TM_USERNAME: timemachine
       TM_GROUPNAME: timemachine
@@ -181,7 +181,7 @@ services:
     tmpfs:
       - /tmp:size=64m
     pids_limit: 300
-    mem_limit: 2g
+    mem_limit: 512m
     environment:
       RUSTFS_VOLUMES: /data
       RUSTFS_ADDRESS: 0.0.0.0:9000
@@ -231,7 +231,7 @@ services:
       - /dev/nvme2:/dev/nvme2
       - /dev/nvme3:/dev/nvme3
     pids_limit: 200
-    mem_limit: 1g
+    mem_limit: 512m
     ports:
       - "127.0.0.1:8080:8080"          # svc:scrutiny via tailscale serve; InfluxDB (8086) stays unpublished
     volumes:
