@@ -14,7 +14,8 @@
 # Rate limit: at most MAX_PER_HOUR bounces per rolling hour; if a bounce didn't help, it waits
 # COOLDOWN_MIN minutes before the next one (a bounce can't fix what isn't this fault).
 #
-# Cron (as root on MOS, via bash: /boot on MOS doesn't allow executing files directly):
+# Cron: add the line in the MOS UI's cron jobs section. `crontab` entries are lost at reboot on MOS
+# (verified 2026-11-16). Via bash, because /boot on MOS doesn't allow executing files directly:
 #   * * * * *  bash /boot/config/home0ps/nic-watchdog.sh
 #
 #   nic-watchdog.sh            check, and bounce the NIC if wedged
