@@ -8,7 +8,7 @@ Four separate stacks for MOS on the replacement storage host (the 4-bay NVMe box
 |---|---|---|---|---|
 | **media** | [`media/compose.yaml`](media/compose.yaml) | Jellyfin, Komga, Homey | the media LXC | VLAN 13 (IoT) |
 | **infra** | [`infra/compose.yaml`](infra/compose.yaml) | cloudflared | the infra VM | VLAN 24 (infra, tier 0) |
-| **apps** | [`apps/compose.yaml`](apps/compose.yaml) | mediasort, paperless-ngx, FileBrowser Quantum, Immich, ArchiveBox, ArchiveTeam Warrior, Atuin, HedgeDoc, Filestash, RackPeek | the apps VM | VLAN 31 (apps) |
+| **apps** | [`apps/compose.yaml`](apps/compose.yaml) | mediasort, paperless-ngx, CannonCommander, Immich, ArchiveBox, ArchiveTeam Warrior, Atuin, HedgeDoc, Filestash, RackPeek | the apps VM | VLAN 31 (apps) |
 | **storage** | [`storage/compose.yaml`](storage/compose.yaml) | Kopia, Time Machine, RustFS, Scrutiny, plus the box's socket proxy and Beszel agent | new (#43, #39, #103); the proxy and agent move from MOS-template deploys | the storage host's own network |
 
 This follows the scenario in kaywoz/home0ps#314: Docker runs **directly on MOS**, one stack per zone, the zone stacks on a macvlan network on their VLAN sub-interface **with no host IP on those VLANs**. The MOS UI is the storage host's only management portal (#312). kaywoz asked for the media stack to replace the media LXC and to "do the same" for the infra VM and the apps VM. I read that as all of them moving onto the new box (G1).
@@ -39,7 +39,7 @@ The candidates came from the 2026-11-13 discussion: a long list from kaywoz's Gi
 | Range | Stack | uids |
 |---|---|---|
 | 20xx | media | 2001 Jellyfin, 2002 Komga, 2010 Tailscale sidecar (Homey: see M-Q1) |
-| 21xx | apps | 2104 mediasort (as today), 2105 paperless, 2106 paperless Redis, 2107 FileBrowser Quantum, 2110 Tailscale sidecar, 2111 Immich server, 2112 Immich ML, 2113 Immich Postgres, 2114 Immich Valkey, 2121 Atuin, 2123 HedgeDoc |
+| 21xx | apps | 2104 mediasort (as today), 2105 paperless, 2106 paperless Redis, 2107 CannonCommander, 2110 Tailscale sidecar, 2111 Immich server, 2112 Immich ML, 2113 Immich Postgres, 2114 Immich Valkey, 2121 Atuin, 2123 HedgeDoc |
 | image uids | apps | ArchiveBox 911, ArchiveTeam Warrior 1000, RackPeek 1654, Filestash its image's own user (uid unverified, likely 1000). These images only work with their own uid. **Warrior and Filestash may share 1000** (A-Q10) |
 | 22xx | infra | 2201 cloudflared |
 | 23xx | storage | 2301 Kopia, 2302 RustFS, 2303 Time Machine share owner (the process is root); Beszel agent 65534 (as today); Scrutiny root |
@@ -118,7 +118,7 @@ Healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (exec form; th
   - (c) The infra cloudflared joins the other stacks' internal networks. That bridges zones; not recommended.
 
   My pick: **(b)**. Each zone stays self-contained, and the infra stack becomes the place for one shared tunnel only if one is ever needed.
-- **I-Q3:** Which apps are user-facing (tunnel + Access) and which are admin-only (Tailscale)? Candidates for the tunnel: Immich, paperless, FileBrowser Quantum, Jellyfin. Jellyfin through Cloudflare is a terms-of-service and client-compatibility question of its own.
+- **I-Q3:** Which apps are user-facing (tunnel + Access) and which are admin-only (Tailscale)? Candidates for the tunnel: Immich, paperless, CannonCommander, Jellyfin. Jellyfin through Cloudflare is a terms-of-service and client-compatibility question of its own.
 
 ## Stack 3 — apps (VLAN 31), replaces the apps VM
 
@@ -126,15 +126,15 @@ Healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (exec form; th
 |---|---|---|
 | mediasort | `kr-ccp-mediasort-0201` | the media classifier (#260), moved unchanged; Claude/OpenAI API (no local LLM: Ollama is dropped) |
 | paperless-ngx | `kr-ccp-paperless-0101` + `kr-ccp-paperlessredis-0101` | SQLite + Redis, no Postgres, no Tika/Gotenberg |
-| FileBrowser Quantum | `kr-ccp-filebrowser-0101` | files through a browser; OIDC capable |
+| CannonCommander | `kr-ccp-cannoncommander-0101` | two-panel file manager from the MOS Hub (kaywoz's choice, replaces FileBrowser Quantum; it's a fork of it). Users, groups, 2FA, passkeys, OIDC |
 | Immich | `kr-ccp-immich-0101`, `-immichml-0101`, `-immichdb-0101`, `-immichredis-0101` | photos; as the upstream release compose |
 | ArchiveBox | `kr-ccp-archivebox-0101` | archives web pages |
 | ArchiveTeam Warrior | `kr-ccp-archivewarrior-0101` | contributes to ArchiveTeam projects |
 | Atuin | `kr-ccp-atuin-0101` | shell history sync server; SQLite, one container |
 | HedgeDoc | `kr-ccp-hedgedoc-0101` | collaborative Markdown editor, the open-source line of HackMD (replaces Dillinger: A-Q9) |
-| Filestash | `kr-ccp-filestash-0101` | file manager with storage backends (next to FileBrowser Quantum) |
+| Filestash | `kr-ccp-filestash-0101` | file manager with storage backends (next to CannonCommander) |
 | RackPeek | `kr-ccp-rackpeek-0101` | homelab inventory |
-| Tailscale sidecar | `kr-ccp-tailscale-0201` | serves `svc:paperless`, `svc:filebrowser`, `svc:immich`, `svc:archivebox`, `svc:archivewarrior`, `svc:atuin`, `svc:hedgedoc`, `svc:filestash`, `svc:rackpeek` and the mover's `tcp:8089` (tag:docker) |
+| Tailscale sidecar | `kr-ccp-tailscale-0201` | serves `svc:paperless`, `svc:cannoncommander`, `svc:immich`, `svc:archivebox`, `svc:archivewarrior`, `svc:atuin`, `svc:hedgedoc`, `svc:filestash`, `svc:rackpeek` and the mover's `tcp:8089` (tag:docker) |
 
 | Service | Deviation | Why |
 |---|---|---|
@@ -143,9 +143,11 @@ Healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (exec form; th
 | paperless-ngx | `read_only` via `S6_READ_ONLY_ROOT=1` + tmpfs `/run`, `/tmp`, `/var/cache/fontconfig` | rootless (`user:`) is supported upstream; read-only + rootless together isn't tested upstream |
 | paperless-ngx | OCR language limited to the image's built-ins | extra languages install at start, which rootless mode can't do |
 | paperless Redis | password in a config file, not `*_FILE` | Redis has no `*_FILE` support; healthcheck reads the file at run time (visible to processes inside that container only) |
-| FileBrowser Quantum | admin password and OIDC secret in `config.yaml` (600), not env | no `*_FILE` support; env would be readable through the socket proxy. The admin password in the config is re-applied on every start |
-| FileBrowser Quantum | `http.port: 8080` in `config.yaml`, own healthcheck | port 80 as non-root needs `NET_BIND_SERVICE`; the image's healthcheck is hard-coded to 80 |
-| FileBrowser Quantum | `read_only`, cache dir on a tmpfs | not documented upstream; the cache dir must be fast (startup speed test) |
+| CannonCommander | the image's entrypoint bypassed (`entrypoint: tini -- /app/cannoncommander`), `user: 2107` | the entrypoint needs root: it chowns `/remotes`, adds a passwd entry and drops to `PUID` with `setpriv`. Without it, `config.yaml` is copied in by hand at deploy |
+| CannonCommander | admin password (and any OIDC secret) in `config.yaml` (600), not env | a fresh install opens **without a sign-in** until a password is set (upstream changelog, v1.1.x). A password in the config closes that window; it's re-applied on every start. `CC_ADMIN_PASSWORD` in env would be readable through the socket proxy |
+| CannonCommander | `http.port: 8080` in `config.yaml`, own healthcheck | port 80 as non-root needs `NET_BIND_SERVICE`; the image's healthcheck is hard-coded to 80 |
+| CannonCommander | no `/dev/fuse`, `SYS_ADMIN`, `DAC_READ_SEARCH`, `DAC_OVERRIDE`, `apparmor:unconfined` (all in upstream's template) | they serve rclone mounts and Unraid's root-only paths. **rclone remotes are out of scope** (they would store cloud credentials in its config folder) unless kaywoz says otherwise |
+| CannonCommander | `/remotes` source dropped from `config.yaml`; terminal, MCP server and WebDAV left off | the terminal is a shell in the container for admins, the MCP server gives AI assistants file access. All three are off until an admin switches them on |
 | Immich server | `/dev/dri/renderD128` + render GID | Quick Sync transcoding |
 | Immich server/ML | tag `release`, not `latest` | Immich publishes no `latest`; `release` is the moving tag |
 | Immich Postgres | **a version tag** (`14-vectorchord0.4.3-pgvectors0.2.0`) | no `latest` or moving tag exists; upstream ties the extension version to each Immich release, so this tag must follow the release compose on upgrades (A-Q5). The one real exception to "images on `:latest`" |
@@ -168,10 +170,10 @@ Healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (exec form; th
 | Filestash | no egress | backends on other hosts (SFTP, S3) would need it |
 | RackPeek | uid 1654 (the image's); **no authentication on its UI** | Tailscale only, admins only |
 
-**Secrets:** a Tailscale auth key for `tag:docker`. mediasort: `token`, `tmdb`, `llm` (as today). paperless: `secret_key`, `redis_url`, `redis.conf`. FileBrowser Quantum: `config.yaml`. Immich: `db_password` (two copies), `redis_password`, `valkey.conf`. HedgeDoc: `session_secret`. ArchiveTeam Warrior: `projects/config.json` with `http_password`. Filestash: admin hash in its `config.json`. ArchiveBox: its superuser in its database.
+**Secrets:** a Tailscale auth key for `tag:docker`. mediasort: `token`, `tmdb`, `llm` (as today). paperless: `secret_key`, `redis_url`, `redis.conf`. CannonCommander: `config.yaml` (admin password). Immich: `db_password` (two copies), `redis_password`, `valkey.conf`. HedgeDoc: `session_secret`. ArchiveTeam Warrior: `projects/config.json` with `http_password`. Filestash: admin hash in its `config.json`. ArchiveBox: its superuser in its database.
 
 **Tailscale follow-ups** (own PRs, not built):
-- `iac/tailscale-services/`: add `svc:paperless`, `svc:filebrowser`, `svc:immich`, `svc:atuin`, `svc:hedgedoc`, `svc:filestash` and `svc:rackpeek`.
+- `iac/tailscale-services/`: add `svc:paperless`, `svc:cannoncommander`, `svc:immich`, `svc:atuin`, `svc:hedgedoc`, `svc:filestash` and `svc:rackpeek`.
 - `svc:archivebox` and `svc:archivewarrior` already exist. Today the policy auto-approves them only when a `tag:storage` node advertises them, because they were planned on the storage host. Here, the apps stack's sidecar (a `tag:docker` node) advertises them. So their `autoApprovers.services` entries in `policy.hujson` change from `tag:storage` to `tag:docker`; the names, URLs and the Service definitions in `iac/tailscale-services/` stay.
 - Atuin's clients (every machine that syncs shell history) need a grant to `svc:atuin`.
 - `policy.hujson`: auto-approve them for `tag:docker`, plus a grant per Service.
@@ -181,16 +183,20 @@ Healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (exec form; th
 **Migration from the apps VM:**
 1. Copy `mediasort/secrets/` and re-own it from the remapped uid (102104) to 2104.
 2. Start mediasort, point the mover at the sidecar, run one dry run.
-3. paperless, FileBrowser Quantum and Immich are new. Immich imports existing photos through its CLI or an external library (A-Q3).
+3. paperless, CannonCommander and Immich are new. Immich imports existing photos through its CLI or an external library (A-Q3).
 4. Retire the apps VM once the mover has run cleanly for a day. Ollama's models are dropped with it.
 
 **Open questions — apps:**
 - **A-Q1:** mediasort's image. Build it on the host (needs the checkout and a deployer that can build), or build it in GitHub Actions and push to ghcr.io? The second means our own supply chain, flagged in #314.
-- **A-Q2:** FileBrowser Quantum. Which folders does it serve (`${SHARES}`)? Local accounts or OIDC, and which provider (Pocket ID is off the list)?
+- **A-Q2 — CannonCommander.**
+  - Which folders does it serve (`${SHARES}`, mounted where its default source expects `/mnt/user`)? Local accounts or OIDC, and which provider (Pocket ID is off the list)?
+  - **Maturity:** the repository was created on 2026-11-03, has one maintainer and a handful of stars. §8 says the apps host runs trusted, well-known apps. Its base (FileBrowser Quantum) is well known; the fork isn't yet. Accept it as your pick, or keep Quantum as the fallback if the fork stalls?
+  - **First sign-in:** the MOS Hub card says the first start writes an admin password into the log. The current code doesn't: a fresh install opens with no sign-in at all, and older releases printed the password below the startup banner. That banner comes from the entrypoint, which this draft bypasses, and the draft sets the password in `config.yaml`. If the image's own entrypoint is ever used, the password line goes to journald → Fluent Bit → LogTide, and the admin password must be changed at first sign-in.
+  - **To verify at build:** that the server starts as 2107 with the entrypoint bypassed and `read_only` (it needs `config.yaml` present and writes its database and `cache/` under `/config`). If it doesn't, the fallback is the image's entrypoint as root, dropping to 2107 with `setpriv` and `CHOWN`/`FOWNER`/`SETUID`/`SETGID`: that becomes exception E8.
 - **A-Q3:** Immich: where do the photos live (`${PHOTOS}`), and do existing photos come in as an external library (read-only) or by upload?
 - **A-Q4:** Immich ML on the N95: CPU (as drafted), OpenVINO (`release-openvino` + `/dev/dri`; upstream warns about integrated GPUs on low-RAM hosts), or ML off (Immich needs 6 GB minimum, 4 GB without ML)? Models need egress the first time; accept a permanent VLAN 31 address for ML instead?
 - **A-Q5:** The Immich Postgres version tag. Accept this one exception to `:latest`, updated with each Immich release?
-- **A-Q6:** paperless: how do scans reach `consume/` (FileBrowser upload, an SMB share, scanner e-mail)?
+- **A-Q6:** paperless: how do scans reach `consume/` (CannonCommander upload, an SMB share, scanner e-mail)?
 - **A-Q8 — Atuin's tag:** `:latest` (lags releases, as drafted) or the `18.24` release tag?
 - **A-Q9 — Markdown editor: HedgeDoc (drafted) or another?** Dillinger is dropped (no current image). Candidates checked:
   - **HedgeDoc 1.x:** HackMD's open-source line. One container, SQLite, local accounts or OIDC, collaborative. HedgeDoc 2 is still alpha.
@@ -207,7 +213,7 @@ Healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (exec form; th
     - Its own docs say it's "not designed for production".
   - What we have today: each Service has a grant, so only the named admins' devices reach it. `tailscale serve` also passes the user's identity (`Tailscale-User-Login`) for user devices, though these apps can't use it.
   - My pick: **no tinyauth in this phase.** Limit those Services to admins by grant (with ACL tests), set the Warrior's `http_password`, and revisit with public hostnames, where Cloudflare Access does this job.
-- **A-Q10 — two file managers and shared uids.** Filestash next to FileBrowser Quantum: both, as asked? Filestash's and Warrior's image uids may both be 1000; same uid means one compromised app can read the other's files where permissions allow. Check `docker run --rm --entrypoint id machines/filestash` at build.
+- **A-Q10 — two file managers and shared uids.** Filestash next to CannonCommander: both, as asked? Filestash's and Warrior's image uids may both be 1000; same uid means one compromised app can read the other's files where permissions allow. Check `docker run --rm --entrypoint id machines/filestash` at build.
 
 ## Stack 4 — storage (the storage host's own network)
 
@@ -286,6 +292,7 @@ Named exceptions to the container standard (CLAUDE.md §8). They go into the sec
 | E5 | Scrutiny | root, `SYS_RAWIO` + `SYS_ADMIN`, devices, not `read_only`, UI has no login | SMART on NVMe (S-Q4) |
 | E6 | socket proxy | root (no `user:`) | needs to open `docker.sock`; `POST=0` is the control, as today |
 | E7 | Immich Postgres | a version tag instead of `:latest` | no moving tag exists (A-Q5) |
+| (E8) | CannonCommander | only if the bypassed entrypoint fails at build: root entrypoint dropping to 2107, four capabilities | see A-Q2; not an exception in the draft |
 
 ### Mitigations for E1 and E2 (and what else is available)
 
@@ -342,14 +349,14 @@ Named exceptions to the container standard (CLAUDE.md §8). They go into the sec
     - **Immich ML** is off by default (compose profile `immich-ml`). Immich needs 6 GB with ML and 4 GB without. ML could run on another machine instead, e.g. the Mac mini, since Immich takes a remote ML URL (A-Q4).
     - **paperless** uses one worker.
     - **Komga's** heap is 512 MB.
-  - If it's still tight, the next cuts are ArchiveBox and the Warrior (start them only when needed), then Filestash, which duplicates FileBrowser Quantum.
+  - If it's still tight, the next cuts are ArchiveBox and the Warrior (start them only when needed), then Filestash, which duplicates CannonCommander.
   - MOS's root filesystem is RAM. With 8 GB, anything writing to `/` (logs, a misplaced cache: MISTAKES.md 2026-11-10) eats into the same memory.
   - Check `nproc` and `free -g` on the box before going live.
 
 ## Unverified (checked at build, before anything goes live)
 
 - **Tailscale sidecar:** non-root with `read_only`, and whether it serves Services in userspace mode to another container's IP. The containerboot source supports the config; the behaviour hasn't been tested.
-- **`read_only`** for cloudflared, paperless-ngx (rootless), FileBrowser Quantum, Kopia, RustFS and all four Immich containers. Every writable path listed comes from reading the code, not from upstream docs.
+- **`read_only`** for cloudflared, paperless-ngx (rootless), CannonCommander (entrypoint bypassed), Kopia, RustFS and all four Immich containers. Every writable path listed comes from reading the code, not from upstream docs.
 - **Running as a non-root uid:** Immich Postgres with an arbitrary uid (nss_wrapper), and Kopia as non-root.
 - **Image uids:** Filestash's (not read from the image layers).
 - **Capability sets:** Scrutiny's under s6. ArchiveTeam Warrior's per-project needs and target hosts.

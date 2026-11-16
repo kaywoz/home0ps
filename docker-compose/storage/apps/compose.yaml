@@ -5,7 +5,7 @@
 # - apps-vlan31: macvlan on the VLAN 31 sub-interface, no host IP on it: egress for the containers that
 #   need it (mediasort, the sidecar). The MOS host can't reach macvlan containers, and they can't reach it.
 # - proxy-<app>: internal bridges for everything that needs no egress (paperless + its Redis,
-#   FileBrowser Quantum, Immich's database and Redis). No published ports; the sidecar joins the ones it serves.
+#   CannonCommander, Immich's database and Redis). No published ports; the sidecar joins the ones it serves.
 # - No `ports:` anywhere: Tailscale Services (and the mover's tcp:8089) are served by this stack's own
 #   Tailscale sidecar (tag:docker, as the apps VM is today).
 # No userns-remap assumed on MOS (#310 §7c open): `user:` uids are host uids, data folders owned by them.
@@ -30,7 +30,7 @@ services:
       TS_SOCKET: /tmp/tailscaled.sock      # set explicitly: docs and source disagree on the default
       TS_AUTHKEY: file:/run/secrets/ts_authkey
       TS_EXTRA_ARGS: --advertise-tags=tag:docker
-      TS_SERVE_CONFIG: /config/serve.json   # svc:paperless, filebrowser, immich, archivebox, archivewarrior, atuin, hedgedoc, filestash, rackpeek; tcp:8089 -> mediasort (the mover)
+      TS_SERVE_CONFIG: /config/serve.json   # svc:paperless, cannoncommander, immich, archivebox, archivewarrior, atuin, hedgedoc, filestash, rackpeek; tcp:8089 -> mediasort (the mover)
       TS_ENABLE_HEALTH_CHECK: "true"
       TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
     secrets:
@@ -41,7 +41,7 @@ services:
     networks:
       - apps-vlan31
       - proxy-paperless
-      - proxy-filebrowser
+      - proxy-cannoncommander
       - proxy-immich
       - proxy-atuin
       - proxy-hedgedoc
@@ -153,29 +153,34 @@ services:
       timeout: 5s
       retries: 3
 
-  # FileBrowser Quantum: files through a browser. Secrets have no *_FILE support, so the admin password and
-  # any OIDC secret live in config.yaml in the data folder (600, owned 2107), not in env.
-  filebrowser:
-    image: gtstef/filebrowser:latest
-    container_name: kr-ccp-filebrowser-0101
+  # CannonCommander (MOS Hub app, a fork of FileBrowser Quantum): two-panel file manager in the browser.
+  # The image's entrypoint needs root (chowns /remotes, edits /etc/passwd, drops to PUID with setpriv), so
+  # it is bypassed: tini starts the server directly as 2107. config.yaml is placed by hand at deploy
+  # (the entrypoint would have copied the default) and holds the admin password, so the instance never
+  # starts without a sign-in (a fresh install is open until a password is set) and no password reaches
+  # the log. No /dev/fuse, no SYS_ADMIN, no DAC_* caps: rclone remotes and the Unraid extras stay off.
+  cannoncommander:
+    image: junkerderprovinz/cannoncommander:latest
+    container_name: kr-ccp-cannoncommander-0101
     restart: unless-stopped
-    user: "2107:2107"                  # image runs as uid 1000 with no entrypoint script: any uid works
-    read_only: true                    # not documented upstream; to verify at build
+    user: "2107:2107"
+    entrypoint: ["/sbin/tini", "--", "/app/cannoncommander"]   # to verify at build: README A-Q2
+    read_only: true                    # to verify at build
     cap_drop: [ALL]                    # config.yaml sets http.port 8080, so no NET_BIND_SERVICE for port 80
     security_opt:
       - no-new-privileges:true
     tmpfs:
       - /tmp:size=64m
-      - /home/filebrowser/tmp:size=1g,uid=2107,gid=2107   # server.cacheDir (default "tmp"); must be fast
     pids_limit: 200
     mem_limit: 256m
     environment:
-      FILEBROWSER_CONFIG: /home/filebrowser/data/config.yaml
+      CC_CONFIG: /config/config.yaml                       # image default, set for clarity
+      CC_DATABASE_PATH: /config/cannoncommander.sqlite     # image default
     volumes:
-      - ${APPDATA}/filebrowser/data:/home/filebrowser/data   # config.yaml, database.sqlite
-      - ${SHARES}:/folder                                    # what it serves (source path in config.yaml)
+      - ${APPDATA}/cannoncommander:/config   # config.yaml (600, admin password), database, cache/
+      - ${SHARES}:/mnt/user                  # what it serves (the source path in config.yaml)
     networks:
-      - proxy-filebrowser              # internal: no egress
+      - proxy-cannoncommander          # internal: no egress (no update checks, no rclone)
     healthcheck:                       # the image's own check is hard-coded to port 80
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
       interval: 30s
@@ -481,8 +486,8 @@ networks:
     name: paperless-backend
     driver: bridge
     internal: true
-  proxy-filebrowser:
-    name: proxy-filebrowser
+  proxy-cannoncommander:
+    name: proxy-cannoncommander
     driver: bridge
     internal: true
   proxy-immich:
