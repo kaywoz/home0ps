@@ -1,0 +1,90 @@
+# PROPOSAL — not deployed. Infra stack on the replacement storage host (MOS), replacing the infra VM.
+# Design, open questions and migration: docker-compose/storage/README.md. Nothing here runs until kaywoz OKs it.
+#
+# Zone: VLAN 24 (infra, tier 0). Holds the login provider and the Cloudflare Tunnel.
+# Dockhand-home is NOT here: in the #314 scenario the MOS UI is the storage host's Docker UI and nothing
+# else on home is left for Dockhand to manage (open question in the README).
+# - infra-vlan24: macvlan on the VLAN 24 sub-interface, no host IP on it: egress for cloudflared only.
+#   The MOS host can't reach macvlan containers, and they can't reach it.
+# - proxy-pocketid: internal bridge, Pocket ID + cloudflared only. No egress, no published ports.
+# No Tailscale sidecar: nothing here is an admin UI. Pocket ID's passkeys are bound to APP_URL's hostname,
+# so a second origin (svc:pocketid) wouldn't work for logins; its admin pages are behind its own passkeys.
+# No userns-remap assumed on MOS (#310 §7c open): `user:` uids are host uids.
+services:
+  # Pocket ID: OIDC provider with passkeys for the home apps (CLAUDE.md §8 prefers OIDC + MFA). Tier 0 for
+  # logins. Reached by users, admins and OIDC clients through the tunnel only (APP_URL).
+  pocketid:
+    image: ghcr.io/pocket-id/pocket-id:latest
+    container_name: kr-ccp-pocketid-0101
+    restart: unless-stopped
+    user: "2201:2201"                  # entrypoint execs directly when non-root (no PUID/PGID, no chown)
+    read_only: true                    # documented on pocket-id.org/docs/advanced/hardening
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=32m
+    pids_limit: 200
+    mem_limit: 256m
+    environment:
+      APP_URL: ${POCKETID_APP_URL}     # HTTPS (passkeys need it), no path
+      TRUST_PROXY: "true"              # behind cloudflared
+      ENCRYPTION_KEY_FILE: /run/secrets/pocketid_enc_key   # >= 16 bytes; written with printf (not trimmed)
+    secrets:
+      - pocketid_enc_key
+    volumes:
+      - ${APPDATA}/pocketid/data:/app/data   # pocket-id.db, uploads; owned 2201
+    networks:
+      - proxy-pocketid                 # internal: no egress (no SMTP, no GeoLite download)
+    # healthcheck: built into the image (/app/pocket-id healthcheck)
+
+  # cloudflared: the Cloudflare Tunnel for user-facing apps (second access plane, CLAUDE.md §8). Outbound
+  # only. Token as a file. Ingress rules are kept in Cloudflare (remotely managed tunnel).
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: kr-ccp-cloudflared-0101
+    restart: unless-stopped
+    user: "2202:2202"                  # image is distroless nonroot, no entrypoint script: any uid works
+    read_only: true                    # no writable path documented; to verify at build
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    mem_limit: 256m
+    # Metrics pinned to loopback: container builds otherwise bind 0.0.0.0:20241, which on macvlan
+    # would be open to VLAN 24.
+    command: ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:20241", "run"]
+    environment:
+      TUNNEL_TOKEN_FILE: /run/secrets/cf_tunnel_token   # cloudflared >= 2025.4.0; never TUNNEL_TOKEN
+    secrets:
+      - cf_tunnel_token
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:20241", "ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      infra-vlan24: {}
+      proxy-pocketid: {}
+
+networks:
+  infra-vlan24:
+    name: infra-vlan24
+    driver: macvlan
+    driver_opts:
+      parent: ${VLAN24_PARENT}
+    ipam:
+      config:
+        - subnet: ${VLAN24_SUBNET}
+          gateway: ${VLAN24_GATEWAY}
+          ip_range: ${VLAN24_RANGE}
+  proxy-pocketid:
+    name: proxy-pocketid
+    driver: bridge
+    internal: true
+
+secrets:
+  pocketid_enc_key:
+    file: ${APPDATA}/pocketid/secrets/enc_key  # printf '%s' "$(openssl rand -base64 32)"; 600, owned 2201
+  cf_tunnel_token:
+    file: ${APPDATA}/cloudflared/token         # from the Cloudflare dashboard; 600, owned 2202

@@ -1,0 +1,250 @@
+# PROPOSAL — not deployed. Apps stack on the replacement storage host (MOS), replacing the apps VM.
+# Design, open questions and migration: docker-compose/storage/README.md. Nothing here runs until kaywoz OKs it.
+#
+# Zone: VLAN 31 (apps). Trusted, well-known apps only (CLAUDE.md §8).
+# - apps-vlan31: macvlan on the VLAN 31 sub-interface, no host IP on it: egress for the containers that
+#   need it (mediasort, the sidecar). The MOS host can't reach macvlan containers, and they can't reach it.
+# - proxy-<app>: internal bridges for everything that needs no egress (paperless + its Redis, copyparty,
+#   ollama). No egress, no published ports; the sidecar joins the ones it serves.
+# - No `ports:` anywhere: Tailscale Services (and the mover's tcp:8089) are served by this stack's own
+#   Tailscale sidecar (tag:docker, as the apps VM is today).
+# No userns-remap assumed on MOS (#310 §7c open): `user:` uids are host uids, data folders owned by them.
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: kr-ccp-tailscale-0201
+    hostname: ${TS_HOSTNAME}
+    restart: unless-stopped
+    user: "2110:2110"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m
+    pids_limit: 100
+    mem_limit: 256m
+    environment:
+      TS_USERSPACE: "true"
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SOCKET: /tmp/tailscaled.sock      # set explicitly: docs and source disagree on the default
+      TS_AUTHKEY: file:/run/secrets/ts_authkey
+      TS_EXTRA_ARGS: --advertise-tags=tag:docker
+      TS_SERVE_CONFIG: /config/serve.json   # svc:paperless, svc:copyparty; tcp:8089 -> mediasort (the mover)
+      TS_ENABLE_HEALTH_CHECK: "true"
+      TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
+    secrets:
+      - ts_authkey
+    volumes:
+      - ${APPDATA}/tailscale-apps/state:/var/lib/tailscale
+      - ${APPDATA}/tailscale-apps/serve.json:/config/serve.json:ro
+    networks:
+      apps-vlan31: {}
+      proxy-paperless: {}
+      proxy-copyparty: {}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9002/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Media classifier (#260), moved from the apps VM unchanged. Egress to TMDB and the LLM provider, so it
+  # sits on apps-vlan31. Its API (8089) is bearer-token protected and is now also reachable from VLAN 31.
+  mediasort:
+    build: ../../apps/mediasort        # built on the host from the repo checkout (open question: prebuilt image)
+    image: home0ps/mediasort:latest
+    container_name: kr-ccp-mediasort-0201
+    restart: unless-stopped
+    user: "2104:2104"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    pids_limit: 64
+    mem_limit: 256m
+    environment:
+      LLM_PROVIDER: anthropic           # openai | anthropic | ollama
+      OPENAI_MODEL: gpt-6-luna
+      OPENAI_MIN_INTERVAL: "6.5"
+      ANTHROPIC_MODEL: claude-haiku-5-5
+      ANTHROPIC_MIN_INTERVAL: "1"
+      LLM_KEY_FILE: /run/secrets/llm_key
+      OLLAMA_URL: http://ollama:11434   # only with the ollama profile
+      OLLAMA_MODEL: qwen3:4b-instruct
+      OLLAMA_NUM_THREAD: "2"
+      TOKEN_FILE: /run/secrets/mediasort_token
+      TMDB_TOKEN_FILE: /run/secrets/tmdb_token
+    secrets:
+      - mediasort_token
+      - tmdb_token
+      - llm_key
+    networks:
+      apps-vlan31: {}
+      proxy-ollama: {}
+    # healthcheck: in the image (GET /health)
+
+  # Local LLM (#261). Off by default (profile): the N95 has 4 cores and the storage role overheated under
+  # local inference before (#270); mediasort uses the Claude API. Start with `--profile ollama`.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: kr-ccp-ollama-0201
+    profiles: [ollama]
+    restart: unless-stopped
+    user: "2103:2103"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+      - /home/ollama:uid=2103,gid=2103,mode=0700
+    pids_limit: 512
+    mem_limit: 8g
+    cpus: 2                            # half the N95: the NAS keeps serving while a model runs
+    environment:
+      HOME: /home/ollama
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_MODELS: /models
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_KEEP_ALIVE: 10m
+      OLLAMA_CONTEXT_LENGTH: "4096"
+    networks:
+      - proxy-ollama                   # internal: the API has no auth, so it never sits on a VLAN.
+                                       # Model pulls: docker network connect apps-vlan31 <container>, pull, disconnect.
+    volumes:
+      - ${APPDATA}/ollama/models:/models
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # paperless-ngx: scan, OCR and archive documents. SQLite + Redis (no Postgres); no Tika/Gotenberg
+  # (Office files and mail parsing parked). No egress.
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    container_name: kr-ccp-paperless-0101
+    restart: unless-stopped
+    user: "2105:2105"                  # "rootless" mode (docs/setup.md): s6 skips usermod/chown. Never with USERMAP_UID
+    read_only: true                    # via S6_READ_ONLY_ROOT; read_only + rootless together untested upstream
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /run:size=32m                  # s6 copies its scripts here; also holds the *_FILE env
+      - /tmp:size=1g                   # PAPERLESS_SCRATCH_DIR (OCR working files)
+      - /var/cache/fontconfig:size=16m
+    pids_limit: 300
+    mem_limit: 2g
+    environment:
+      S6_READ_ONLY_ROOT: "1"
+      PAPERLESS_URL: ${PAPERLESS_URL}
+      PAPERLESS_SECRET_KEY_FILE: /run/secrets/paperless_secret_key
+      PAPERLESS_REDIS_FILE: /run/secrets/paperless_redis_url   # redis://:<password>@paperlessredis:6379
+      PAPERLESS_OCR_LANGUAGE: eng      # extra languages can't be installed at start in rootless mode
+      PAPERLESS_TIKA_ENABLED: "false"
+    secrets:
+      - paperless_secret_key
+      - paperless_redis_url
+    volumes:
+      - ${APPDATA}/paperless/data:/usr/src/paperless/data      # SQLite db, index
+      - ${APPDATA}/paperless/media:/usr/src/paperless/media    # the documents
+      - ${APPDATA}/paperless/consume:/usr/src/paperless/consume
+      - ${APPDATA}/paperless/export:/usr/src/paperless/export
+    networks:
+      - proxy-paperless                # internal: no egress (no mail fetch)
+    depends_on:
+      - paperlessredis
+    # healthcheck: built into the image (curl http://localhost:8000)
+
+  paperlessredis:
+    image: redis:latest
+    container_name: kr-ccp-paperlessredis-0101
+    restart: unless-stopped
+    user: "2106:2106"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # Password (requirepass) from a config file: Redis has no *_FILE support. The sidecar shares this
+    # network, so Redis isn't left open to it.
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    pids_limit: 64
+    mem_limit: 256m
+    volumes:
+      - ${APPDATA}/paperless/redis:/data
+      - ${APPDATA}/paperless/secrets/redis.conf:/usr/local/etc/redis/redis.conf:ro   # requirepass <pw>; save 60 1
+    networks:
+      - proxy-paperless
+    healthcheck:                       # reads the password from the file at run time: never in env or inspect
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$(sed -n 's/^requirepass //p' /usr/local/etc/redis/redis.conf)\" ping | grep -q PONG"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  copyparty:
+    image: copyparty/ac:latest
+    container_name: kr-ccp-copyparty-0101
+    restart: unless-stopped
+    user: "2107:2107"                  # no USER, no entrypoint user setup: any uid works (README: -u 1000)
+    read_only: true                    # not documented upstream; writes go to /cfg and /w (to verify at build)
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=256m
+    pids_limit: 200
+    mem_limit: 512m
+    # Config in /cfg/*.conf (in the data folder, not git): [accounts] with argon2-hashed passwords
+    # (--ah-alg argon2), hist: /cfg/hists/ so nothing is written into the share's .hist folders.
+    volumes:
+      - ${APPDATA}/copyparty/cfg:/cfg  # config, salts, sessions.db, shares.db: must persist
+      - ${SHARES}:/w                   # what it serves
+    networks:
+      - proxy-copyparty                # internal: no egress
+    healthcheck:                       # as in upstream's compose example
+      test: ["CMD", "wget", "--spider", "-q", "127.0.0.1:3923/?reset=/._"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  apps-vlan31:
+    name: apps-vlan31
+    driver: macvlan
+    driver_opts:
+      parent: ${VLAN31_PARENT}
+    ipam:
+      config:
+        - subnet: ${VLAN31_SUBNET}
+          gateway: ${VLAN31_GATEWAY}
+          ip_range: ${VLAN31_RANGE}
+  proxy-ollama:
+    name: proxy-ollama
+    driver: bridge
+    internal: true
+  proxy-paperless:
+    name: proxy-paperless
+    driver: bridge
+    internal: true
+  proxy-copyparty:
+    name: proxy-copyparty
+    driver: bridge
+    internal: true
+
+secrets:
+  ts_authkey:
+    file: ${APPDATA}/tailscale-apps/authkey          # 600, owned 2110; delete after the node has joined
+  mediasort_token:
+    file: ${APPDATA}/mediasort/secrets/token         # 600, owned 2104; same value in the mover's token file
+  tmdb_token:
+    file: ${APPDATA}/mediasort/secrets/tmdb          # 600, owned 2104
+  llm_key:
+    file: ${APPDATA}/mediasort/secrets/llm           # 600, owned 2104; must exist (empty is fine for ollama)
+  paperless_secret_key:
+    file: ${APPDATA}/paperless/secrets/secret_key    # openssl rand -hex 32, no trailing newline; 600, owned 2105
+  paperless_redis_url:
+    file: ${APPDATA}/paperless/secrets/redis_url     # redis://:<password>@paperlessredis:6379; 600, owned 2105
