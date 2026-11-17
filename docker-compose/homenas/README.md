@@ -251,7 +251,7 @@ cloudflared healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (e
 - **A-Q3 — decided:** existing photos come in as an **external library, read-only** (`${PHOTOS_LIBRARY}:/external:ro`), from a work folder on the same pool (exact path at build). `${PHOTOS}` stays Immich's own upload location. Under remap Immich (165536 + 2111) needs the folder world-readable or group access to read it.
 - **A-Q4 — decided: Immich ML off** (profile `immich-ml` not enabled): the 8 GB box can't spare it. No smart search or face recognition; ML on another machine stays possible later.
 - **A-Q5 — decided: the Immich Postgres version tag is accepted** (E7), updated with each Immich release.
-- **A-Q6 — open:** how scans reach paperless's `consume/`.
+- **A-Q6 — decided: upload through paperless's web UI or mobile app**, via `svc:paperless`. No consume share, no mail fetch: `consume/` stays internal to the container's volume.
 - **A-Q8 — decided: Atuin on `:latest`** (§8), lag accepted.
 - **A-Q9 — decided: HedgeDoc 1.x**, as drafted.
 - **A-Q10 — decided: both file managers.** At build, check Filestash's uid (`docker run --rm --entrypoint id machines/filestash`); if it shares 1000 with the Warrior, give one its own `user:`.
