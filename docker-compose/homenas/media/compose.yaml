@@ -4,7 +4,8 @@
 # Zone: VLAN 13 (IoT). Docker runs directly on MOS (no LXC), one stack per zone (#314 scenario).
 # - media-vlan13: macvlan on the VLAN 13 sub-interface, no host IP on it. Jellyfin and Homey are IoT members
 #   of VLAN 13 with fixed addresses (kaywoz, 2026-11-17: Apple TV, discovery, Homey bridges); nothing else in
-#   this stack is on VLAN 13. The MOS host can't reach
+#   this stack is on VLAN 13.
+# - apps-vlan31: Komga's internet access (README M-Q2), as for every Docker container that needs it. The MOS host can't reach
 #   macvlan containers, and they can't reach it — wanted here.
 # - proxy-jellyfin, proxy-komga: internal bridges, app + the media sidecar only. No egress, no published ports.
 #   Jellyfin is on proxy-jellyfin too, so the sidecar reaches it without a VLAN 13 address of its own.
@@ -64,7 +65,8 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: -Xmx512m        # 8 GB box: heap capped below mem_limit
     networks:
-      - proxy-komga                           # internal: no egress (to verify, see README)
+      - apps-vlan31                           # internet access (README M-Q2); UI open on VLAN 31, Komga login
+      - proxy-komga                           # internal: the media sidecar serves svc:komga through it
     volumes:
       - ${APPDATA}/komga/config:/config
       - ${MEDIA_MNT}:/data:ro
@@ -102,6 +104,8 @@ services:
 
 networks:                                     # owned by the infra stack (start it first)
   media-vlan13:
+    external: true
+  apps-vlan31:
     external: true
   proxy-jellyfin:
     external: true
