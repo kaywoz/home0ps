@@ -269,6 +269,9 @@ change explicitly if one no longer fits.
 - **Host layout:** `/srv/docker/compose.yaml` — one file, all services
   inline, no `include:` — plus one data subfolder per service. Host-level
   config lives in this repo (`config-files/`), not in `/srv/docker`.
+  **Exception — homenas** (MOS, kaywoz 2026-11-17): one compose file per
+  stack (`docker-compose/homenas/<stack>/compose.yaml`), each one MOS
+  stack, because MOS starts, stops and autostarts per stack.
 - **Networks:** one bridge per app, `proxy-<app>`; `internal: true` only when
   the container needs no egress **and** publishes no ports.
 - **Container standard:** non-root `user`, `read_only` + `tmpfs`,

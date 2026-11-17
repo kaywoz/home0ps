@@ -67,7 +67,7 @@ Service uids:
 On the host each uid above is 165536 + uid (2001 → 167537), except the two exemptions.
 
 - **Paths:** MOS's root filesystem is RAM. All data lives under variables pointing at the pool (`${APPDATA}`, `${PHOTOS}`, `${BACKUPS}`, …). There's no `/srv/docker`, and no relative paths: the MOS UI runs each stack from its own folder (`appdata/compose_<stack>/`), so mediasort's build context is an absolute path too (`MEDIASORT_SRC`, A-Q1).
-- **One file per stack, not one per host:** asked for explicitly; §8's host layout is one file per host (G2).
+- **One file per stack, not one per host:** decided (G2); §8's host layout has a homenas exception for it.
 - **Monitoring:** one Docker daemon serves all stacks, so one read-only socket proxy (`kr-ccp-socketproxy-0301`, `POST=0`) and one Beszel agent (`kr-ccp-beszelagent-0201`) see every container. Both move from MOS-template deploys into the infra stack under the same names (`observed-hosts.md`: compose hosts keep them in their compose). **No Dozzle agent:** Dozzle already reads this host in remote-host mode through the proxy (verified 2026-11-08); an agent would need the full socket and allows exec (MISTAKES.md 2026-10-18). The guests' proxies, Hawser agents and native Beszel agents retire with the guests.
 - **Logs:** MOS has no journald (Devuan). Container logs go to the monitoring host (G5, decided); Dozzle for live viewing.
 
@@ -374,7 +374,7 @@ Named exceptions to the container standard (CLAUDE.md §8). They go into the sec
 ## General open questions
 
 - **G1 — resolved:** all stacks run on MOS; no LXC and no VM stays (kaywoz, 2026-11-17).
-- **G2:** One compose file per stack (as here), or one per host (§8 host layout)? CLAUDE.md §8 and #314 get updated to match.
+- **G2 — decided:** one compose file per stack, in its own folder (`docker-compose/homenas/<stack>/compose.yaml`), as drafted (kaywoz, 2026-11-17). Each folder is one MOS stack, so MOS's per-stack autostart, start and stop work as tested in #310. `CLAUDE.md` §8's host layout now has the homenas exception; #314's deployer works per stack folder.
 - **G3 — decided:** the role is called **homenas** (kaywoz, 2026-11-17): storage, backups and the home Docker stacks. Renamed in `CLAUDE.md` §8, `README.md`, `SECURITY.md` and `security/homenas.md`. The Tailscale tag stays `tag:storage`. The rows that describe today's guests (media LXC, infra VM, apps VM) are rewritten with the build.
 - **G4 — resolved:** the #310 tests are done (§7b: the UI manages stacks, macvlan with a VLAN parent works; §7c: remap persists through a pre-start hook, #325; §7d: shim not usable). What's left before the build is listed under [Before the build](#before-the-build).
 - **G5 — decided:** container logs are sent to the monitoring host (kaywoz, 2026-11-17). The driver and transport (Docker `syslog` driver or a shipper) are chosen with the monitoring host's revival (#225).
