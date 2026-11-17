@@ -255,6 +255,10 @@ change explicitly if one no longer fits.
     **not the homenas** (kaywoz, 2026-11-09), **never the monitoring
     host** (backup copy 1 stays outside central control) and **never lab
     agents**.
+    **Retires with the homenas Docker migration** (kaywoz, 2026-11-17,
+    kaywoz/home0ps#320): the MOS UI becomes the home Docker UI, and
+    Dockhand-home, its Hawser agents and their grants go with the infra
+    VM, apps VM and media LXC. Don't extend it to new home hosts meanwhile.
   - **Dockhand-lab** runs next to Xen Orchestra in the **lab management
     VM on dedicated lab hardware** (VLAN 21, not on the MOS host) and
     manages lab containers only; lab-facing management never runs on home
@@ -280,7 +284,8 @@ change explicitly if one no longer fits.
   files (`600`, owned by the container's remapped host UID), never in git.
 - **Docker socket:** only `tecnativa/docker-socket-proxy` mounts it
   (`POST=0`); consumers use `DOCKER_HOST=tcp://…:2375`. Exceptions:
-  Dockhand-home on its own VM and the Hawser agents it manages (see above).
+  Dockhand-home on its own VM and the Hawser agents it manages, until
+  they retire (see above).
 - **Images on `:latest`**, no digest/version pinning — decided, don't
   propose it. (OpenTofu providers are different: exact pins, §3.)
 - **rclone always shows progress** (kaywoz, 2026-11-10): every rclone
