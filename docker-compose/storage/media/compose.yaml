@@ -11,8 +11,11 @@
 # - No `ports:` anywhere: Tailscale Services are served by the media zone's Tailscale sidecar (tag:media),
 #   because host-side `tailscale serve` to 127.0.0.1 can't reach macvlan containers. The sidecar and both
 #   networks are defined in the infra stack (shared services, kaywoz 2026-11-17); this stack joins them.
-# No userns-remap (#310 §7c: works at runtime but doesn't persist on MOS; settled), so container uids are host
-# uids: data folders are owned by the uid in `user:`. Service uids per the table in the README.
+# Docker runs with userns-remap, daemon-wide (kaywoz, 2026-11-17; #310 §7c, set up by #325): container uid N
+# is host uid 165536+N, so appdata and secret files are owned 165536+<the uid in `user:`> ("owned 165536+N"
+# below). Distinct non-root uids per service on top of it. Exemptions (`userns_mode: host`) are listed in the
+# README with a reason. The stack needs MOS autostart on: `restart:` alone doesn't bring it back.
+# Service uids per the table in the README.
 # Data lives on the pool (${APPDATA}), never on MOS's RAM rootfs. Media comes read-only from the host's
 # rclone mount (config-files/mos/media-mount.sh, #197).
 services:
@@ -22,7 +25,7 @@ services:
     restart: unless-stopped
     user: "2001:2001"
     group_add:
-      - ${RENDER_GID}                         # host render group (getent group render on MOS)
+      - ${RENDER_GID}                         # host render group (getent group render on MOS); see R3 under remap
     devices:
       - /dev/dri/renderD128:/dev/dri/renderD128   # Intel QSV / VA-API: render node only
     read_only: true

@@ -10,7 +10,10 @@
 #   the host firewall (#219) and the rclone rc fix (#316) come first (README S-Q1).
 # - Time Machine: macvlan on the host's own interface with a fixed address, so Macs reach SMB without
 #   clashing with MOS's own Samba on 445 (README S-Q2).
-# No userns-remap (#310 §7c: works at runtime but doesn't persist on MOS; settled): `user:` uids are host uids.
+# Docker runs with userns-remap, daemon-wide (kaywoz, 2026-11-17; #310 §7c, set up by #325): container uid N
+# is host uid 165536+N, so appdata and secret files are owned 165536+<the uid in `user:`> ("owned 165536+N"
+# below). Distinct non-root uids per service on top of it. Exemptions (`userns_mode: host`) are listed in the
+# README with a reason. The stack needs MOS autostart on: `restart:` alone doesn't bring it back.
 #
 # The box's socket proxy and Beszel agent are in the infra stack (shared services, kaywoz 2026-11-17).
 # No Scrutiny container: the SMART collector runs natively from a MOS UI cron job and pushes to the hub (#103).
@@ -163,8 +166,8 @@ networks:
 
 secrets:
   timemachine_password:
-    file: ${APPDATA}/timemachine/password     # 600, root-owned (the entrypoint reads it as root)
+    file: ${APPDATA}/timemachine/password     # 600, owned 165536 (container root; the entrypoint reads it as root)
   rustfs_access_key:
-    file: ${APPDATA}/rustfs/secrets/access_key   # 600, owned 2302
+    file: ${APPDATA}/rustfs/secrets/access_key   # 600, owned 165536+2302
   rustfs_secret_key:
-    file: ${APPDATA}/rustfs/secrets/secret_key   # 600, owned 2302
+    file: ${APPDATA}/rustfs/secrets/secret_key   # 600, owned 165536+2302

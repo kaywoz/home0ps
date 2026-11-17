@@ -9,8 +9,10 @@
 # - No `ports:` anywhere: Tailscale Services (and the mover's tcp:8089) are served by the apps zone's
 #   Tailscale sidecar (tag:docker, as the apps VM is today). The sidecar, the macvlan and the proxy-<app>
 #   networks are defined in the infra stack (shared services, kaywoz 2026-11-17); this stack joins them.
-# No userns-remap (#310 §7c: works at runtime but doesn't persist on MOS; settled): `user:` uids are host uids,
-# data folders owned by them.
+# Docker runs with userns-remap, daemon-wide (kaywoz, 2026-11-17; #310 §7c, set up by #325): container uid N
+# is host uid 165536+N, so appdata and secret files are owned 165536+<the uid in `user:`> ("owned 165536+N"
+# below). Distinct non-root uids per service on top of it. Exemptions (`userns_mode: host`) are listed in the
+# README with a reason. The stack needs MOS autostart on: `restart:` alone doesn't bring it back.
 services:
   # Media classifier (#260), moved from the apps VM unchanged. Egress to TMDB and the LLM provider, so it
   # sits on apps-vlan31. Its API (8089) is bearer-token protected and is now also reachable from VLAN 31.
@@ -155,7 +157,7 @@ services:
     restart: unless-stopped
     user: "2111:2111"                  # start.sh does no user switching (FAQ: non-root via user:)
     group_add:
-      - ${RENDER_GID}                  # Quick Sync transcoding
+      - ${RENDER_GID}                  # Quick Sync transcoding; under remap see README R3 (build test)
     devices:
       - /dev/dri/renderD128:/dev/dri/renderD128
     read_only: true                    # not documented upstream; to verify at build
@@ -178,7 +180,7 @@ services:
       - immich_db_password
       - immich_redis_password
     volumes:
-      - ${PHOTOS}:/data                # UPLOAD_LOCATION: originals, thumbs, encoded video; owned 2111
+      - ${PHOTOS}:/data                # UPLOAD_LOCATION: originals, thumbs, encoded video; owned 165536+2111
       - /etc/localtime:/etc/localtime:ro
     networks:
       - proxy-immich                   # internal: server + sidecar
@@ -293,7 +295,7 @@ services:
     # Admin account: once, `docker compose run --rm archivebox archivebox manage createsuperuser`
     # (no *_FILE support; ADMIN_PASSWORD in env would be readable through the socket proxy).
     volumes:
-      - ${APPDATA}/archivebox/data:/data   # owned 911
+      - ${APPDATA}/archivebox/data:/data   # owned 165536+911
     networks:
       apps-vlan31:
         ipv4_address: ${ARCHIVEBOX_IP}       # fixed: UniFi rules per address (README E1/E2 mitigations)
@@ -343,7 +345,7 @@ services:
       ATUIN_OPEN_REGISTRATION: "false"
       ATUIN_DB_URI: sqlite:///config/atuin.db
     volumes:
-      - ${APPDATA}/atuin/config:/config   # server.toml + atuin.db; owned 2121
+      - ${APPDATA}/atuin/config:/config   # server.toml + atuin.db; owned 165536+2121
     networks:
       - proxy-atuin                    # internal: atuin + sidecar
     # healthcheck: built into the image (/healthz)
@@ -377,7 +379,7 @@ services:
         target: sessionsecret          # without it every restart logs everyone out
     volumes:
       - ${APPDATA}/hedgedoc/db:/hedgedoc/db
-      - ${APPDATA}/hedgedoc/uploads:/hedgedoc/public/uploads   # owned 2123, mode 700
+      - ${APPDATA}/hedgedoc/uploads:/hedgedoc/public/uploads   # owned 165536+2123, mode 700
     networks:
       - proxy-hedgedoc                 # internal: no egress
     # healthcheck: built into the image (node healthcheck.mjs -> /_health)
@@ -459,20 +461,20 @@ networks:
 
 secrets:
   mediasort_token:
-    file: ${APPDATA}/mediasort/secrets/token         # 600, owned 2104; same value in the mover's token file
+    file: ${APPDATA}/mediasort/secrets/token         # 600, owned 165536+2104; same value in the mover's token file
   tmdb_token:
-    file: ${APPDATA}/mediasort/secrets/tmdb          # 600, owned 2104
+    file: ${APPDATA}/mediasort/secrets/tmdb          # 600, owned 165536+2104
   llm_key:
-    file: ${APPDATA}/mediasort/secrets/llm           # 600, owned 2104; the selected provider's API key
+    file: ${APPDATA}/mediasort/secrets/llm           # 600, owned 165536+2104; the selected provider's API key
   paperless_secret_key:
-    file: ${APPDATA}/paperless/secrets/secret_key    # openssl rand -hex 32, no trailing newline; 600, owned 2105
+    file: ${APPDATA}/paperless/secrets/secret_key    # openssl rand -hex 32, no trailing newline; 600, owned 165536+2105
   paperless_redis_url:
-    file: ${APPDATA}/paperless/secrets/redis_url     # redis://:<password>@paperlessredis:6379; 600, owned 2105
+    file: ${APPDATA}/paperless/secrets/redis_url     # redis://:<password>@paperlessredis:6379; 600, owned 165536+2105
   immich_db_password:
-    file: ${APPDATA}/immich/secrets/db_password      # letters and digits only (Immich docs); 600, owned 2111
+    file: ${APPDATA}/immich/secrets/db_password      # letters and digits only (Immich docs); 600, owned 165536+2111
   immich_db_password_pg:
-    file: ${APPDATA}/immich/secrets/db_password_pg   # same value, second copy: 600, owned 2113 (the db's uid)
+    file: ${APPDATA}/immich/secrets/db_password_pg   # same value, second copy: 600, owned 165536+2113 (the db's uid)
   immich_redis_password:
-    file: ${APPDATA}/immich/secrets/redis_password   # same value as requirepass in valkey.conf; 600, owned 2111
+    file: ${APPDATA}/immich/secrets/redis_password   # same value as requirepass in valkey.conf; 600, owned 165536+2111
   hedgedoc_session_secret:
-    file: ${APPDATA}/hedgedoc/secrets/session_secret   # openssl rand -hex 32; 600, owned 2123
+    file: ${APPDATA}/hedgedoc/secrets/session_secret   # openssl rand -hex 32; 600, owned 165536+2123
