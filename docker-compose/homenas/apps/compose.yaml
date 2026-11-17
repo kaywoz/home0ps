@@ -123,7 +123,8 @@ services:
     image: junkerderprovinz/cannoncommander:latest
     container_name: kr-ccp-cannoncommander-0101
     restart: unless-stopped
-    user: "2107:2107"
+    user: "${SHARE_UID}:${SHARE_GID}"  # the Samba-only data user that owns 1.data and tmp (README A-Q2)
+    userns_mode: host                  # R5: writes as the same owner as SMB, so not remapped
     entrypoint: ["/sbin/tini", "--", "/app/cannoncommander"]   # to verify at build: README A-Q2
     read_only: true                    # to verify at build
     cap_drop: [ALL]                    # config.yaml sets http.port 8080, so no NET_BIND_SERVICE for port 80
@@ -137,8 +138,9 @@ services:
       CC_CONFIG: /config/config.yaml                       # image default, set for clarity
       CC_DATABASE_PATH: /config/cannoncommander.sqlite     # image default
     volumes:
-      - ${APPDATA}/cannoncommander:/config   # config.yaml (600, admin password), database, cache/
-      - ${SHARES}:/mnt/user                  # what it serves (the source path in config.yaml)
+      - ${APPDATA}/cannoncommander:/config   # config.yaml (600, admin password), database, cache/; owned by the data user
+      - ${SHARE_DATA}:/mnt/user/1.data       # what it serves (source /mnt/user in config.yaml); never the pool root
+      - ${SHARE_TMP}:/mnt/user/tmp
     networks:
       - proxy-cannoncommander          # internal: no egress (no update checks, no rclone)
     healthcheck:                       # the image's own check is hard-coded to port 80

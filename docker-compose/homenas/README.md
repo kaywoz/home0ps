@@ -50,6 +50,7 @@ The candidates came from the 2026-11-13 discussion: a long list from kaywoz's Gi
     | **R1** | socket proxy (infra) | it opens `docker.sock` as root; remapped root is host uid 165536, which has no access to the socket. Not in Docker's docs: reasoned from the socket's permissions, to confirm at build. `POST=0` stays the control (E6) |
     | **R2** | Beszel agent (infra) | `network_mode: host`, which Docker doesn't allow with a remapped container (docs.docker.com/engine/security/userns-remap, "known limitations"). It runs as 65534 |
     | **(R3)** | Jellyfin, Immich server | **only if the build test fails:** the render node's host group doesn't map into a remapped container, so `group_add: RENDER_GID` may not grant `/dev/dri/renderD128`. Two fixes: a boot step that sets the node's group to 165536 + `RENDER_GID` (keeps them remapped; it would go into #325's hook), or `userns_mode: host` for both (still non-root uids). Not an exemption in the draft |
+    | **R5** | CannonCommander (apps) | it must write the same files as SMB: it runs as the Samba-only data user's uid:gid (`SHARE_UID`/`SHARE_GID`), which a remapped container can't be. An escape lands as that user, which owns `1.data` and `tmp` only. `cap_drop: [ALL]`, `no-new-privileges`, `read_only` stay (A-Q2) |
     | **R4** | Scrutiny collector (storage) | NVMe SMART needs `SYS_ADMIN` on the host's controller devices; a capability inside a remapped namespace doesn't count for host devices. Runs once a day, collector only (E5) |
 
   - Everything else runs remapped, including the root containers: Homey (E3) and Time Machine (E4) now run as host uid 165536, not host root.
@@ -59,12 +60,12 @@ Service uids:
 | Range | Stack | uids |
 |---|---|---|
 | 20xx | media | 2001 Jellyfin, 2002 Komga (Homey: uid 0, M-Q1) |
-| 21xx | apps | 2104 mediasort (as today), 2105 paperless, 2106 paperless Redis, 2107 CannonCommander, 2111 Immich server, 2112 Immich ML, 2113 Immich Postgres, 2114 Immich Valkey, 2121 Atuin, 2123 HedgeDoc |
+| 21xx | apps | 2104 mediasort (as today), 2105 paperless, 2106 paperless Redis, 2107 CannonCommander (unused: it runs as the data user, R5), 2111 Immich server, 2112 Immich ML, 2113 Immich Postgres, 2114 Immich Valkey, 2121 Atuin, 2123 HedgeDoc |
 | image uids | apps | ArchiveBox 911, ArchiveTeam Warrior 1000, RackPeek 1654, Filestash its image's own user (uid unverified, likely 1000). These images only work with their own uid. **Warrior and Filestash may share 1000** (A-Q10) |
 | 22xx | infra | 2201 cloudflared, 2210 media sidecar, 2211 apps sidecar; Beszel agent 65534 (as today, not remapped: R2); socket proxy root (E6, not remapped: R1) |
 | 23xx | storage | 2301 Kopia, 2302 RustFS, 2303 Time Machine share owner (the process is root) |
 
-On the host each uid above is 165536 + uid (2001 → 167537), except the two exemptions.
+On the host each uid above is 165536 + uid (2001 → 167537), except the exemptions (R1, R2, R4, R5).
 
 - **Paths:** MOS's root filesystem is RAM. All data lives under variables pointing at the pool (`${APPDATA}`, `${PHOTOS}`, `${BACKUPS}`, …). There's no `/srv/docker`, and no relative paths: the MOS UI runs each stack from its own folder (`appdata/compose_<stack>/`), so there are no relative paths to resolve.
 - **One file per stack, not one per host:** decided (G2); §8's host layout has a homenas exception for it.
@@ -199,7 +200,7 @@ cloudflared healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (e
 | paperless-ngx | `read_only` via `S6_READ_ONLY_ROOT=1` + tmpfs `/run`, `/tmp`, `/var/cache/fontconfig` | rootless (`user:`) is supported upstream; read-only + rootless together isn't tested upstream |
 | paperless-ngx | OCR language limited to the image's built-ins | extra languages install at start, which rootless mode can't do |
 | paperless Redis | password in a config file, not `*_FILE` | Redis has no `*_FILE` support; healthcheck reads the file at run time (visible to processes inside that container only) |
-| CannonCommander | the image's entrypoint bypassed (`entrypoint: tini -- /app/cannoncommander`), `user: 2107` | the entrypoint needs root: it chowns `/remotes`, adds a passwd entry and drops to `PUID` with `setpriv`. Without it, `config.yaml` is copied in by hand at deploy |
+| CannonCommander | the image's entrypoint bypassed (`entrypoint: tini -- /app/cannoncommander`), `user: "${SHARE_UID}:${SHARE_GID}"` (R5) | the entrypoint needs root: it chowns `/remotes`, adds a passwd entry and drops to `PUID` with `setpriv`. Without it, `config.yaml` is copied in by hand at deploy |
 | CannonCommander | admin password (and any OIDC secret) in `config.yaml` (600), not env | a fresh install opens **without a sign-in** until a password is set (upstream changelog, v1.1.x). A password in the config closes that window; it's re-applied on every start. `CC_ADMIN_PASSWORD` in env would be readable through the socket proxy |
 | CannonCommander | `http.port: 8080` in `config.yaml`, own healthcheck | port 80 as non-root needs `NET_BIND_SERVICE`; the image's healthcheck is hard-coded to 80 |
 | CannonCommander | no `/dev/fuse`, `SYS_ADMIN`, `DAC_READ_SEARCH`, `DAC_OVERRIDE`, `apparmor:unconfined` (all in upstream's template) | they serve rclone mounts and Unraid's root-only paths. **rclone remotes are out of scope** (they would store cloud credentials in its config folder) unless kaywoz says otherwise |
@@ -244,8 +245,8 @@ cloudflared healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (e
 
 **Apps decisions** (kaywoz, 2026-11-17):
 - **A-Q1 — decided: mediasort is built in GitHub Actions and pushed to ghcr.io** (`ghcr.io/kaywoz/mediasort:latest`); the stack only pulls. The workflow is its own PR (needs the `workflow` scope check, §5). Our own supply chain, flagged in #314.
-- **A-Q2 — CannonCommander, partly decided:** it serves folders on the pool (`/mnt/merger-nvme`, e.g. `1.data`), mounted as `${SHARES}` where its default source expects `/mnt/user`. Local accounts (no OIDC provider exists). Maturity accepted (2026-11-17), no FileBrowser Quantum fallback.
-  - **Open — write access under remap:** it runs as host uid 167643 (165536 + 2107), and these folders are owned by MOS's SMB users, so it can read only what's world-readable and write nothing. Read-only browsing, or a shared group so it can write?
+- **A-Q2 — CannonCommander, decided:** it serves two folders on the pool, `1.data` and `tmp` (`${SHARE_DATA}`, `${SHARE_TMP}`), mounted under `/mnt/user`, its default source. Local accounts (no OIDC provider exists). Maturity accepted (2026-11-17), no FileBrowser Quantum fallback.
+  - **Write access — decided** (kaywoz, 2026-11-17): it writes to `1.data` and `tmp` only (two mounts, never the pool root). Both folders are owned by a **dedicated Samba-only user** (no shell, no home), which the MOS SMB shares for them use; CannonCommander runs **unremapped as that user's uid:gid** (`userns_mode: host`, R5), so SMB and CannonCommander write as the same owner. No ACLs (MOS has no `setfacl`, and mergerfs is mounted without `posix_acl`) and no shared group (`/etc` is RAM). Build steps: create the user in the MOS UI, `chown -R` both folders to it once (they're root-owned from the copy-in), set the shares to it. Anything else that writes there as root still leaves root-owned files CannonCommander can read but not change.
   - **First sign-in:** the current code opens with no sign-in on a fresh install; this draft bypasses the entrypoint and sets the admin password in `config.yaml`. If the image's own entrypoint is ever used, older releases print the password to the log (→ journald → LogTide): change it at first sign-in.
   - **To verify at build:** the server starts as 2107 with the entrypoint bypassed and `read_only` (needs `config.yaml`, writes its database and `cache/` under `/config`). Fallback: the image's entrypoint as root dropping to 2107 with `setpriv` and `CHOWN`/`FOWNER`/`SETUID`/`SETGID`, which becomes exception E8.
 - **A-Q3 — decided:** existing photos come in as an **external library, read-only** (`${PHOTOS_LIBRARY}:/external:ro`), from a work folder on the same pool (exact path at build). `${PHOTOS}` stays Immich's own upload location. Under remap Immich (165536 + 2111) needs the folder world-readable or group access to read it.
@@ -317,7 +318,7 @@ Named exceptions to the container standard (CLAUDE.md §8). They go into the sec
 | E5 | Scrutiny collector (storage stack) | root, `SYS_RAWIO` + `SYS_ADMIN`, the NVMe controller devices, not remapped (R4) | NVMe SMART reads need them (Scrutiny README). Narrowed: collector only, controller devices only, `read_only`, runs for seconds once a day (S-Q4) |
 | E6 | socket proxy (infra stack) | root (no `user:`), not remapped (R1): real host root | needs to open `docker.sock`; `POST=0` is the control, as today |
 | E7 | Immich Postgres | a version tag instead of `:latest` | no moving tag exists; accepted (A-Q5) |
-| (E8) | CannonCommander | only if the bypassed entrypoint fails at build: root entrypoint dropping to 2107, four capabilities | see A-Q2; not an exception in the draft |
+| (E8) | CannonCommander | only if the bypassed entrypoint fails at build: root entrypoint dropping to the data user, four capabilities | see A-Q2; not an exception in the draft |
 
 ### Mitigations for E1 and E2 (and what else is available)
 
@@ -406,7 +407,7 @@ Security gaps from the 2026-11-17 attack-path review. None of them is in these f
 - **Time Machine:** its capability set.
 - **Networking:** Homey's discovery on a macvlan address.
 - **MOS:** the Docker version (not recorded in #310). Settled by #310 and no longer listed here: the UI manages stacks, macvlan with a VLAN parent works, remap persists (#325).
-- **Under remap:** the socket proxy's need for R1; the GPU for Jellyfin and Immich (R3); Homey and Time Machine as remapped root (D-Bus, avahi, Samba's user setup); whether the remapped uids can read the host's rclone media mount (FUSE `--uid`/`--gid` and `allow_other`); folders on the pool shared with host users (CannonCommander's `${SHARES}`, A-Q2).
+- **Under remap:** the socket proxy's need for R1; the GPU for Jellyfin and Immich (R3); Homey and Time Machine as remapped root (D-Bus, avahi, Samba's user setup); whether the remapped uids can read the host's rclone media mount (FUSE `--uid`/`--gid` and `allow_other`); CannonCommander writing as the data user next to SMB (A-Q2, R5).
 - **MOS stack copies** (still open from #310 §7b): which copy MOS uses if the appdata copy is missing (pool not mounted), and whether a UI save overwrites a direct disk edit.
 
 ## Follow-ups (not built; each its own PR after the OK)
