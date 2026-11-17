@@ -21,13 +21,13 @@ The candidates came from the 2026-11-13 discussion: a long list from kaywoz's Gi
 
 ### Zone stacks (media, infra, apps): reachability
 - **Two macvlans** on VLAN sub-interfaces, no IP on the host side (kaywoz, 2026-11-17):
-  - **`media-vlan13`:** only Jellyfin and Homey, as IoT members of VLAN 13 with fixed addresses.
+  - **`media-vlan13`:** only Jellyfin, Komga and Homey, as IoT members of VLAN 13 with fixed addresses. Komga gets its internet access here (M-Q2), the one exception to Docker's egress on VLAN 31.
   - **`apps-vlan31`:** every Docker container that needs the internet: both sidecars, cloudflared, mediasort, the archivers, and Immich ML for its first model download. "services needing internet use vlan31 for docker. vlan24 is for servers needing internet": **VLAN 24 isn't used by Docker.**
   - Everything else sits on internal bridges only. Traffic leaves through the VLAN, so the UniFi rules apply as they do to today's guests.
 - **Everything else sits on `internal: true` bridges** (§8: internal when no egress and no ports). Each app gets a `proxy-<app>` network (app + sidecar). Apps with a database also get a `<app>-backend` network (app + database/Redis), so the sidecar never reaches a database. An internal bridge never gets a gateway, so the macvlan is always the default route where a container has both: no `gw_priority` (Engine ≥ 28) needed.
 - **No `ports:`.** Macvlan containers can't be reached from the host (a kernel restriction, per Docker's macvlan docs), and port publishing doesn't work on macvlan or internal networks (moby source). So host-side `tailscale serve` to `127.0.0.1` can't reach them.
 - **One Tailscale sidecar per zone with admin UIs** (`tailscale/tailscale`, userspace networking: no TUN, no `NET_ADMIN`). It joins the zone's macvlan and that zone's `proxy-<app>` networks, and advertises the Services from a serve-config file (`TS_SERVE_CONFIG`, `ipn.ServeConfig` JSON with a `Services` key; auto-advertised since containerboot 1.96). It keeps the zone's tag (`tag:media`, `tag:docker`), so the policy mostly stays. Both sidecars are **defined in the infra stack** (shared services) but each stays in its own zone: no container joins two zones' networks (I-Q4).
-- **The infra stack owns the shared networks:** the macvlans (`media-vlan13`, `apps-vlan31`) and the `proxy-<app>` bridges the sidecars serve. The media and apps stacks join them as `external: true`, so **infra starts first**. The `<app>-backend` networks stay with their app's stack. Fixed addresses (`JELLYFIN_IP`, `HOMEY_IP`, `ARCHIVEBOX_IP`, `WARRIOR_IP`) stay in the zone stacks' `.env`; the subnets move to the infra stack's.
+- **The infra stack owns the shared networks:** the macvlans (`media-vlan13`, `apps-vlan31`) and the `proxy-<app>` bridges the sidecars serve. The media and apps stacks join them as `external: true`, so **infra starts first**. The `<app>-backend` networks stay with their app's stack. Fixed addresses (`JELLYFIN_IP`, `KOMGA_IP`, `HOMEY_IP`, `ARCHIVEBOX_IP`, `WARRIOR_IP`) stay in the zone stacks' `.env`; the subnets move to the infra stack's.
 - **What the macvlan isolation buys:** a zone container can't reach the MOS host: not the MOS UI, not SMB/NFS, not the rclone remote control (not started at boot; CLI only, #316 closed).
 - **What it costs:** on its macvlan IP every listening port of a container is open to that VLAN; Docker filters nothing there. Listed per service below.
 
@@ -58,7 +58,7 @@ Service uids:
 
 | Range | Stack | uids |
 |---|---|---|
-| 20xx | media | 2001 Jellyfin, 2002 Komga (Homey: see M-Q1) |
+| 20xx | media | 2001 Jellyfin, 2002 Komga (Homey: uid 0, M-Q1) |
 | 21xx | apps | 2104 mediasort (as today), 2105 paperless, 2106 paperless Redis, 2107 CannonCommander, 2111 Immich server, 2112 Immich ML, 2113 Immich Postgres, 2114 Immich Valkey, 2121 Atuin, 2123 HedgeDoc |
 | image uids | apps | ArchiveBox 911, ArchiveTeam Warrior 1000, RackPeek 1654, Filestash its image's own user (uid unverified, likely 1000). These images only work with their own uid. **Warrior and Filestash may share 1000** (A-Q10) |
 | 22xx | infra | 2201 cloudflared, 2210 media sidecar, 2211 apps sidecar; Beszel agent 65534 (as today, not remapped: R2); socket proxy root (E6, not remapped: R1) |
@@ -101,7 +101,7 @@ On the host each uid above is 165536 + uid (2001 → 167537), except the two exe
 | Jellyfin | `/dev/dri/renderD128` + `group_add` render GID | hardware transcoding (Jellyfin's Intel docs: no privileged, no capabilities) |
 | Jellyfin | fixed IP on `media-vlan13`: **every port open on VLAN 13** (8096, 7359/udp; 8920/1900 only if HTTPS/DLNA get turned on) | Apple TV and other VLAN 13 clients play locally. Today's exception (8096 + 7359) becomes "all of Jellyfin's ports": keep HTTPS and DLNA off |
 | Komga | `/tmp` tmpfs with `exec` | the SQLite JDBC driver loads its native library from `/tmp` (as today) |
-| Komga | no egress (internal bridge only) | Komga reads embedded metadata; if it turns out to need the internet, it joins `media-vlan13` and is then open on VLAN 13 (M-Q2) |
+| Komga | on `media-vlan13` with a fixed address (`KOMGA_IP`), for internet access | decided (M-Q2). Its UI (25600) is then open on VLAN 13 to IoT devices, behind Komga's own login; the sidecar still serves `svc:komga` through `proxy-komga` |
 | Homey | **the hardening tested in #229, unchanged:** no `privileged`, `read_only`, `no-new-privileges`, `cap_drop: [ALL]` + `SETUID`, `SETGID`, `SYS_CHROOT`, `CHOWN`, `/run` tmpfs | tested one capability at a time on the media LXC (2026-11-07). In that test, `docker top` showed Homey's core (`homey-shs`) and `homey-matter-daemon` as uid 0 in the container. D-Bus (100), avahi (101) and go2rtc dropped to their own users. Without userns-remap on MOS, uid 0 in the container is uid 0 on the host (M-Q1) |
 | Homey | fixed macvlan IP on VLAN 13 instead of `network_mode: host` | host network would be the homenas's own network; discovery/mDNS should work on the macvlan L2 segment (to verify) |
 | Homey | no healthcheck | none documented |
@@ -121,8 +121,8 @@ On the host each uid above is 165536 + uid (2001 → 167537), except the two exe
 8. Keep the LXC stopped (autostart off) for a week, then archive it.
 
 **Open questions — media:**
-- **M-Q1 — Homey as uid 0.** The tested setup removes `privileged` and all but four capabilities, but the core still runs as uid 0. With remap that's host uid 165536 if it escapes, not host root, which takes most of the weight off this question. I found no record of a run with a non-root `user:`. Options: (a) accept, as tested; (b) test `user:` with a non-root uid on the media LXC before it retires: D-Bus, avahi and go2rtc switch users themselves and may fail without root. Remap must be tested with Homey's D-Bus, avahi and Matter at build.
-- **M-Q2:** Does Komga need egress?
+- **M-Q1 — decided: Homey stays uid 0, as tested** (kaywoz, 2026-11-17): no `privileged`, four capabilities, and remap makes an escape host uid 165536, not root. Homey's D-Bus, avahi and Matter under remap are tested at build.
+- **M-Q2 — decided: Komga joins `media-vlan13`** (kaywoz, 2026-11-17) with a fixed address (`KOMGA_IP`, inside `VLAN13_RANGE` like the others). It is then a VLAN 13 member next to Jellyfin and Homey.
 
 ## Stack 2 — infra (shared services), replaces the infra VM
 
@@ -327,7 +327,7 @@ Named exceptions to the container standard (CLAUDE.md §8). They go into the sec
 |---|---|---|---|
 | **E1** | ArchiveBox | not `read_only`; fixed image uid 911 | `/opt/archivebox` holds the browser and plugin binaries and must be writable; its directories are owned 911 |
 | **E2** | ArchiveTeam Warrior | not `read_only`; fixed image uid 1000; UI has no login unless `http_password` is set | `/home/warrior/data` holds its `wget-at` binaries and must be writable |
-| E3 | Homey | core runs as uid 0, four capabilities | tested in #229 (M-Q1). Remapped: host uid 165536 |
+| E3 | Homey | core runs as uid 0, four capabilities | tested in #229; accepted (M-Q1). Remapped: host uid 165536 |
 | E4 | Time Machine | root, not `read_only`, six capabilities | its entrypoint writes users and the Samba config into `/etc`. Remapped: host uid 165536 |
 | E5 | Scrutiny collector (storage stack) | root, `SYS_RAWIO` + `SYS_ADMIN`, the NVMe controller devices, not remapped (R4) | NVMe SMART reads need them (Scrutiny README). Narrowed: collector only, controller devices only, `read_only`, runs for seconds once a day (S-Q4) |
 | E6 | socket proxy (infra stack) | root (no `user:`), not remapped (R1): real host root | needs to open `docker.sock`; `POST=0` is the control, as today |
@@ -392,7 +392,7 @@ Named exceptions to the container standard (CLAUDE.md §8). They go into the sec
   - If it's still tight, the next cuts are ArchiveBox and the Warrior (start them only when needed), then Filestash, which duplicates CannonCommander.
   - MOS's root filesystem is RAM. With 8 GB, anything writing to `/` (logs, a misplaced cache: MISTAKES.md 2026-11-10) eats into the same memory.
   - Check `nproc` and `free -g` on the box before going live.
-- **G8 — internet access: decided** (kaywoz, 2026-11-17). Jellyfin and Homey are VLAN 13's IoT members. Docker containers that need the internet get an address on the VLAN 31 macvlan: "services needing internet use vlan31 for docker. vlan24 is for servers needing internet". Everything else stays on internal bridges. The per-address internet-only UniFi rules on VLAN 31 for the archivers still apply (mitigation 2 for E1/E2). What's left is A-Q12.
+- **G8 — internet access: decided** (kaywoz, 2026-11-17). Jellyfin, Komga and Homey are VLAN 13's IoT members (Komga added by M-Q2, so its internet access is on VLAN 13: the one exception to the next sentence). Docker containers that need the internet get an address on the VLAN 31 macvlan: "services needing internet use vlan31 for docker. vlan24 is for servers needing internet". Everything else stays on internal bridges. The per-address internet-only UniFi rules on VLAN 31 for the archivers still apply (mitigation 2 for E1/E2). What's left is A-Q12.
   - Containers on the same macvlan reach each other directly: macvlan bridge mode switches between them inside the host, so UniFi never sees that traffic. On VLAN 31 the archivers can therefore reach the sidecars, cloudflared, mediasort and Immich ML (while it's connected) on any listening port; the UniFi rules only cover traffic that leaves the host.
 
 ## Before the build
@@ -419,7 +419,7 @@ Security gaps from the 2026-11-17 attack-path review. None of them is in these f
 - **Image uids:** Filestash's (not read from the image layers).
 - **Capability sets:** ArchiveTeam Warrior's per-project needs and target hosts.
 - **Time Machine:** its capability set.
-- **Networking:** Homey's discovery on a macvlan address, and Komga without egress.
+- **Networking:** Homey's discovery on a macvlan address.
 - **MOS:** the Docker version (not recorded in #310). Settled by #310 and no longer listed here: the UI manages stacks, macvlan with a VLAN parent works, remap persists (#325).
 - **Under remap:** the socket proxy's need for R1; the GPU for Jellyfin and Immich (R3); Homey and Time Machine as remapped root (D-Bus, avahi, Samba's user setup); whether the remapped uids can read the host's rclone media mount (FUSE `--uid`/`--gid` and `allow_other`); folders on the pool shared with host users (CannonCommander's `${SHARES}`, A-Q2).
 - **MOS stack copies** (still open from #310 §7b): which copy MOS uses if the appdata copy is missing (pool not mounted), and whether a UI save overwrites a direct disk edit.

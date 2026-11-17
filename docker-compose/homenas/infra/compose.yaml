@@ -12,7 +12,7 @@
 #   (both sidecars, cloudflared, mediasort, the archivers, Immich ML's model download). kaywoz, 2026-11-17:
 #   "services needing internet use vlan31 for docker. vlan24 is for servers needing internet". VLAN 24 isn't
 #   used by Docker.
-# - media-vlan13: macvlan on the VLAN 13 sub-interface, for its two IoT members only (Jellyfin, Homey).
+# - media-vlan13: macvlan on the VLAN 13 sub-interface, for its IoT members only (Jellyfin, Komga, Homey).
 #   No host IP on any of them: the MOS host can't reach macvlan containers, and they can't reach it.
 # - proxy-<app>: internal bridges, one per served app (app + its zone's sidecar). No egress, no ports.
 # - socketproxy: a plain bridge, the proxy's port on 127.0.0.1 for the host's `tailscale serve` (tag:storage).
