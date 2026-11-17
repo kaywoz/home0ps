@@ -17,9 +17,7 @@ services:
   # Media classifier (#260), moved from the apps VM unchanged. Egress to TMDB and the LLM provider, so it
   # sits on apps-vlan31. Its API (8089) is bearer-token protected and is now also reachable from VLAN 31.
   mediasort:
-    build: ${MEDIASORT_SRC}            # absolute path to apps/mediasort in a checkout on the pool: the MOS UI runs
-                                       # the stack from its own folder, so a relative path wouldn't resolve (A-Q1)
-    image: home0ps/mediasort:latest
+    image: ghcr.io/kaywoz/mediasort:latest   # built in GitHub Actions (README A-Q1)
     container_name: kr-ccp-mediasort-0201
     restart: unless-stopped
     user: "2104:2104"
@@ -181,6 +179,7 @@ services:
       - immich_redis_password
     volumes:
       - ${PHOTOS}:/data                # UPLOAD_LOCATION: originals, thumbs, encoded video; owned 165536+2111
+      - ${PHOTOS_LIBRARY}:/external:ro # existing photos as an external library (README A-Q3)
       - /etc/localtime:/etc/localtime:ro
     networks:
       - proxy-immich                   # internal: server + sidecar
