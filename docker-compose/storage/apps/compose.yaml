@@ -3,56 +3,14 @@
 #
 # Zone: VLAN 31 (apps). Trusted, well-known apps only (CLAUDE.md §8).
 # - apps-vlan31: macvlan on the VLAN 31 sub-interface, no host IP on it: egress for the containers that
-#   need it (mediasort, the sidecar). The MOS host can't reach macvlan containers, and they can't reach it.
+#   need it (mediasort, ArchiveBox, the Warrior; the sidecar from the infra stack). The MOS host can't reach macvlan containers, and they can't reach it.
 # - proxy-<app>: internal bridges for everything that needs no egress (paperless + its Redis,
 #   CannonCommander, Immich's database and Redis). No published ports; the sidecar joins the ones it serves.
-# - No `ports:` anywhere: Tailscale Services (and the mover's tcp:8089) are served by this stack's own
-#   Tailscale sidecar (tag:docker, as the apps VM is today).
+# - No `ports:` anywhere: Tailscale Services (and the mover's tcp:8089) are served by the apps zone's
+#   Tailscale sidecar (tag:docker, as the apps VM is today). The sidecar, the macvlan and the proxy-<app>
+#   networks are defined in the infra stack (shared services, kaywoz 2026-11-17); this stack joins them.
 # No userns-remap assumed on MOS (#310 §7c open): `user:` uids are host uids, data folders owned by them.
 services:
-  tailscale:
-    image: tailscale/tailscale:latest
-    container_name: kr-ccp-tailscale-0201
-    hostname: ${TS_HOSTNAME}
-    restart: unless-stopped
-    user: "2110:2110"
-    read_only: true
-    cap_drop: [ALL]
-    security_opt:
-      - no-new-privileges:true
-    tmpfs:
-      - /tmp:size=16m
-    pids_limit: 100
-    mem_limit: 128m
-    environment:
-      TS_USERSPACE: "true"
-      TS_STATE_DIR: /var/lib/tailscale
-      TS_SOCKET: /tmp/tailscaled.sock      # set explicitly: docs and source disagree on the default
-      TS_AUTHKEY: file:/run/secrets/ts_authkey
-      TS_EXTRA_ARGS: --advertise-tags=tag:docker
-      TS_SERVE_CONFIG: /config/serve.json   # svc:paperless, cannoncommander, immich, archivebox, archivewarrior, atuin, hedgedoc, filestash, rackpeek; tcp:8089 -> mediasort (the mover)
-      TS_ENABLE_HEALTH_CHECK: "true"
-      TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
-    secrets:
-      - ts_authkey
-    volumes:
-      - ${APPDATA}/tailscale-apps/state:/var/lib/tailscale
-      - ${APPDATA}/tailscale-apps/serve.json:/config/serve.json:ro
-    networks:
-      - apps-vlan31
-      - proxy-paperless
-      - proxy-cannoncommander
-      - proxy-immich
-      - proxy-atuin
-      - proxy-hedgedoc
-      - proxy-filestash
-      - proxy-rackpeek
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9002/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
   # Media classifier (#260), moved from the apps VM unchanged. Egress to TMDB and the LLM provider, so it
   # sits on apps-vlan31. Its API (8089) is bearer-token protected and is now also reachable from VLAN 31.
   mediasort:
@@ -468,30 +426,26 @@ services:
     # healthcheck: built into the image (/health)
 
 networks:
+  # Owned by the infra stack (start it first): the zone macvlan and the networks the apps sidecar serves.
   apps-vlan31:
-    name: apps-vlan31
-    driver: macvlan
-    driver_opts:
-      parent: ${VLAN31_PARENT}
-    ipam:
-      config:
-        - subnet: ${VLAN31_SUBNET}
-          gateway: ${VLAN31_GATEWAY}
-          ip_range: ${VLAN31_RANGE}
+    external: true
   proxy-paperless:
-    name: proxy-paperless
-    driver: bridge
-    internal: true
+    external: true
+  proxy-cannoncommander:
+    external: true
+  proxy-immich:
+    external: true
+  proxy-atuin:
+    external: true
+  proxy-hedgedoc:
+    external: true
+  proxy-filestash:
+    external: true
+  proxy-rackpeek:
+    external: true
+  # This stack's own: databases and Redis, never joined by the sidecar.
   paperless-backend:
     name: paperless-backend
-    driver: bridge
-    internal: true
-  proxy-cannoncommander:
-    name: proxy-cannoncommander
-    driver: bridge
-    internal: true
-  proxy-immich:
-    name: proxy-immich
     driver: bridge
     internal: true
   immich-backend:
@@ -499,25 +453,7 @@ networks:
     driver: bridge
     internal: true
 
-  proxy-atuin:
-    name: proxy-atuin
-    driver: bridge
-    internal: true
-  proxy-hedgedoc:
-    name: proxy-hedgedoc
-    driver: bridge
-    internal: true
-  proxy-filestash:
-    name: proxy-filestash
-    driver: bridge
-    internal: true
-  proxy-rackpeek:
-    name: proxy-rackpeek
-    driver: bridge
-    internal: true
 secrets:
-  ts_authkey:
-    file: ${APPDATA}/tailscale-apps/authkey          # 600, owned 2110; delete after the node has joined
   mediasort_token:
     file: ${APPDATA}/mediasort/secrets/token         # 600, owned 2104; same value in the mover's token file
   tmdb_token:

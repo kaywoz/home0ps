@@ -5,81 +5,15 @@
 # Zone: the storage host's own network (no zone VLAN). Unlike the other three stacks, these are served by the
 # host's own tailscaled (tag:storage, which already has svc:kopia, svc:rustfs and svc:scrutiny), so they use
 # today's pattern: one bridge per app, ports on 127.0.0.1, `tailscale serve` on the host.
-# - socketproxy, proxy-scrutiny, proxy-kopia, proxy-rustfs: plain bridges (not internal, because internal networks can't publish ports).
+# - proxy-scrutiny, proxy-kopia, proxy-rustfs: plain bridges (not internal, because internal networks can't publish ports).
 #   They need no egress. A container on a plain bridge can reach the MOS host through the bridge gateway, so
 #   the host firewall (#219) and the rclone rc fix (#316) come first (README S-Q1).
 # - Time Machine: macvlan on the host's own interface with a fixed address, so Macs reach SMB without
 #   clashing with MOS's own Samba on 445 (README S-Q2).
 # No userns-remap assumed on MOS (#310 §7c open): `user:` uids are host uids.
 #
-# Observability for the whole box lives here (observed-hosts.md: compose hosts keep the socket proxy and the
-# Beszel agent in their compose). One Docker daemon serves all four stacks, so one proxy and one agent cover
-# every container. Both keep the names they have as MOS-template deploys today. Dozzle on the monitoring host
-# reads this host in remote-host mode through the proxy: no Dozzle agent (an agent needs the full socket).
+# The box's socket proxy and Beszel agent are in the infra stack (shared services, kaywoz 2026-11-17).
 services:
-  # Read-only Docker API for Dozzle (monitoring host) and the Beszel agent. Never host networking: the proxy
-  # would listen on every interface. `tailscale serve --tcp=2375 tcp://127.0.0.1:2375` on the host;
-  # only tag:monitoring may reach it (existing grant + tests).
-  socketproxy:
-    image: tecnativa/docker-socket-proxy:latest
-    container_name: kr-ccp-socketproxy-0301
-    restart: unless-stopped
-    read_only: true
-    tmpfs:
-      - /run
-      - /tmp
-    security_opt:
-      - no-new-privileges:true
-    pids_limit: 100
-    mem_limit: 64m
-    environment:
-      - CONTAINERS=1   # list/inspect/logs/stats
-      - INFO=1
-      - EVENTS=1
-      - POST=0         # read-only API
-    ports:
-      - "127.0.0.1:2375:2375"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro   # :ro restricts nothing; POST=0 does
-    networks:
-      - socketproxy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:2375/_ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-
-  # Beszel agent: host network (upstream requirement for interface stats), LISTEN on the tailnet IP only,
-  # Docker only through the read-only proxy, pushes to svc:beszel. As deployed today (containers.md).
-  beszelagent:
-    image: henrygd/beszel-agent:latest
-    container_name: kr-ccp-beszelagent-0201
-    restart: unless-stopped
-    network_mode: host
-    user: "65534:65534"
-    read_only: true
-    cap_drop: [ALL]
-    security_opt:
-      - no-new-privileges:true
-    pids_limit: 50
-    mem_limit: 128m
-    environment:
-      DOCKER_HOST: tcp://127.0.0.1:2375
-      LISTEN: ${BESZEL_LISTEN}         # <tailnet-ip>:45876
-      HUB_URL: https://beszel.${TAILNET}.ts.net
-      KEY_FILE: /run/secrets/beszel_key      # KEY_FILE / TOKEN_FILE supported by the agent
-      TOKEN_FILE: /run/secrets/beszel_token
-    secrets:
-      - beszel_key
-      - beszel_token
-    volumes:
-      - ${APPDATA}/beszel/agent:/var/lib/beszel-agent   # owned 65534
-    healthcheck:                       # upstream's suggestion: fails if the health file is older than 91 s
-      test: ["CMD", "/agent", "health"]
-      interval: 60s
-      timeout: 5s
-      retries: 3
-
   # Kopia repository server: backups from the other machines (#43). Repository on the pool. TLS with its own
   # certificate (the repository server's gRPC needs TLS); served as svc:kopia with https+insecure.
   kopia:
@@ -247,9 +181,6 @@ services:
       retries: 3
 
 networks:
-  socketproxy:
-    name: socketproxy
-    driver: bridge
   proxy-scrutiny:
     name: proxy-scrutiny
     driver: bridge
@@ -277,7 +208,3 @@ secrets:
     file: ${APPDATA}/rustfs/secrets/access_key   # 600, owned 2302
   rustfs_secret_key:
     file: ${APPDATA}/rustfs/secrets/secret_key   # 600, owned 2302
-  beszel_key:
-    file: ${APPDATA}/beszel/secrets/key          # from the hub's "Add system"; 600, owned 65534
-  beszel_token:
-    file: ${APPDATA}/beszel/secrets/token        # 600, owned 65534

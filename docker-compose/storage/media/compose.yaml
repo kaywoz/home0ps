@@ -5,54 +5,15 @@
 # - media-vlan13: macvlan on the VLAN 13 sub-interface, no host IP on it. Gives Jellyfin and Homey their
 #   own VLAN 13 address (Apple TV, discovery, Homey bridges) and the zone's egress. The MOS host can't reach
 #   macvlan containers, and they can't reach it — wanted here.
-# - proxy-komga: internal bridge, Komga + the Tailscale sidecar only. No egress, no published ports.
-# - No `ports:` anywhere: Tailscale Services are served by the stack's own Tailscale sidecar (tag:media),
-#   because host-side `tailscale serve` to 127.0.0.1 can't reach macvlan containers.
+# - proxy-komga: internal bridge, Komga + the media sidecar only. No egress, no published ports.
+# - No `ports:` anywhere: Tailscale Services are served by the media zone's Tailscale sidecar (tag:media),
+#   because host-side `tailscale serve` to 127.0.0.1 can't reach macvlan containers. The sidecar and both
+#   networks are defined in the infra stack (shared services, kaywoz 2026-11-17); this stack joins them.
 # No userns-remap assumed (MOS today: uid_map 0 0 4294967295; #310 §7c open), so container uids are host
 # uids: data folders are owned by the uid in `user:`. Service uids per the table in the README.
 # Data lives on the pool (${APPDATA}), never on MOS's RAM rootfs. Media comes read-only from the host's
 # rclone mount (config-files/mos/media-mount.sh, #197).
 services:
-  # Tailscale sidecar: a node of its own (tag:media, as the media LXC is today) that serves svc:jellyfin and
-  # svc:komga to the containers' addresses on this stack's networks. Userspace networking: no TUN device,
-  # no NET_ADMIN. Auth key and serve config as files. Docs: tailscale.com/kb/1282/docker, /kb/1552/services.
-  tailscale:
-    image: tailscale/tailscale:latest
-    container_name: kr-ccp-tailscale-0101
-    hostname: ${TS_HOSTNAME}                 # MagicDNS name of this node (host-local .env)
-    restart: unless-stopped
-    user: "2010:2010"
-    read_only: true
-    cap_drop: [ALL]
-    security_opt:
-      - no-new-privileges:true
-    tmpfs:
-      - /tmp:size=16m
-    pids_limit: 100
-    mem_limit: 128m
-    environment:
-      TS_USERSPACE: "true"
-      TS_STATE_DIR: /var/lib/tailscale
-      TS_SOCKET: /tmp/tailscaled.sock      # set explicitly: docs and source disagree on the default
-      TS_AUTHKEY: file:/run/secrets/ts_authkey   # tagged, single-use, pre-approved key (tag:media)
-      TS_EXTRA_ARGS: --advertise-tags=tag:media
-      TS_SERVE_CONFIG: /config/serve.json         # svc:jellyfin -> http://${JELLYFIN_IP}:8096, svc:komga -> http://komga:25600
-      TS_ENABLE_HEALTH_CHECK: "true"
-      TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
-    secrets:
-      - ts_authkey
-    volumes:
-      - ${APPDATA}/tailscale-media/state:/var/lib/tailscale
-      - ${APPDATA}/tailscale-media/serve.json:/config/serve.json:ro
-    networks:
-      media-vlan13: {}
-      proxy-komga: {}
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9002/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
   jellyfin:
     image: jellyfin/jellyfin:latest
     container_name: kr-ccp-jellyfin-0201
@@ -133,22 +94,8 @@ services:
     volumes:
       - ${APPDATA}/homey:/homey/user
 
-networks:
+networks:                                     # owned by the infra stack (start it first)
   media-vlan13:
-    name: media-vlan13
-    driver: macvlan
-    driver_opts:
-      parent: ${VLAN13_PARENT}                # e.g. <nic>.13, no IP on the host side
-    ipam:
-      config:
-        - subnet: ${VLAN13_SUBNET}
-          gateway: ${VLAN13_GATEWAY}
-          ip_range: ${VLAN13_RANGE}           # a small block outside the gateway's DHCP pool
+    external: true
   proxy-komga:
-    name: proxy-komga
-    driver: bridge
-    internal: true
-
-secrets:
-  ts_authkey:
-    file: ${APPDATA}/tailscale-media/authkey  # 600, owned 2010; delete after the node has joined
+    external: true

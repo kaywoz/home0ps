@@ -37,12 +37,12 @@ Names reserved by the storage-host stacks proposal ([`storage/README.md`](storag
 
 | Container | Host role | Defined in |
 |---|---|---|
-| `kr-ccp-tailscale-0101` | storage host (MOS), media stack | [`storage/media/compose.yaml`](storage/media/compose.yaml) |
+| `kr-ccp-tailscale-0101` | storage host (MOS), infra stack (media zone sidecar) | [`storage/infra/compose.yaml`](storage/infra/compose.yaml) |
 | `kr-ccp-jellyfin-0201` | storage host (MOS), media stack | [`storage/media/compose.yaml`](storage/media/compose.yaml) |
 | `kr-ccp-komga-0201` | storage host (MOS), media stack | [`storage/media/compose.yaml`](storage/media/compose.yaml) |
 | `kr-ccp-homey-0201` | storage host (MOS), media stack | [`storage/media/compose.yaml`](storage/media/compose.yaml) |
 | `kr-ccp-cloudflared-0101` | storage host (MOS), infra stack | [`storage/infra/compose.yaml`](storage/infra/compose.yaml) |
-| `kr-ccp-tailscale-0201` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-tailscale-0201` | storage host (MOS), infra stack (apps zone sidecar) | [`storage/infra/compose.yaml`](storage/infra/compose.yaml) |
 | `kr-ccp-mediasort-0201` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
 | `kr-ccp-paperless-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
 | `kr-ccp-paperlessredis-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
@@ -61,8 +61,8 @@ Names reserved by the storage-host stacks proposal ([`storage/README.md`](storag
 | `kr-ccp-timemachine-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
 | `kr-ccp-rustfs-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
 | `kr-ccp-scrutiny-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
-| `kr-ccp-socketproxy-0301` | storage host (MOS), storage stack | moves from the MOS template deploy (same name, row above) |
-| `kr-ccp-beszelagent-0201` | storage host (MOS), storage stack | moves from the MOS template deploy (same name, row above) |
+| `kr-ccp-socketproxy-0301` | storage host (MOS), infra stack | moves from the MOS template deploy (same name, row above) |
+| `kr-ccp-beszelagent-0201` | storage host (MOS), infra stack | moves from the MOS template deploy (same name, row above) |
 
 Not containers: the Beszel agent on the infra VM and the apps VM runs natively (systemd), so it has no container name.
 
