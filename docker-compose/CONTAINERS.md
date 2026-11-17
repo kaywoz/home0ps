@@ -31,6 +31,38 @@ Every container on the home0ps hosts, so names stay unique. Scheme: [`NAMING.md`
 | `kr-ccp-komga-0101` | media LXC | [`media/compose.yaml`](media/compose.yaml) | 2026-11-07 |
 | `kr-ccp-homey-0101` | media LXC | [`media/compose.yaml`](media/compose.yaml) | 2026-11-07 |
 
+## Proposed — reserved, not deployed
+
+Names reserved by the storage-host stacks proposal ([`storage/README.md`](storage/README.md)). They move into the table above only when a stack is built; if the proposal is dropped, they're removed.
+
+| Container | Host role | Defined in |
+|---|---|---|
+| `kr-ccp-tailscale-0101` | storage host (MOS), infra stack (media zone sidecar) | [`storage/infra/compose.yaml`](storage/infra/compose.yaml) |
+| `kr-ccp-jellyfin-0201` | storage host (MOS), media stack | [`storage/media/compose.yaml`](storage/media/compose.yaml) |
+| `kr-ccp-komga-0201` | storage host (MOS), media stack | [`storage/media/compose.yaml`](storage/media/compose.yaml) |
+| `kr-ccp-homey-0201` | storage host (MOS), media stack | [`storage/media/compose.yaml`](storage/media/compose.yaml) |
+| `kr-ccp-cloudflared-0101` | storage host (MOS), infra stack | [`storage/infra/compose.yaml`](storage/infra/compose.yaml) |
+| `kr-ccp-tailscale-0201` | storage host (MOS), infra stack (apps zone sidecar) | [`storage/infra/compose.yaml`](storage/infra/compose.yaml) |
+| `kr-ccp-mediasort-0201` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-paperless-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-paperlessredis-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-cannoncommander-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-immich-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-immichml-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-immichdb-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-immichredis-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-archivebox-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-archivewarrior-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-atuin-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-hedgedoc-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-filestash-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-rackpeek-0101` | storage host (MOS), apps stack | [`storage/apps/compose.yaml`](storage/apps/compose.yaml) |
+| `kr-ccp-kopia-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
+| `kr-ccp-timemachine-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
+| `kr-ccp-rustfs-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
+| `kr-ccp-socketproxy-0301` | storage host (MOS), infra stack | moves from the MOS template deploy (same name, row above) |
+| `kr-ccp-beszelagent-0201` | storage host (MOS), infra stack | moves from the MOS template deploy (same name, row above) |
+
 Not containers: the Beszel agent on the infra VM and the apps VM runs natively (systemd), so it has no container name.
 
 LXC guests (`kr-cxp-…`): `kr-cxp-media-0101` (storage host).

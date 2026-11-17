@@ -1,0 +1,170 @@
+# PROPOSAL — not deployed. Storage stack on the replacement storage host (MOS): the host's own storage
+# services. Design, open questions and migration: docker-compose/storage/README.md. Nothing here runs until
+# kaywoz OKs it.
+#
+# Zone: the storage host's own network (no zone VLAN). Unlike the other three stacks, these are served by the
+# host's own tailscaled (tag:storage, which already has svc:kopia and svc:rustfs), so they use
+# today's pattern: one bridge per app, ports on 127.0.0.1, `tailscale serve` on the host.
+# - proxy-kopia, proxy-rustfs: plain bridges (not internal, because internal networks can't publish ports).
+#   They need no egress. A container on a plain bridge can reach the MOS host through the bridge gateway, so
+#   the host firewall (#219) and the rclone rc fix (#316) come first (README S-Q1).
+# - Time Machine: macvlan on the host's own interface with a fixed address, so Macs reach SMB without
+#   clashing with MOS's own Samba on 445 (README S-Q2).
+# No userns-remap (#310 §7c: works at runtime but doesn't persist on MOS; settled): `user:` uids are host uids.
+#
+# The box's socket proxy and Beszel agent are in the infra stack (shared services, kaywoz 2026-11-17).
+# No Scrutiny container: the SMART collector runs natively from a MOS UI cron job and pushes to the hub (#103).
+services:
+  # Kopia repository server: backups from the other machines (#43). Repository on the pool. TLS with its own
+  # certificate (the repository server's gRPC needs TLS); served as svc:kopia with https+insecure.
+  kopia:
+    image: kopia/kopia:latest
+    container_name: kr-ccp-kopia-0101
+    restart: unless-stopped
+    user: "2301:2301"                  # no USER and no entrypoint script in the image (to verify at build)
+    read_only: true                    # not documented upstream; to verify at build
+    cap_drop: [ALL]                    # no FUSE/SYS_ADMIN: those are only for `kopia mount`
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=256m
+    pids_limit: 300
+    mem_limit: 512m
+    environment:
+      KOPIA_CONFIG_PATH: /app/config/repository.config
+      KOPIA_PERSIST_CREDENTIALS_ON_CONNECT: "true"   # repository password in /app/config/*.kopia-password
+                                                     # (600) instead of KOPIA_PASSWORD in env
+    # UI basic auth from an htpasswd file (a hidden, older flag; `kopia server user add` covers repository
+    # users). No password on the command line or in env: both are readable through the socket proxy.
+    command:
+      - server
+      - start
+      - --address=0.0.0.0:51515
+      - --tls-cert-file=/app/config/tls.crt
+      - --tls-key-file=/app/config/tls.key
+      - --htpasswd-file=/app/config/htpasswd
+    ports:
+      - "127.0.0.1:51515:51515"        # tailscale serve --service=svc:kopia https+insecure://127.0.0.1:51515
+    volumes:
+      - ${APPDATA}/kopia/config:/app/config
+      - ${APPDATA}/kopia/cache:/app/cache
+      - ${APPDATA}/kopia/logs:/app/logs
+      - ${BACKUPS}:/repository
+    networks:
+      - proxy-kopia
+    healthcheck:                       # no unauthenticated endpoint: a 401 from the UI means it's up
+      test: ["CMD-SHELL", "curl -ks -o /dev/null -w '%{http_code}' https://127.0.0.1:51515/ | grep -q 401"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
+  # Time Machine for the Macs. The one service here that needs root: its entrypoint creates the SMB user,
+  # writes smb.conf and the avahi service, then runs smbd/nmbd/avahi under s6. Not read_only.
+  timemachine:
+    image: mbentley/timemachine:smb
+    container_name: kr-ccp-timemachine-0101
+    restart: unless-stopped
+    cap_drop: [ALL]
+    cap_add:                           # from the entrypoint; each to be confirmed one at a time at build
+      - CHOWN                          # user setup, chown of the share
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID                         # smbd switches to the share user per connection
+      - SETGID
+      - NET_BIND_SERVICE               # 445
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /run/samba                     # as in upstream's compose
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    pids_limit: 200
+    mem_limit: 256m
+    environment:
+      TM_USERNAME: timemachine
+      TM_GROUPNAME: timemachine
+      TM_UID: "2303"                   # owner of the share files (not the process uid)
+      TM_GID: "2303"
+      PASSWORD_FILE: /run/secrets/timemachine_password
+      VOLUME_SIZE_LIMIT: 1T            # caps what Time Machine sees as free space
+      SET_PERMISSIONS: "false"
+    secrets:
+      - timemachine_password
+    volumes:
+      - ${TIMEMACHINE}:/opt/timemachine
+    networks:
+      storage-lan:
+        ipv4_address: ${TIMEMACHINE_IP}
+    healthcheck:                       # the image ships none for the smb variant
+      test: ["CMD", "pgrep", "smbd"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
+  # RustFS: local S3 (#39). Keys as files (*_FILE are native); never the default rustfsadmin/rustfsadmin.
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: kr-ccp-rustfs-0101
+    restart: unless-stopped
+    user: "2302:2302"                  # image runs as 10001; the entrypoint never switches user
+    read_only: true                    # not documented upstream; to verify at build
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m
+    pids_limit: 300
+    mem_limit: 512m
+    environment:
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CONSOLE_CORS_ALLOWED_ORIGINS: ${RUSTFS_CONSOLE_ORIGIN}   # the image defaults to "*"
+      RUSTFS_OBS_LOG_DIRECTORY: /logs
+      RUSTFS_ACCESS_KEY_FILE: /run/secrets/rustfs_access_key
+      RUSTFS_SECRET_KEY_FILE: /run/secrets/rustfs_secret_key
+    secrets:
+      - rustfs_access_key
+      - rustfs_secret_key
+    ports:
+      - "127.0.0.1:9000:9000"          # S3 API: a Service of its own (README S-Q3)
+      - "127.0.0.1:9001:9001"          # console: svc:rustfs
+    volumes:
+      - ${S3DATA}:/data
+      - ${APPDATA}/rustfs/logs:/logs
+    networks:
+      - proxy-rustfs
+    healthcheck:                       # as in upstream's compose
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  proxy-kopia:
+    name: proxy-kopia
+    driver: bridge
+  proxy-rustfs:
+    name: proxy-rustfs
+    driver: bridge
+  storage-lan:
+    name: storage-lan
+    driver: macvlan
+    driver_opts:
+      parent: ${LAN_PARENT}
+    ipam:
+      config:
+        - subnet: ${LAN_SUBNET}
+          gateway: ${LAN_GATEWAY}
+          ip_range: ${LAN_RANGE}
+
+secrets:
+  timemachine_password:
+    file: ${APPDATA}/timemachine/password     # 600, root-owned (the entrypoint reads it as root)
+  rustfs_access_key:
+    file: ${APPDATA}/rustfs/secrets/access_key   # 600, owned 2302
+  rustfs_secret_key:
+    file: ${APPDATA}/rustfs/secrets/secret_key   # 600, owned 2302

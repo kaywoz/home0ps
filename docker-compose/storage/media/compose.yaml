@@ -1,0 +1,106 @@
+# PROPOSAL — not deployed. Media stack on the replacement storage host (MOS), replacing the media LXC.
+# Design, open questions and migration: docker-compose/storage/README.md. Nothing here runs until kaywoz OKs it.
+#
+# Zone: VLAN 13 (IoT). Docker runs directly on MOS (no LXC), one stack per zone (#314 scenario).
+# - media-vlan13: macvlan on the VLAN 13 sub-interface, no host IP on it. Jellyfin and Homey are IoT members
+#   of VLAN 13 with fixed addresses (kaywoz, 2026-11-17: Apple TV, discovery, Homey bridges); nothing else in
+#   this stack is on VLAN 13. The MOS host can't reach
+#   macvlan containers, and they can't reach it — wanted here.
+# - proxy-jellyfin, proxy-komga: internal bridges, app + the media sidecar only. No egress, no published ports.
+#   Jellyfin is on proxy-jellyfin too, so the sidecar reaches it without a VLAN 13 address of its own.
+# - No `ports:` anywhere: Tailscale Services are served by the media zone's Tailscale sidecar (tag:media),
+#   because host-side `tailscale serve` to 127.0.0.1 can't reach macvlan containers. The sidecar and both
+#   networks are defined in the infra stack (shared services, kaywoz 2026-11-17); this stack joins them.
+# No userns-remap (#310 §7c: works at runtime but doesn't persist on MOS; settled), so container uids are host
+# uids: data folders are owned by the uid in `user:`. Service uids per the table in the README.
+# Data lives on the pool (${APPDATA}), never on MOS's RAM rootfs. Media comes read-only from the host's
+# rclone mount (config-files/mos/media-mount.sh, #197).
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: kr-ccp-jellyfin-0201
+    restart: unless-stopped
+    user: "2001:2001"
+    group_add:
+      - ${RENDER_GID}                         # host render group (getent group render on MOS)
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128   # Intel QSV / VA-API: render node only
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=256m
+    pids_limit: 500
+    mem_limit: 1536m
+    environment:
+      JELLYFIN_PublishedServerUrl: http://${JELLYFIN_IP}:8096   # what LAN discovery hands out
+    networks:
+      media-vlan13:
+        ipv4_address: ${JELLYFIN_IP}          # fixed: Apple TV and other VLAN 13 clients
+      proxy-jellyfin: {}                      # internal: the media sidecar serves svc:jellyfin through it
+    volumes:
+      - ${APPDATA}/jellyfin/config:/config
+      - ${APPDATA}/jellyfin/cache:/cache
+      - ${MEDIA_MNT}:/media:ro
+    # healthcheck: built into the image
+
+  komga:
+    image: gotson/komga:latest
+    container_name: kr-ccp-komga-0201
+    restart: unless-stopped
+    user: "2002:2002"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=256m,exec                   # exec: the SQLite JDBC driver loads its native library from /tmp
+    pids_limit: 300
+    mem_limit: 768m
+    environment:
+      JAVA_TOOL_OPTIONS: -Xmx512m        # 8 GB box: heap capped below mem_limit
+    networks:
+      - proxy-komga                           # internal: no egress (to verify, see README)
+    volumes:
+      - ${APPDATA}/komga/config:/config
+      - ${MEDIA_MNT}:/data:ro
+    # no healthcheck: none documented by Komga
+
+  homey:
+    image: ghcr.io/athombv/homey-shs:latest
+    container_name: kr-ccp-homey-0201
+    restart: unless-stopped
+    # In the LXC Homey used network_mode: host to get the LXC's VLAN 13 address. On MOS, host network would
+    # be the storage host's own network, so it gets a fixed macvlan address on VLAN 13 instead (discovery and
+    # mDNS work on that L2 segment; to verify). Runs as the image's own user (root in the container) with
+    # only the four capabilities tested on the media LXC (2026-11-07).
+    read_only: true
+    cap_drop: [ALL]
+    cap_add:
+      - SETUID
+      - SETGID
+      - SYS_CHROOT
+      - CHOWN
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=128m
+      - /run:size=16m
+    pids_limit: 300
+    mem_limit: 512m
+    environment:
+      HOMEY_LOCAL_ADDRESS: ${HOMEY_IP}
+    networks:
+      media-vlan13:
+        ipv4_address: ${HOMEY_IP}
+    volumes:
+      - ${APPDATA}/homey:/homey/user
+
+networks:                                     # owned by the infra stack (start it first)
+  media-vlan13:
+    external: true
+  proxy-jellyfin:
+    external: true
+  proxy-komga:
+    external: true
