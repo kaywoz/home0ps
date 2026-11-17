@@ -11,7 +11,7 @@ Four separate stacks for MOS on the replacement homenas (the 4-bay NVMe box test
 | **media** | [`media/compose.yaml`](media/compose.yaml) | Jellyfin, Komga, Homey | the media LXC | VLAN 13 (IoT) |
 | **infra** | [`infra/compose.yaml`](infra/compose.yaml) | the shared services: Tailscale sidecars (media and apps zones), cloudflared, the box's socket proxy and Beszel agent | the infra VM; the proxy and agent move from MOS-template deploys | each container in the zone it serves; internet access through VLAN 31 |
 | **apps** | [`apps/compose.yaml`](apps/compose.yaml) | mediasort, paperless-ngx, CannonCommander, Immich, ArchiveBox, ArchiveTeam Warrior, Atuin, HedgeDoc, Filestash, RackPeek | the apps VM | VLAN 31 (apps) |
-| **storage** | [`storage/compose.yaml`](storage/compose.yaml) | Kopia, Time Machine, RustFS (Scrutiny: native collector, no container, #103) | new (#43, #39) | the homenas's own network |
+| **storage** | [`storage/compose.yaml`](storage/compose.yaml) | Kopia, Time Machine, RustFS, Scrutiny collector (run once a day from MOS cron, #103) | new (#43, #39) | the homenas's own network |
 
 This follows the scenario in kaywoz/home0ps#314: Docker runs **directly on MOS**, one stack per zone, the zone stacks on a macvlan network on their VLAN sub-interface **with no host IP on those VLANs**. The MOS UI is the homenas's only management portal (#312). All three guests (the media LXC, the infra VM and the apps VM) move onto the new box (kaywoz, 2026-11-17; G1 resolved).
 
@@ -50,6 +50,7 @@ The candidates came from the 2026-11-13 discussion: a long list from kaywoz's Gi
     | **R1** | socket proxy (infra) | it opens `docker.sock` as root; remapped root is host uid 165536, which has no access to the socket. Not in Docker's docs: reasoned from the socket's permissions, to confirm at build. `POST=0` stays the control (E6) |
     | **R2** | Beszel agent (infra) | `network_mode: host`, which Docker doesn't allow with a remapped container (docs.docker.com/engine/security/userns-remap, "known limitations"). It runs as 65534 |
     | **(R3)** | Jellyfin, Immich server | **only if the build test fails:** the render node's host group doesn't map into a remapped container, so `group_add: RENDER_GID` may not grant `/dev/dri/renderD128`. Two fixes: a boot step that sets the node's group to 165536 + `RENDER_GID` (keeps them remapped; it would go into #325's hook), or `userns_mode: host` for both (still non-root uids). Not an exemption in the draft |
+    | **R4** | Scrutiny collector (storage) | NVMe SMART needs `SYS_ADMIN` on the host's controller devices; a capability inside a remapped namespace doesn't count for host devices. Runs once a day, collector only (E5) |
 
   - Everything else runs remapped, including the root containers: Homey (E3) and Time Machine (E4) now run as host uid 165536, not host root.
 
@@ -321,7 +322,7 @@ The host's own storage services. They're served by the host's own tailscaled (`t
   - Over the tailnet it would need its own sidecar.
   - The alternative is MOS's own Samba with a Time Machine share, if MOS supports `fruit:time machine` (unverified).
 - **S-Q3:** RustFS's S3 API. Is it local only (the box's own backups, #30), or a Tailscale Service for other hosts (#28 "secure s3 endpoint")?
-- **S-Q4 — Scrutiny: decided by #103.** No Scrutiny container on this box (the privileged one in the earlier draft and its exception E5 are gone). The collector runs **natively**: `smartctl` plus Scrutiny's collector binary, started from a **MOS UI cron job** (MOS keeps cron only through its UI), pushing to the hub on the monitoring host. Still to check on MOS: that `smartctl` is present, and where the collector binary can live and execute (`/boot` is `noexec`; the pool, if it isn't).
+- **S-Q4 — Scrutiny: decided** (kaywoz, 2026-11-17, replaces #103's native collector): a **collector-only container**, run once a day by a MOS UI cron job (`docker-compose --profile cron run --rm`), pushing to the hub on the monitoring host. Not privileged: `SYS_RAWIO` + `SYS_ADMIN`, the NVMe controller devices only (no namespaces, so no direct disk read/write), `read_only`, no UI or port. Not remapped (R4); exception E5. Residual risk: NVMe admin commands through the controller, the same as a native collector running as root. Why a container: the MOS UI manages it, the image brings `smartctl`, and no binary has to live on an executable path (`/boot` is `noexec`).
 
 ## Exception register
 
@@ -333,7 +334,7 @@ Named exceptions to the container standard (CLAUDE.md §8). They go into the sec
 | **E2** | ArchiveTeam Warrior | not `read_only`; fixed image uid 1000; UI has no login unless `http_password` is set | `/home/warrior/data` holds its `wget-at` binaries and must be writable |
 | E3 | Homey | core runs as uid 0, four capabilities | tested in #229 (M-Q1). Remapped: host uid 165536 |
 | E4 | Time Machine | root, not `read_only`, six capabilities | its entrypoint writes users and the Samba config into `/etc`. Remapped: host uid 165536 |
-| E5 | — | retired 2026-11-17: Scrutiny has no container any more (#103) | |
+| E5 | Scrutiny collector (storage stack) | root, `SYS_RAWIO` + `SYS_ADMIN`, the NVMe controller devices, not remapped (R4) | NVMe SMART reads need them (Scrutiny README). Narrowed: collector only, controller devices only, `read_only`, runs for seconds once a day (S-Q4) |
 | E6 | socket proxy (infra stack) | root (no `user:`), not remapped (R1): real host root | needs to open `docker.sock`; `POST=0` is the control, as today |
 | E7 | Immich Postgres | a version tag instead of `:latest` | no moving tag exists (A-Q5) |
 | (E8) | CannonCommander | only if the bypassed entrypoint fails at build: root entrypoint dropping to 2107, four capabilities | see A-Q2; not an exception in the draft |
@@ -385,7 +386,7 @@ Named exceptions to the container standard (CLAUDE.md §8). They go into the sec
   | media | 2.8 GB (Jellyfin 1.5 GB, Komga 768 MB with a 512 MB heap, Homey 512 MB) |
   | infra | 0.6 GB (two sidecars, cloudflared, Beszel agent at 128 MB each; socket proxy 64 MB) |
   | apps | 5.4 GB without Immich ML (+1.5 GB with it) |
-  | storage | 1.3 GB (Scrutiny's container is gone) |
+  | storage | 1.3 GB, plus 128 MB for the Scrutiny collector while it runs (seconds a day) |
   | **total** | **≈ 10 GB of caps** on an 8 GB box, before MOS itself, its RAM root filesystem and the rclone mount's buffers |
 
   - Caps over physical RAM are normal as long as the peaks don't line up. The peaks here are Jellyfin transcoding, paperless OCR (one worker now), ArchiveBox's Chromium and Immich imports. Real usage is unmeasured: watch it in Beszel for the first weeks and alert near the top.
@@ -437,4 +438,4 @@ Security gaps from the 2026-11-17 attack-path review. None of them is in these f
 - **`docker-compose/CONTAINERS.md`:** move the reserved names into the main table when built.
 - **MOS feature request:** a working `docker_options` field (the UI resets it today), so remap wouldn't need the pre-start hook (#310 §7c; kaywoz files the report).
 - **`security/homenas.md`:** the remap exemptions (R1, R2, and R3 if it comes to that) in the "Container escape" row, once #325 has merged.
-- **Scrutiny (#103):** the hub on the monitoring host, the native collector + MOS UI cron job here, the push grant.
+- **Scrutiny (#103):** the hub on the monitoring host, the collector container + MOS UI cron job here, the push grant.

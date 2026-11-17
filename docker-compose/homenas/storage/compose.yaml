@@ -16,7 +16,9 @@
 # README with a reason. The stack needs MOS autostart on: `restart:` alone doesn't bring it back.
 #
 # The box's socket proxy and Beszel agent are in the infra stack (shared services, kaywoz 2026-11-17).
-# No Scrutiny container: the SMART collector runs natively from a MOS UI cron job and pushes to the hub (#103).
+# Scrutiny: collector only (kaywoz, 2026-11-17, replaces the native collector in #103). Not started by `up`
+# (profile `cron`): a MOS UI cron job runs it once a day and it exits. The hub (UI, database) is on the
+# monitoring host.
 services:
   # Kopia repository server: backups from the other machines (#43). Repository on the pool. TLS with its own
   # certificate (the repository server's gRPC needs TLS); served as svc:kopia with https+insecure.
@@ -146,12 +148,53 @@ services:
       timeout: 5s
       retries: 3
 
+  # Scrutiny SMART collector (spoke; hub on the monitoring host, #103). Exception E5 (README): NVMe SMART needs
+  # SYS_RAWIO + SYS_ADMIN and the controller devices, and SYS_ADMIN in a remapped namespace doesn't count for host
+  # devices, so it runs as host root (userns_mode: host, R4). Narrowed as far as the docs allow:
+  # - controller char devices only (/dev/nvmeN), never the namespaces (/dev/nvmeNn1): no direct read/write of
+  #   disk data. Residual: NVMe admin commands (format, sanitize, firmware) through the controller, the same
+  #   power the native collector would have had as host root.
+  # - collector-only image: no UI, no database, no listening port; it only pushes to the hub.
+  # - runs once a day for seconds, not all the time. MOS UI cron (one line, as root):
+  #     0 3 * * *  cd <appdata>/compose_storage && docker-compose --profile cron run --rm scrutinycollector
+  #   (stack folder name as MOS creates it; check at build). MOS autostart's `up -d` skips the profile.
+  # Docs: github.com/AnalogJ/scrutiny docs/INSTALL_HUB_SPOKE.md and README (Docker, hub/spoke).
+  # To verify at build: smartctl works through /dev/nvmeN alone; the binary path and `run` in the image; the
+  # nvmeN numbering is stable across reboots (#310 saw drives renumber after a bus drop).
+  scrutinycollector:
+    image: ghcr.io/analogj/scrutiny:latest-collector
+    container_name: kr-ccp-scrutinycollector-0101
+    profiles: [cron]
+    restart: "no"
+    userns_mode: host                  # R4 / E5: SYS_ADMIN must count for the host's NVMe devices
+    entrypoint: ["/opt/scrutiny/bin/scrutiny-collector-metrics", "run", "--api-endpoint", "${SCRUTINY_API}"]
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [SYS_RAWIO, SYS_ADMIN]    # SYS_ADMIN: NVMe only (Scrutiny README)
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m
+    pids_limit: 50
+    mem_limit: 128m
+    devices:
+      - /dev/nvme0:/dev/nvme0
+      - /dev/nvme1:/dev/nvme1
+      - /dev/nvme2:/dev/nvme2
+      - /dev/nvme3:/dev/nvme3
+    volumes:
+      - /run/udev:/run/udev:ro         # device metadata (Scrutiny README)
+    networks: [proxy-scrutinycollector]
+
 networks:
   proxy-kopia:
     name: proxy-kopia
     driver: bridge
   proxy-rustfs:
     name: proxy-rustfs
+    driver: bridge
+  proxy-scrutinycollector:           # egress only: pushes to svc:scrutiny over the host's tailscaled
+    name: proxy-scrutinycollector
     driver: bridge
   storage-lan:
     name: storage-lan

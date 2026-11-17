@@ -60,6 +60,7 @@ Names reserved by the homenas stacks proposal ([`homenas/README.md`](homenas/REA
 | `kr-ccp-kopia-0101` | homenas (MOS), storage stack | [`homenas/storage/compose.yaml`](homenas/storage/compose.yaml) |
 | `kr-ccp-timemachine-0101` | homenas (MOS), storage stack | [`homenas/storage/compose.yaml`](homenas/storage/compose.yaml) |
 | `kr-ccp-rustfs-0101` | homenas (MOS), storage stack | [`homenas/storage/compose.yaml`](homenas/storage/compose.yaml) |
+| `kr-ccp-scrutinycollector-0101` | homenas (MOS), storage stack (run from MOS cron) | [`homenas/storage/compose.yaml`](homenas/storage/compose.yaml) |
 | `kr-ccp-socketproxy-0301` | homenas (MOS), infra stack | moves from the MOS template deploy (same name, row above) |
 | `kr-ccp-beszelagent-0201` | homenas (MOS), infra stack | moves from the MOS template deploy (same name, row above) |
 
