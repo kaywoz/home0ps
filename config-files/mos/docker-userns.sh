@@ -29,7 +29,7 @@
 #   * a daemon.json it didn't write -> abort + alert (MOS may have started managing it)
 #   * /etc/init.d/docker no longer matching the recorded checksum -> alert (still acts)
 #
-# Install (host): /boot is noexec, hence bash.
+# Install (host): bootstrap-docker-userns.sh does all of this; by hand: /boot is noexec, hence bash.
 #   /boot/config/home0ps/docker-userns.sh       this file, 600
 #   /boot/config/home0ps/docker-userns.env      settings, 600 (docker-userns.env.example)
 #   /boot/optional/scripts/pre-start.sh         pre-start.sh here, 600
