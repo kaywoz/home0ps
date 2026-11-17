@@ -37,7 +37,7 @@ services:
       TS_SOCKET: /tmp/tailscaled.sock      # set explicitly: docs and source disagree on the default
       TS_AUTHKEY: file:/run/secrets/ts_authkey_media   # tagged, single-use, pre-approved key (tag:media)
       TS_EXTRA_ARGS: --advertise-tags=tag:media
-      TS_SERVE_CONFIG: /config/serve.json  # svc:jellyfin -> http://<JELLYFIN_IP>:8096, svc:komga -> http://kr-ccp-komga-0201:25600
+      TS_SERVE_CONFIG: /config/serve.json  # svc:jellyfin -> http://kr-ccp-jellyfin-0201:8096, svc:komga -> http://kr-ccp-komga-0201:25600
       TS_ENABLE_HEALTH_CHECK: "true"
       TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
     secrets:
@@ -46,7 +46,8 @@ services:
       - ${APPDATA}/tailscale-media/state:/var/lib/tailscale
       - ${APPDATA}/tailscale-media/serve.json:/config/serve.json:ro
     networks:                              # media zone only
-      - media-vlan13
+      - media-vlan13                       # egress only, until README G8 decides (it is not a VLAN 13 member)
+      - proxy-jellyfin
       - proxy-komga
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9002/healthz"]
@@ -225,6 +226,10 @@ networks:
           gateway: ${VLAN31_GATEWAY}
           ip_range: ${VLAN31_RANGE}
   # Media zone: served apps (joined by the media stack as external).
+  proxy-jellyfin:
+    name: proxy-jellyfin
+    driver: bridge
+    internal: true
   proxy-komga:
     name: proxy-komga
     driver: bridge

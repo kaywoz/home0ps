@@ -2,10 +2,12 @@
 # Design, open questions and migration: docker-compose/storage/README.md. Nothing here runs until kaywoz OKs it.
 #
 # Zone: VLAN 13 (IoT). Docker runs directly on MOS (no LXC), one stack per zone (#314 scenario).
-# - media-vlan13: macvlan on the VLAN 13 sub-interface, no host IP on it. Gives Jellyfin and Homey their
-#   own VLAN 13 address (Apple TV, discovery, Homey bridges) and the zone's egress. The MOS host can't reach
+# - media-vlan13: macvlan on the VLAN 13 sub-interface, no host IP on it. Jellyfin and Homey are IoT members
+#   of VLAN 13 with fixed addresses (kaywoz, 2026-11-17: Apple TV, discovery, Homey bridges); nothing else in
+#   this stack is on VLAN 13. The MOS host can't reach
 #   macvlan containers, and they can't reach it — wanted here.
-# - proxy-komga: internal bridge, Komga + the media sidecar only. No egress, no published ports.
+# - proxy-jellyfin, proxy-komga: internal bridges, app + the media sidecar only. No egress, no published ports.
+#   Jellyfin is on proxy-jellyfin too, so the sidecar reaches it without a VLAN 13 address of its own.
 # - No `ports:` anywhere: Tailscale Services are served by the media zone's Tailscale sidecar (tag:media),
 #   because host-side `tailscale serve` to 127.0.0.1 can't reach macvlan containers. The sidecar and both
 #   networks are defined in the infra stack (shared services, kaywoz 2026-11-17); this stack joins them.
@@ -36,6 +38,7 @@ services:
     networks:
       media-vlan13:
         ipv4_address: ${JELLYFIN_IP}          # fixed: Apple TV and other VLAN 13 clients
+      proxy-jellyfin: {}                      # internal: the media sidecar serves svc:jellyfin through it
     volumes:
       - ${APPDATA}/jellyfin/config:/config
       - ${APPDATA}/jellyfin/cache:/cache
@@ -96,6 +99,8 @@ services:
 
 networks:                                     # owned by the infra stack (start it first)
   media-vlan13:
+    external: true
+  proxy-jellyfin:
     external: true
   proxy-komga:
     external: true

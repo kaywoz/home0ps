@@ -37,7 +37,10 @@ The candidates came from the 2026-11-13 discussion: a long list from kaywoz's Gi
 
 ### Container standard (CLAUDE.md §8) and MOS specifics
 - **Applied everywhere** unless a service's table says otherwise: non-root `user:`, `read_only` + `tmpfs`, `cap_drop: [ALL]`, `no-new-privileges`, `mem_limit`, `pids_limit`, healthcheck where the image has or allows one, secrets as files (600, owned by the service uid), images on `:latest` (two exceptions under apps).
-- **No userns-remap — settled** (#310 §7c). Remap works at runtime through `/etc/docker/daemon.json` (dockremap range 165536:65536, since 100000 is taken by root's LXC range), but **doesn't persist**: `/etc` is RAM, MOS has no option for it, and its init script reads only `filesystem` and `directory` from `/boot/config/docker.json`. So `user:` uids are real host uids, and a container running as root is root on the storage host if it escapes. **Distinct uids per service**, so one compromised app can't read another's data (follow-up: a MOS feature request for daemon options in `docker.json`):
+- **No userns-remap — settled** (#310 §7c). Remap works at runtime through `/etc/docker/daemon.json` (dockremap range 165536:65536, since 100000 is taken by root's LXC range), but **doesn't persist**: `/etc` is RAM, MOS has no option for it, and its init script reads only `filesystem` and `directory` from `/boot/config/docker.json`. So `user:` uids are real host uids, and a container running as root is root on the storage host if it escapes. **Distinct uids per service**, so one compromised app can't read another's data. Follow-up: a MOS feature request for daemon options in `docker.json`.
+  - **Possible workaround (an option, untested; not the plan unless kaywoz says so):** turn off Docker's autostart in MOS and have a boot job write `/etc/docker/daemon.json` with `userns-remap`, then start Docker. The socket proxy, the Beszel agent and Time Machine would then need `userns_mode: host` (they need real host access: `docker.sock`, host metrics, share ownership), existing appdata would be re-owned into the 165536 range, and the MOS UI's container list drifts from what Docker sees (#310 §7c). The boot job would run from the MOS UI's cron/boot facility; whether MOS offers a hook before Docker starts is untested.
+
+Service uids:
 
 | Range | Stack | uids |
 |---|---|---|
@@ -110,7 +113,7 @@ kaywoz, 2026-11-17: the infra stack holds the services that serve other services
 
 | App | Container | Zone / network | Serves |
 |---|---|---|---|
-| Tailscale sidecar, media | `kr-ccp-tailscale-0101` | `media-vlan13` + `proxy-komga` | `svc:jellyfin`, `svc:komga` (tag:media) |
+| Tailscale sidecar, media | `kr-ccp-tailscale-0101` | `proxy-jellyfin` + `proxy-komga`; `media-vlan13` for egress only until G8 | `svc:jellyfin`, `svc:komga` (tag:media) |
 | Tailscale sidecar, apps | `kr-ccp-tailscale-0201` | `apps-vlan31` + the apps' `proxy-<app>` networks | the apps stack's Services and the mover's `tcp:8089` (tag:docker) |
 | cloudflared | `kr-ccp-cloudflared-0101` | `infra-vlan24` | the Cloudflare Tunnel for user-facing apps, §8's second access plane; outbound only |
 | socket proxy | `kr-ccp-socketproxy-0301` | plain bridge, `127.0.0.1:2375` | read-only Docker API for Dozzle and the Beszel agent; moves from its MOS-template deploy |
@@ -376,14 +379,15 @@ Named exceptions to the container standard (CLAUDE.md §8). They go into the sec
   - If it's still tight, the next cuts are ArchiveBox and the Warrior (start them only when needed), then Filestash, which duplicates CannonCommander.
   - MOS's root filesystem is RAM. With 8 GB, anything writing to `/` (logs, a misplaced cache: MISTAKES.md 2026-11-10) eats into the same memory.
   - Check `nproc` and `free -g` on the box before going live.
-- **G8 — macvlan only where a LAN presence is needed?** (kaywoz's idea, 2026-11-17; not applied.)
-  - **The idea:** only Jellyfin and Homey keep a macvlan (VLAN 13: Apple TV, discovery, Homey's bridges). Everything else sits on internal bridges behind Tailscale. Fewer open ports on VLANs, fewer addresses to manage.
-  - **The catch is egress:** the sidecars, cloudflared, mediasort and the two archivers need the internet, and internal bridges have none. A plain bridge would give it through the storage host's own network and let them reach the MOS host (S-Q1).
-  - **Recommendation (from the review session):** one **shared egress macvlan on VLAN 24** for everything that needs the internet, with a fixed address each and per-address UniFi rules allowing the internet only; **no VLAN 31 macvlan**. The apps sidecar keeps `tag:docker` (the tag isn't tied to the VLAN).
-  - **Two things to weigh before saying yes:**
-    - Containers on the same macvlan reach each other directly: macvlan bridge mode switches between them inside the host, so UniFi never sees that traffic and can't filter it. On one shared egress network, a compromised archiver could reach both sidecars and cloudflared on every port. Keeping the archivers on a second egress network, or on their own VLAN, avoids that.
-    - VLAN 24 is the tier 0 infra VLAN. Web crawlers fetching arbitrary pages would then share it with the infra devices, behind the same per-address rules.
-  - **Not carried over:** the review suggests the archivers could go to the lab as "risky workloads". kaywoz ruled on 2026-11-16 that "risky" in §8 means security tooling (malware, analysis, forensics), not the archivers (MISTAKES.md), so this draft keeps them at home.
+- **G8 — internet access for everything that isn't a VLAN 13 member** (open).
+  - **Decided (kaywoz, 2026-11-17):** "i want jellyfin and homey to act as iot and belong to vlan13". Jellyfin and Homey are IoT members of VLAN 13 with fixed macvlan addresses. Komga and everything else are **not** on VLAN 13. Applied in the draft: the media sidecar now reaches Jellyfin over an internal bridge (`proxy-jellyfin`), so it needs no VLAN 13 membership; its VLAN 13 attachment is kept for egress only until this question is decided.
+  - **Open:** internet access for the rest: both sidecars, cloudflared, mediasort, the two archivers, and Immich ML's first model download. Internal bridges have none, and a plain bridge would give it through the storage host's own network, where the container can reach the MOS host (S-Q1).
+  - **Proposal (from the review session):** one **egress macvlan on VLAN 24** for all of them, a fixed address each, and per-address UniFi rules allowing the internet only; **no VLAN 31 macvlan**. The archivers go to the lab or onto VLAN 24. Tags stay as they are (`tag:docker` isn't tied to a VLAN).
+  - **To weigh before deciding:**
+    - Containers on the same macvlan reach each other directly: macvlan bridge mode switches between them inside the host, so UniFi never sees that traffic and can't filter it. On one shared egress network, a compromised archiver could reach both sidecars and cloudflared on every port. A second egress network (or VLAN) for the archivers avoids that.
+    - VLAN 24 is the tier 0 infra VLAN, so web crawlers would share it with the infra devices, behind the same per-address rules.
+    - The lab option conflicts with kaywoz's 2026-11-16 ruling that §8's "risky workloads" means security tooling (malware, analysis, forensics), not the archivers (MISTAKES.md). It's listed because the review proposed it; this draft keeps the archivers at home until kaywoz says otherwise.
+    - Immich ML needs the internet only for the first model download; it could get egress for that run and none afterwards.
 
 ## Before the build
 
