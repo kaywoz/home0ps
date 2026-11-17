@@ -846,3 +846,11 @@ mistakes, not a diary.
 - **Root cause:** tested a shortcut path instead of the path the OS uses at boot, and didn't read `mos-start` before concluding.
 - **Fix applied:** read `mos-start`, confirmed with a harmless flag through the UI, corrected the bug report and #310.
 - **Rule going forward:** test a setting through the same path the platform uses (boot script or UI), and read that path's code before saying a setting has no effect.
+
+### 2026-11-17 — mos (remap user restored without its group)
+
+- **Trigger:** apply broke something (Docker didn't start after a reboot)
+- **What happened:** after a Samba-only user was created in the MOS UI, MOS saved its user list, `dockremap` included, to `/boot/config/system/passwd`, but not the group. At the next boot the user came back without its group; `docker-userns.sh` only created the user when it was missing, so it skipped, and `dockerd` refused to start.
+- **Root cause:** the hook treated user and group as one unit and assumed nothing else in MOS touches `/etc/passwd`.
+- **Fix applied:** `groupadd` by hand on the host; the hook now checks user and group separately and `--check` reports a missing group (#341).
+- **Rule going forward:** a hook that recreates RAM `/etc` state checks every piece it depends on (user, group, subuid, subgid, config) on its own, and after any change in the MOS UI that touches users, reboot-test before relying on it.
