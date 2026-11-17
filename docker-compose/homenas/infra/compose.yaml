@@ -1,115 +1,15 @@
 # PROPOSAL — not deployed. Infra stack on the replacement homenas (MOS), replacing the infra VM.
 # Design, open questions and migration: docker-compose/homenas/README.md. Nothing here runs until kaywoz OKs it.
 #
-# The shared services that serve other services (kaywoz, 2026-11-17): the per-zone Tailscale sidecars,
-# cloudflared, the read-only socket proxy and the Beszel agent. Each container still sits in the zone it
-# serves: the stack is where it's defined, not a network. No container joins two zones' app networks (README
-# I-Q4); the media sidecar's internet access is on VLAN 31 (a noted trade-off in the README).
-#
-# This stack owns the networks the sidecars share with the apps: the zone macvlans and the apps' internal
-# proxy-<app> bridges. The media and apps stacks join them as `external: true`, so this stack starts first.
-# - apps-vlan31: macvlan on the VLAN 31 sub-interface: internet access for every Docker container that needs it
-#   (both sidecars, cloudflared, mediasort, the archivers, Immich ML's model download). kaywoz, 2026-11-17:
-#   "services needing internet use vlan31 for docker. vlan24 is for servers needing internet". VLAN 24 isn't
-#   used by Docker.
-# - media-vlan13: macvlan on the VLAN 13 sub-interface, for its two IoT members only (Jellyfin, Homey).
-#   No host IP on any of them: the MOS host can't reach macvlan containers, and they can't reach it.
-# - proxy-<app>: internal bridges, one per served app (app + its zone's sidecar). No egress, no ports.
-# - socketproxy: a plain bridge, the proxy's port on 127.0.0.1 for the host's `tailscale serve` (tag:storage).
-# Docker runs with userns-remap, daemon-wide (kaywoz, 2026-11-17; #310 §7c, set up by #325): container uid N
-# is host uid 165536+N, so appdata and secret files are owned 165536+<the uid in `user:`> ("owned 165536+N"
-# below). Distinct non-root uids per service on top of it. Exemptions (`userns_mode: host`) are listed in the
-# README with a reason. The stack needs MOS autostart on: `restart:` alone doesn't bring it back.
+# The services that serve other services: cloudflared, the read-only socket proxy and the Beszel agent.
+# Baseline (kaywoz, 2026-11-17): Docker as MOS ships it (no userns-remap), each stack owns its networks,
+# admin UIs are served by the host's own tailscaled (`tailscale serve`, tag:storage) to 127.0.0.1 ports.
+# No Tailscale sidecars. Appdata and secret files are owned by the uid in `user:`. The stack needs MOS
+# autostart on: `restart:` alone doesn't bring it back.
 services:
-  # Media zone sidecar: a node of its own (tag:media, as the media LXC is today) that serves svc:jellyfin
-  # and svc:komga. Userspace networking: no TUN device, no NET_ADMIN. Auth key and serve config as files.
-  # Docs: tailscale.com/kb/1282/docker, /kb/1552/services.
-  tailscale-media:
-    image: tailscale/tailscale:latest
-    container_name: kr-ccp-tailscale-0101
-    hostname: ${TS_HOSTNAME_MEDIA}           # MagicDNS name of this node (host-local .env)
-    restart: unless-stopped
-    user: "2210:2210"
-    read_only: true
-    cap_drop: [ALL]
-    security_opt:
-      - no-new-privileges:true
-    tmpfs:
-      - /tmp:size=16m
-    pids_limit: 100
-    mem_limit: 128m
-    environment:
-      TS_USERSPACE: "true"
-      TS_STATE_DIR: /var/lib/tailscale
-      TS_SOCKET: /tmp/tailscaled.sock      # set explicitly: docs and source disagree on the default
-      TS_AUTHKEY: file:/run/secrets/ts_authkey_media   # tagged, single-use, pre-approved key (tag:media)
-      TS_EXTRA_ARGS: --advertise-tags=tag:media
-      TS_SERVE_CONFIG: /config/serve.json  # svc:jellyfin -> http://kr-ccp-jellyfin-0201:8096, svc:komga -> http://kr-ccp-komga-0201:25600
-      TS_ENABLE_HEALTH_CHECK: "true"
-      TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
-    secrets:
-      - ts_authkey_media
-    volumes:
-      - ${APPDATA}/tailscale-media/state:/var/lib/tailscale
-      - ${APPDATA}/tailscale-media/serve.json:/config/serve.json:ro
-    networks:                              # media zone only
-      - apps-vlan31                        # internet access (Docker egress is on VLAN 31; not a VLAN 13 member)
-      - proxy-jellyfin
-      - proxy-komga
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9002/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
-  # Apps zone sidecar: tag:docker, as the apps VM is today. Serves the apps stack's Services and the
-  # mover's tcp:8089. Targets by container name (Docker's DNS works across stacks on a shared network).
-  tailscale-apps:
-    image: tailscale/tailscale:latest
-    container_name: kr-ccp-tailscale-0201
-    hostname: ${TS_HOSTNAME_APPS}
-    restart: unless-stopped
-    user: "2211:2211"
-    read_only: true
-    cap_drop: [ALL]
-    security_opt:
-      - no-new-privileges:true
-    tmpfs:
-      - /tmp:size=16m
-    pids_limit: 100
-    mem_limit: 128m
-    environment:
-      TS_USERSPACE: "true"
-      TS_STATE_DIR: /var/lib/tailscale
-      TS_SOCKET: /tmp/tailscaled.sock
-      TS_AUTHKEY: file:/run/secrets/ts_authkey_apps    # tag:docker
-      TS_EXTRA_ARGS: --advertise-tags=tag:docker
-      TS_SERVE_CONFIG: /config/serve.json  # svc:paperless, cannoncommander, immich, archivebox, archivewarrior, atuin, hedgedoc, filestash, rackpeek; tcp:8089 -> mediasort (the mover)
-      TS_ENABLE_HEALTH_CHECK: "true"
-      TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
-    secrets:
-      - ts_authkey_apps
-    volumes:
-      - ${APPDATA}/tailscale-apps/state:/var/lib/tailscale
-      - ${APPDATA}/tailscale-apps/serve.json:/config/serve.json:ro
-    networks:                              # apps zone only
-      - apps-vlan31
-      - proxy-paperless
-      - proxy-cannoncommander
-      - proxy-immich
-      - proxy-atuin
-      - proxy-hedgedoc
-      - proxy-filestash
-      - proxy-rackpeek
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9002/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
   # cloudflared: the Cloudflare Tunnel for user-facing apps (second access plane, CLAUDE.md §8). Outbound
-  # only. Token as a file. Ingress rules are kept in Cloudflare (remotely managed tunnel). It reaches public
-  # apps-zone apps via their proxy-<app> networks (README I-Q2); no app is public yet (I-Q3), so it joins none.
+  # only. Token as a file. Ingress rules are kept in Cloudflare (remotely managed tunnel). A public app is
+  # reached by cloudflared joining that app's proxy-<app> network (README I-Q2); no app is public yet (I-Q3).
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: kr-ccp-cloudflared-0101
@@ -121,8 +21,7 @@ services:
       - no-new-privileges:true
     pids_limit: 100
     mem_limit: 128m
-    # Metrics pinned to loopback: container builds otherwise bind 0.0.0.0:20241, which on macvlan
-    # would be open to VLAN 31.
+    # Metrics pinned to loopback: container builds otherwise bind 0.0.0.0:20241.
     command: ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:20241", "run"]
     environment:
       TUNNEL_TOKEN_FILE: /run/secrets/cf_tunnel_token   # cloudflared >= 2025.4.0; never TUNNEL_TOKEN
@@ -134,7 +33,7 @@ services:
       timeout: 5s
       retries: 3
     networks:
-      - apps-vlan31                    # internet access; reaching apps: README I-Q2
+      - cloudflared                    # plain bridge: egress only, no ports
 
   # Read-only Docker API for Dozzle (monitoring host) and the Beszel agent. One Docker daemon serves all
   # stacks, so one proxy sees every container. Never host networking: the proxy would listen on every
@@ -144,7 +43,6 @@ services:
     image: tecnativa/docker-socket-proxy:latest
     container_name: kr-ccp-socketproxy-0301
     restart: unless-stopped
-    userns_mode: host                  # remap exemption R1: remapped root (host 165536) can't open docker.sock
     read_only: true
     tmpfs:
       - /run
@@ -178,8 +76,6 @@ services:
     container_name: kr-ccp-beszelagent-0201
     restart: unless-stopped
     network_mode: host
-    userns_mode: host                  # remap exemption R2: Docker can't share the host network namespace
-                                       # with a remapped container (docs.docker.com/engine/security/userns-remap)
     user: "65534:65534"
     read_only: true
     cap_drop: [ALL]
@@ -197,7 +93,7 @@ services:
       - beszel_key
       - beszel_token
     volumes:
-      - ${APPDATA}/beszel/agent:/var/lib/beszel-agent   # owned 65534 (not remapped)
+      - ${APPDATA}/beszel/agent:/var/lib/beszel-agent   # owned 65534
     healthcheck:                       # upstream's suggestion: fails if the health file is older than 91 s
       test: ["CMD", "/agent", "health"]
       interval: 60s
@@ -205,76 +101,15 @@ services:
       retries: 3
 
 networks:
-  media-vlan13:
-    name: media-vlan13
-    driver: macvlan
-    driver_opts:
-      parent: ${VLAN13_PARENT}         # e.g. <nic>.13, no IP on the host side
-    ipam:
-      config:
-        - subnet: ${VLAN13_SUBNET}
-          gateway: ${VLAN13_GATEWAY}
-          ip_range: ${VLAN13_RANGE}    # a small block outside the gateway's DHCP pool
-  apps-vlan31:
-    name: apps-vlan31
-    driver: macvlan
-    driver_opts:
-      parent: ${VLAN31_PARENT}
-    ipam:
-      config:
-        - subnet: ${VLAN31_SUBNET}
-          gateway: ${VLAN31_GATEWAY}
-          ip_range: ${VLAN31_RANGE}
-  # Media zone: served apps (joined by the media stack as external).
-  proxy-jellyfin:
-    name: proxy-jellyfin
-    driver: bridge
-    internal: true
-  proxy-komga:
-    name: proxy-komga
-    driver: bridge
-    internal: true
-  # Apps zone: served apps (joined by the apps stack as external). Databases stay on the apps stack's own
-  # <app>-backend networks, which the sidecar never joins.
-  proxy-paperless:
-    name: proxy-paperless
-    driver: bridge
-    internal: true
-  proxy-cannoncommander:
-    name: proxy-cannoncommander
-    driver: bridge
-    internal: true
-  proxy-immich:
-    name: proxy-immich
-    driver: bridge
-    internal: true
-  proxy-atuin:
-    name: proxy-atuin
-    driver: bridge
-    internal: true
-  proxy-hedgedoc:
-    name: proxy-hedgedoc
-    driver: bridge
-    internal: true
-  proxy-filestash:
-    name: proxy-filestash
-    driver: bridge
-    internal: true
-  proxy-rackpeek:
-    name: proxy-rackpeek
-    driver: bridge
-    internal: true
+  cloudflared:
+    name: cloudflared
   socketproxy:
     name: socketproxy
 
 secrets:
-  ts_authkey_media:
-    file: ${APPDATA}/tailscale-media/authkey   # 600, owned 165536+2210; delete after the node has joined
-  ts_authkey_apps:
-    file: ${APPDATA}/tailscale-apps/authkey    # 600, owned 165536+2211; delete after the node has joined
   cf_tunnel_token:
-    file: ${APPDATA}/cloudflared/token         # from the Cloudflare dashboard; 600, owned 165536+2201
+    file: ${APPDATA}/cloudflared/token         # from the Cloudflare dashboard; 600, owned 2201
   beszel_key:
-    file: ${APPDATA}/beszel/secrets/key          # from the hub's "Add system"; 600, owned 65534 (not remapped)
+    file: ${APPDATA}/beszel/secrets/key          # from the hub's "Add system"; 600, owned 65534
   beszel_token:
-    file: ${APPDATA}/beszel/secrets/token        # 600, owned 65534 (not remapped)
+    file: ${APPDATA}/beszel/secrets/token        # 600, owned 65534

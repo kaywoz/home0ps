@@ -2,18 +2,15 @@
 # services. Design, open questions and migration: docker-compose/homenas/README.md. Nothing here runs until
 # kaywoz OKs it.
 #
-# Zone: the homenas's own network (no zone VLAN). Unlike the other three stacks, these are served by the
-# host's own tailscaled (tag:storage, which already has svc:kopia and svc:rustfs), so they use
-# today's pattern: one bridge per app, ports on 127.0.0.1, `tailscale serve` on the host.
+# Same pattern as the other stacks: one bridge per app, ports on 127.0.0.1, `tailscale serve` on the host
+# (tag:storage, which already has svc:kopia and svc:rustfs).
 # - proxy-kopia, proxy-rustfs: plain bridges (not internal, because internal networks can't publish ports).
 #   They need no egress. A container on a plain bridge can reach the MOS host through the bridge gateway:
 #   accepted, every host listener needs a login or is tailnet-only (README S-Q1).
 # - Time Machine: macvlan on VLAN 11 (trusted clients) with a fixed address, so Macs reach SMB without
 #   clashing with MOS's own Samba on 445 (README S-Q2).
-# Docker runs with userns-remap, daemon-wide (kaywoz, 2026-11-17; #310 §7c, set up by #325): container uid N
-# is host uid 165536+N, so appdata and secret files are owned 165536+<the uid in `user:`> ("owned 165536+N"
-# below). Distinct non-root uids per service on top of it. Exemptions (`userns_mode: host`) are listed in the
-# README with a reason. The stack needs MOS autostart on: `restart:` alone doesn't bring it back.
+# Docker as MOS ships it (no userns-remap, kaywoz 2026-11-17): appdata and secret files are owned by the uid
+# in `user:`. The stack needs MOS autostart on: `restart:` alone doesn't bring it back.
 #
 # The box's socket proxy and Beszel agent are in the infra stack (shared services, kaywoz 2026-11-17).
 # Scrutiny: collector only (kaywoz, 2026-11-17, replaces the native collector in #103). Not started by `up`
@@ -63,8 +60,9 @@ services:
       timeout: 5s
       retries: 3
 
-  # Time Machine for the Macs. The one service here that needs root: its entrypoint creates the SMB user,
-  # writes smb.conf and the avahi service, then runs smbd/nmbd/avahi under s6. Not read_only.
+  # Time Machine for the Macs (S-Q2). Root with six capabilities (exception E4): its entrypoint creates the
+  # SMB user, writes smb.conf and the avahi service, then runs smbd/nmbd/avahi under s6. Not read_only. On the
+  # VLAN 11 macvlan only, so it can't reach the host's own addresses.
   timemachine:
     image: mbentley/timemachine:smb
     container_name: kr-ccp-timemachine-0101
@@ -149,8 +147,7 @@ services:
       retries: 3
 
   # Scrutiny SMART collector (spoke; hub on the monitoring host, #103). Exception E5 (README): NVMe SMART needs
-  # SYS_RAWIO + SYS_ADMIN and the controller devices, and SYS_ADMIN in a remapped namespace doesn't count for host
-  # devices, so it runs as host root (userns_mode: host, R4). Narrowed as far as the docs allow:
+  # SYS_RAWIO + SYS_ADMIN and the controller devices, so it runs as root. Narrowed as far as the docs allow:
   # - controller char devices only (/dev/nvmeN), never the namespaces (/dev/nvmeNn1): no direct read/write of
   #   disk data. Residual: NVMe admin commands (format, sanitize, firmware) through the controller, the same
   #   power the native collector would have had as host root.
@@ -166,7 +163,6 @@ services:
     container_name: kr-ccp-scrutinycollector-0101
     profiles: [cron]
     restart: "no"
-    userns_mode: host                  # R4 / E5: SYS_ADMIN must count for the host's NVMe devices
     entrypoint: ["/opt/scrutiny/bin/scrutiny-collector-metrics", "run", "--api-endpoint", "${SCRUTINY_API}"]
     read_only: true
     cap_drop: [ALL]
@@ -209,8 +205,8 @@ networks:
 
 secrets:
   timemachine_password:
-    file: ${APPDATA}/timemachine/password     # 600, owned 165536 (container root; the entrypoint reads it as root)
+    file: ${APPDATA}/timemachine/password     # 600, root (the entrypoint reads it as root)
   rustfs_access_key:
-    file: ${APPDATA}/rustfs/secrets/access_key   # 600, owned 165536+2302
+    file: ${APPDATA}/rustfs/secrets/access_key   # 600, owned 2302
   rustfs_secret_key:
-    file: ${APPDATA}/rustfs/secrets/secret_key   # 600, owned 165536+2302
+    file: ${APPDATA}/rustfs/secrets/secret_key   # 600, owned 2302
