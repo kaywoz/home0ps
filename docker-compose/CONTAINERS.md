@@ -60,7 +60,6 @@ Names reserved by the storage-host stacks proposal ([`storage/README.md`](storag
 | `kr-ccp-kopia-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
 | `kr-ccp-timemachine-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
 | `kr-ccp-rustfs-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
-| `kr-ccp-scrutiny-0101` | storage host (MOS), storage stack | [`storage/storage/compose.yaml`](storage/storage/compose.yaml) |
 | `kr-ccp-socketproxy-0301` | storage host (MOS), infra stack | moves from the MOS template deploy (same name, row above) |
 | `kr-ccp-beszelagent-0201` | storage host (MOS), infra stack | moves from the MOS template deploy (same name, row above) |
 

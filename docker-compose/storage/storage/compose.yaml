@@ -3,16 +3,17 @@
 # kaywoz OKs it.
 #
 # Zone: the storage host's own network (no zone VLAN). Unlike the other three stacks, these are served by the
-# host's own tailscaled (tag:storage, which already has svc:kopia, svc:rustfs and svc:scrutiny), so they use
+# host's own tailscaled (tag:storage, which already has svc:kopia and svc:rustfs), so they use
 # today's pattern: one bridge per app, ports on 127.0.0.1, `tailscale serve` on the host.
-# - proxy-scrutiny, proxy-kopia, proxy-rustfs: plain bridges (not internal, because internal networks can't publish ports).
+# - proxy-kopia, proxy-rustfs: plain bridges (not internal, because internal networks can't publish ports).
 #   They need no egress. A container on a plain bridge can reach the MOS host through the bridge gateway, so
 #   the host firewall (#219) and the rclone rc fix (#316) come first (README S-Q1).
 # - Time Machine: macvlan on the host's own interface with a fixed address, so Macs reach SMB without
 #   clashing with MOS's own Samba on 445 (README S-Q2).
-# No userns-remap assumed on MOS (#310 §7c open): `user:` uids are host uids.
+# No userns-remap (#310 §7c: works at runtime but doesn't persist on MOS; settled): `user:` uids are host uids.
 #
 # The box's socket proxy and Beszel agent are in the infra stack (shared services, kaywoz 2026-11-17).
+# No Scrutiny container: the SMART collector runs natively from a MOS UI cron job and pushes to the hub (#103).
 services:
   # Kopia repository server: backups from the other machines (#43). Repository on the pool. TLS with its own
   # certificate (the repository server's gRPC needs TLS); served as svc:kopia with https+insecure.
@@ -142,48 +143,7 @@ services:
       timeout: 5s
       retries: 3
 
-  # Scrutiny (omnibus, as the MOS template): SMART health of the box's four NVMe drives (#103), served as
-  # svc:scrutiny. Runs as root with SYS_RAWIO + SYS_ADMIN (upstream's requirement for NVMe); its own docs warn
-  # that SYS_ADMIN allows host compromise (README S-Q4). The web UI and API have no authentication.
-  scrutiny:
-    image: ghcr.io/analogj/scrutiny:latest-omnibus
-    container_name: kr-ccp-scrutiny-0101
-    restart: unless-stopped
-    # Not read_only, not non-root: s6-overlay runs influxd, the web app and cron as root and writes /etc.
-    cap_drop: [ALL]
-    cap_add:
-      - SYS_RAWIO                      # SMART passthrough
-      - SYS_ADMIN                      # NVMe admin commands
-      - CHOWN                          # s6 init (to confirm at build)
-      - SETUID
-      - SETGID
-    security_opt:
-      - no-new-privileges:true
-    devices:
-      - /dev/nvme0:/dev/nvme0
-      - /dev/nvme1:/dev/nvme1
-      - /dev/nvme2:/dev/nvme2
-      - /dev/nvme3:/dev/nvme3
-    pids_limit: 200
-    mem_limit: 512m
-    ports:
-      - "127.0.0.1:8080:8080"          # svc:scrutiny via tailscale serve; InfluxDB (8086) stays unpublished
-    volumes:
-      - /run/udev:/run/udev:ro
-      - ${APPDATA}/scrutiny/config:/opt/scrutiny/config
-      - ${APPDATA}/scrutiny/influxdb:/opt/scrutiny/influxdb
-    networks:
-      - proxy-scrutiny
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
-      interval: 60s
-      timeout: 5s
-      retries: 3
-
 networks:
-  proxy-scrutiny:
-    name: proxy-scrutiny
-    driver: bridge
   proxy-kopia:
     name: proxy-kopia
     driver: bridge

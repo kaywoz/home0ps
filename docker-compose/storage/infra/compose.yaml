@@ -12,7 +12,7 @@
 #   No host IP on any of them: the MOS host can't reach macvlan containers, and they can't reach it.
 # - proxy-<app>: internal bridges, one per served app (app + its zone's sidecar). No egress, no ports.
 # - socketproxy: a plain bridge, the proxy's port on 127.0.0.1 for the host's `tailscale serve` (tag:storage).
-# No userns-remap assumed on MOS (#310 §7c open): `user:` uids are host uids.
+# No userns-remap (#310 §7c: works at runtime but doesn't persist on MOS; settled): `user:` uids are host uids.
 services:
   # Media zone sidecar: a node of its own (tag:media, as the media LXC is today) that serves svc:jellyfin
   # and svc:komga. Userspace networking: no TUN device, no NET_ADMIN. Auth key and serve config as files.

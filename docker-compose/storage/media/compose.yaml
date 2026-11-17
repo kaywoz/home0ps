@@ -9,7 +9,7 @@
 # - No `ports:` anywhere: Tailscale Services are served by the media zone's Tailscale sidecar (tag:media),
 #   because host-side `tailscale serve` to 127.0.0.1 can't reach macvlan containers. The sidecar and both
 #   networks are defined in the infra stack (shared services, kaywoz 2026-11-17); this stack joins them.
-# No userns-remap assumed (MOS today: uid_map 0 0 4294967295; #310 §7c open), so container uids are host
+# No userns-remap (#310 §7c: works at runtime but doesn't persist on MOS; settled), so container uids are host
 # uids: data folders are owned by the uid in `user:`. Service uids per the table in the README.
 # Data lives on the pool (${APPDATA}), never on MOS's RAM rootfs. Media comes read-only from the host's
 # rclone mount (config-files/mos/media-mount.sh, #197).

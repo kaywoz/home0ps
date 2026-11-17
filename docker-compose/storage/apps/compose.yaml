@@ -9,12 +9,14 @@
 # - No `ports:` anywhere: Tailscale Services (and the mover's tcp:8089) are served by the apps zone's
 #   Tailscale sidecar (tag:docker, as the apps VM is today). The sidecar, the macvlan and the proxy-<app>
 #   networks are defined in the infra stack (shared services, kaywoz 2026-11-17); this stack joins them.
-# No userns-remap assumed on MOS (#310 §7c open): `user:` uids are host uids, data folders owned by them.
+# No userns-remap (#310 §7c: works at runtime but doesn't persist on MOS; settled): `user:` uids are host uids,
+# data folders owned by them.
 services:
   # Media classifier (#260), moved from the apps VM unchanged. Egress to TMDB and the LLM provider, so it
   # sits on apps-vlan31. Its API (8089) is bearer-token protected and is now also reachable from VLAN 31.
   mediasort:
-    build: ../../apps/mediasort        # built on the host from the repo checkout (open question: prebuilt image)
+    build: ${MEDIASORT_SRC}            # absolute path to apps/mediasort in a checkout on the pool: the MOS UI runs
+                                       # the stack from its own folder, so a relative path wouldn't resolve (A-Q1)
     image: home0ps/mediasort:latest
     container_name: kr-ccp-mediasort-0201
     restart: unless-stopped
