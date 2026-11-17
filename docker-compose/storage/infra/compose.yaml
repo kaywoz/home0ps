@@ -3,12 +3,16 @@
 #
 # The shared services that serve other services (kaywoz, 2026-11-17): the per-zone Tailscale sidecars,
 # cloudflared, the read-only socket proxy and the Beszel agent. Each container still sits in the zone it
-# serves: the stack is where it's defined, not a network. Nothing here bridges two zones (README I-Q4).
+# serves: the stack is where it's defined, not a network. No container joins two zones' app networks (README
+# I-Q4); the media sidecar's internet access is on VLAN 31 (a noted trade-off in the README).
 #
 # This stack owns the networks the sidecars share with the apps: the zone macvlans and the apps' internal
 # proxy-<app> bridges. The media and apps stacks join them as `external: true`, so this stack starts first.
-# - infra-vlan24: macvlan on the VLAN 24 sub-interface: cloudflared's egress.
-# - media-vlan13, apps-vlan31: macvlans on those zones' sub-interfaces, for the zone sidecars and the zone apps.
+# - apps-vlan31: macvlan on the VLAN 31 sub-interface: internet access for every Docker container that needs it
+#   (both sidecars, cloudflared, mediasort, the archivers, Immich ML's model download). kaywoz, 2026-11-17:
+#   "services needing internet use vlan31 for docker. vlan24 is for servers needing internet". VLAN 24 isn't
+#   used by Docker.
+# - media-vlan13: macvlan on the VLAN 13 sub-interface, for its two IoT members only (Jellyfin, Homey).
 #   No host IP on any of them: the MOS host can't reach macvlan containers, and they can't reach it.
 # - proxy-<app>: internal bridges, one per served app (app + its zone's sidecar). No egress, no ports.
 # - socketproxy: a plain bridge, the proxy's port on 127.0.0.1 for the host's `tailscale serve` (tag:storage).
@@ -46,7 +50,7 @@ services:
       - ${APPDATA}/tailscale-media/state:/var/lib/tailscale
       - ${APPDATA}/tailscale-media/serve.json:/config/serve.json:ro
     networks:                              # media zone only
-      - media-vlan13                       # egress only, until README G8 decides (it is not a VLAN 13 member)
+      - apps-vlan31                        # internet access (Docker egress is on VLAN 31; not a VLAN 13 member)
       - proxy-jellyfin
       - proxy-komga
     healthcheck:
@@ -115,7 +119,7 @@ services:
     pids_limit: 100
     mem_limit: 128m
     # Metrics pinned to loopback: container builds otherwise bind 0.0.0.0:20241, which on macvlan
-    # would be open to VLAN 24.
+    # would be open to VLAN 31.
     command: ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:20241", "run"]
     environment:
       TUNNEL_TOKEN_FILE: /run/secrets/cf_tunnel_token   # cloudflared >= 2025.4.0; never TUNNEL_TOKEN
@@ -127,7 +131,7 @@ services:
       timeout: 5s
       retries: 3
     networks:
-      - infra-vlan24
+      - apps-vlan31                    # internet access; how it reaches apps: README I-Q2
 
   # Read-only Docker API for Dozzle (monitoring host) and the Beszel agent. One Docker daemon serves all
   # stacks, so one proxy sees every container. Never host networking: the proxy would listen on every
@@ -195,16 +199,6 @@ services:
       retries: 3
 
 networks:
-  infra-vlan24:
-    name: infra-vlan24
-    driver: macvlan
-    driver_opts:
-      parent: ${VLAN24_PARENT}
-    ipam:
-      config:
-        - subnet: ${VLAN24_SUBNET}
-          gateway: ${VLAN24_GATEWAY}
-          ip_range: ${VLAN24_RANGE}
   media-vlan13:
     name: media-vlan13
     driver: macvlan

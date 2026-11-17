@@ -209,6 +209,8 @@ services:
       - ${APPDATA}/immich/model-cache:/cache   # HF_HOME + JIT caches; bind mount (named volumes break non-root)
     networks:
       - immich-backend                 # internal: its API (3003) has no auth
+      - apps-vlan31                    # internet for the first model download only: 3003 is then open on
+                                       # VLAN 31 without auth, so drop this line once the models are cached (A-Q4)
     # healthcheck: built into the image (healthcheck.py)
 
   # Database: Immich's own Postgres + VectorChord image. It has no `latest` or moving tag; upstream ties the

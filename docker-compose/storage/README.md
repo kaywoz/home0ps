@@ -9,7 +9,7 @@ Four separate stacks for MOS on the replacement storage host (the 4-bay NVMe box
 | Stack | File | Apps | Replaces | Zone |
 |---|---|---|---|---|
 | **media** | [`media/compose.yaml`](media/compose.yaml) | Jellyfin, Komga, Homey | the media LXC | VLAN 13 (IoT) |
-| **infra** | [`infra/compose.yaml`](infra/compose.yaml) | the shared services: Tailscale sidecars (media and apps zones), cloudflared, the box's socket proxy and Beszel agent | the infra VM; the proxy and agent move from MOS-template deploys | each container in the zone it serves; cloudflared on VLAN 24 (infra, tier 0) |
+| **infra** | [`infra/compose.yaml`](infra/compose.yaml) | the shared services: Tailscale sidecars (media and apps zones), cloudflared, the box's socket proxy and Beszel agent | the infra VM; the proxy and agent move from MOS-template deploys | each container in the zone it serves; internet access through VLAN 31 |
 | **apps** | [`apps/compose.yaml`](apps/compose.yaml) | mediasort, paperless-ngx, CannonCommander, Immich, ArchiveBox, ArchiveTeam Warrior, Atuin, HedgeDoc, Filestash, RackPeek | the apps VM | VLAN 31 (apps) |
 | **storage** | [`storage/compose.yaml`](storage/compose.yaml) | Kopia, Time Machine, RustFS (Scrutiny: native collector, no container, #103) | new (#43, #39) | the storage host's own network |
 
@@ -20,11 +20,14 @@ The candidates came from the 2026-11-13 discussion: a long list from kaywoz's Gi
 ## Common design
 
 ### Zone stacks (media, infra, apps): reachability
-- **One macvlan per zone** (`media-vlan13`, `infra-vlan24`, `apps-vlan31`) on the VLAN sub-interface, no IP on the host side. Only containers that need **egress** or a **LAN presence** join it. Their traffic leaves through the zone's VLAN, so the UniFi zone rules apply as they do to today's guests.
+- **Two macvlans** on VLAN sub-interfaces, no IP on the host side (kaywoz, 2026-11-17):
+  - **`media-vlan13`:** only Jellyfin and Homey, as IoT members of VLAN 13 with fixed addresses.
+  - **`apps-vlan31`:** every Docker container that needs the internet: both sidecars, cloudflared, mediasort, the archivers, and Immich ML for its first model download. "services needing internet use vlan31 for docker. vlan24 is for servers needing internet": **VLAN 24 isn't used by Docker.**
+  - Everything else sits on internal bridges only. Traffic leaves through the VLAN, so the UniFi rules apply as they do to today's guests.
 - **Everything else sits on `internal: true` bridges** (§8: internal when no egress and no ports). Each app gets a `proxy-<app>` network (app + sidecar). Apps with a database also get a `<app>-backend` network (app + database/Redis), so the sidecar never reaches a database. An internal bridge never gets a gateway, so the macvlan is always the default route where a container has both: no `gw_priority` (Engine ≥ 28) needed.
 - **No `ports:`.** Macvlan containers can't be reached from the host (a kernel restriction, per Docker's macvlan docs), and port publishing doesn't work on macvlan or internal networks (moby source). So host-side `tailscale serve` to `127.0.0.1` can't reach them.
 - **One Tailscale sidecar per zone with admin UIs** (`tailscale/tailscale`, userspace networking: no TUN, no `NET_ADMIN`). It joins the zone's macvlan and that zone's `proxy-<app>` networks, and advertises the Services from a serve-config file (`TS_SERVE_CONFIG`, `ipn.ServeConfig` JSON with a `Services` key; auto-advertised since containerboot 1.96). It keeps the zone's tag (`tag:media`, `tag:docker`), so the policy mostly stays. Both sidecars are **defined in the infra stack** (shared services) but each stays in its own zone: no container joins two zones' networks (I-Q4).
-- **The infra stack owns the shared networks:** the zone macvlans (`media-vlan13`, `apps-vlan31`, `infra-vlan24`) and the `proxy-<app>` bridges the sidecars serve. The media and apps stacks join them as `external: true`, so **infra starts first**. The `<app>-backend` networks stay with their app's stack. Fixed addresses (`JELLYFIN_IP`, `HOMEY_IP`, `ARCHIVEBOX_IP`, `WARRIOR_IP`) stay in the zone stacks' `.env`; the subnets move to the infra stack's.
+- **The infra stack owns the shared networks:** the macvlans (`media-vlan13`, `apps-vlan31`) and the `proxy-<app>` bridges the sidecars serve. The media and apps stacks join them as `external: true`, so **infra starts first**. The `<app>-backend` networks stay with their app's stack. Fixed addresses (`JELLYFIN_IP`, `HOMEY_IP`, `ARCHIVEBOX_IP`, `WARRIOR_IP`) stay in the zone stacks' `.env`; the subnets move to the infra stack's.
 - **What the macvlan isolation buys:** a zone container can't reach the MOS host: not the MOS UI, not SMB/NFS, not the rclone remote control that listens unauthenticated on all interfaces today (#316).
 - **What it costs:** on its macvlan IP every listening port of a container is open to that VLAN; Docker filters nothing there. Listed per service below.
 
@@ -113,9 +116,9 @@ kaywoz, 2026-11-17: the infra stack holds the services that serve other services
 
 | App | Container | Zone / network | Serves |
 |---|---|---|---|
-| Tailscale sidecar, media | `kr-ccp-tailscale-0101` | `proxy-jellyfin` + `proxy-komga`; `media-vlan13` for egress only until G8 | `svc:jellyfin`, `svc:komga` (tag:media) |
+| Tailscale sidecar, media | `kr-ccp-tailscale-0101` | `proxy-jellyfin` + `proxy-komga`; `apps-vlan31` for internet access (not a VLAN 13 member) | `svc:jellyfin`, `svc:komga` (tag:media) |
 | Tailscale sidecar, apps | `kr-ccp-tailscale-0201` | `apps-vlan31` + the apps' `proxy-<app>` networks | the apps stack's Services and the mover's `tcp:8089` (tag:docker) |
-| cloudflared | `kr-ccp-cloudflared-0101` | `infra-vlan24` | the Cloudflare Tunnel for user-facing apps, §8's second access plane; outbound only |
+| cloudflared | `kr-ccp-cloudflared-0101` | `apps-vlan31` | the Cloudflare Tunnel for user-facing apps, §8's second access plane; outbound only |
 | socket proxy | `kr-ccp-socketproxy-0301` | plain bridge, `127.0.0.1:2375` | read-only Docker API for Dozzle and the Beszel agent; moves from its MOS-template deploy |
 | Beszel agent | `kr-ccp-beszelagent-0201` | host network | host metrics and container stats for all stacks; moves from its MOS-template deploy |
 
@@ -127,8 +130,9 @@ kaywoz, 2026-11-17: the infra stack holds the services that serve other services
 |---|---|---|
 | infra stack | owns the zone macvlans and the `proxy-<app>` networks; media and apps join them as `external` | the sidecars are defined here, and a network is defined in one stack only. Start order: infra, then the zone stacks. Adding an app with a UI means a `proxy-<app>` network here and in the app's stack. `docker compose down` on infra can't remove networks while zone containers are attached |
 | Tailscale sidecars | non-root + `read_only` | **unverified**: the image has no `USER`; userspace mode needs no TUN/caps (containerboot source); writable: state dir and `/tmp` (socket). Fallback: root with `cap_drop: [ALL]` |
+| media sidecar | its internet access is on `apps-vlan31`, next to the apps zone's containers | Docker's egress is VLAN 31 (decided). Its only listener is `127.0.0.1:9002`, but a compromised media sidecar would sit between VLAN 31 and the media apps' internal bridges. Accepted with the decision; the alternative is a second Docker egress network |
 | Tailscale sidecars | Service targets by container name (`kr-ccp-komga-0201`, …) | Docker's DNS resolves names on a shared network across stacks; compose service names are per-project aliases |
-| cloudflared | on `infra-vlan24` (egress), so open on VLAN 24 | it has no service port; metrics pinned to `127.0.0.1:20241` (container builds otherwise bind `0.0.0.0`) |
+| cloudflared | on `apps-vlan31` (internet access), so open on VLAN 31 | it has no service port; metrics pinned to `127.0.0.1:20241` (container builds otherwise bind `0.0.0.0`) |
 | cloudflared | `read_only` | no writable path documented; to verify at build |
 | socket proxy | not `cap_drop`/non-root (E6) | as deployed and verified today: it needs root to open `docker.sock`; `POST=0` is the control |
 | Beszel agent | `network_mode: host` | upstream requirement for interface stats; `LISTEN` on the tailnet IP only, as today. Key and token now as files (`KEY_FILE`, `TOKEN_FILE`), where the template has them in MOS's variables |
@@ -154,16 +158,14 @@ cloudflared healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (e
 
 **Open questions — infra:**
 - **I-Q1:** Retire Dockhand-home for home, as #314 proposes? (A CLAUDE.md §8 change in its own PR.)
-- **I-Q2:** How does cloudflared reach apps in other zones?
-  - (a) A UniFi rule VLAN 24 → the app's address, per port. The app then needs a macvlan address, so it's open on its VLAN.
-  - (b) One cloudflared per zone, each on that zone's internal `proxy-<app>` networks. **With kaywoz's decision, these instances live in the infra stack too**, next to their zone's sidecar, the same pattern as I-Q4 (a). One tunnel token per instance.
-  - (c) The single infra cloudflared joins the other zones' internal networks. That bridges zones; not recommended.
-
-  The decision changes where (b)'s instances are defined, not the pick: **(b)**. Until I-Q3 names the public apps, the draft keeps the single cloudflared on `infra-vlan24` with no app networks; it reaches nothing until then.
+- **I-Q2:** How does cloudflared reach the public apps? With cloudflared on `apps-vlan31` (decided 2026-11-17) the answer changes:
+  - **Apps zone** (Immich, paperless, CannonCommander): cloudflared joins those apps' `proxy-<app>` networks. That stays inside one zone, so it bridges nothing.
+  - **Jellyfin** (VLAN 13): (a) a UniFi rule VLAN 31 → Jellyfin's VLAN 13 address, port 8096 only; (b) a second cloudflared for the media zone on `proxy-jellyfin`, with its own tunnel token, but it would need internet access too, which means VLAN 31 again; (c) the apps cloudflared joins `proxy-jellyfin`, which bridges the zones.
+  - My pick: apps zone as above; **(a)** for Jellyfin, if it goes public at all (I-Q3). Until I-Q3 names the public apps, the draft's cloudflared joins no app network; it reaches nothing until then.
 - **I-Q3:** Which apps are user-facing (tunnel + Access) and which are admin-only (Tailscale)? Candidates for the tunnel: Immich, paperless, CannonCommander, Jellyfin. Jellyfin through Cloudflare is a terms-of-service and client-compatibility question of its own.
 - **I-Q4 — one sidecar per zone (drafted) or one shared sidecar?**
   - **(a) One per zone, defined in the infra stack** (drafted, my pick). Each keeps its zone's tag and networks; only the stack changes. Costs: two containers (2 × 128 MB caps, a few dozen MB real), two auth keys, two nodes, and the infra stack owning the zone networks (start order, see the deviation above).
-  - **(b) One shared sidecar** on every zone's macvlan and `proxy-<app>` networks. Saves one container and one key. Costs: it bridges VLAN 13 and VLAN 31 (the same objection as I-Q2 (c)), so one compromised sidecar reaches every zone's apps; one tag for both zones, so the policy can no longer tell `tag:media` from `tag:docker` and the grants, auto-approvers and tests get rewritten; and one restart takes down every Service.
+  - **(b) One shared sidecar** on every zone's macvlan and `proxy-<app>` networks. Saves one container and one key. Costs: it joins both zones' app networks (the same objection as I-Q2 (c)), so one compromised sidecar reaches every zone's apps; one tag for both zones, so the policy can no longer tell `tag:media` from `tag:docker` and the grants, auto-approvers and tests get rewritten; and one restart takes down every Service.
 
 ## Stack 3 — apps (VLAN 31), replaces the apps VM
 
@@ -198,7 +200,7 @@ cloudflared healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (e
 | Immich Postgres | **a version tag** (`14-vectorchord0.4.3-pgvectors0.2.0`) | no `latest` or moving tag exists; upstream ties the extension version to each Immich release, so this tag must follow the release compose on upgrades (A-Q5). The one real exception to "images on `:latest`" |
 | Immich (all) | `read_only` | not documented upstream for any service; Postgres needs tmpfs `/etc/postgresql` and `/var/run/postgresql`; to verify at build |
 | Immich DB password | two files with the same value (server 2111, database 2113) | a 600 file has one owner. Both images export the value into the process environment at start (`start.sh`, `set-env.sh`), so the file only keeps it out of `docker inspect` |
-| Immich ML | no egress (internal only); models need egress on first use | its API (3003) has no auth, so it never sits on a VLAN. Models: connect it to `apps-vlan31` while they download, then disconnect (A-Q4) |
+| Immich ML | on `apps-vlan31` for the **first model download only**, then that line is dropped | its API (3003) has no auth, so it's open on VLAN 31 while connected. Once the models are cached it's internal only (A-Q4) |
 | Immich Valkey | `valkey/valkey:latest` with a password file | upstream pins `valkey:9` by digest; `:latest` per §8, so a major version bump can arrive unannounced |
 | ArchiveBox | on `apps-vlan31`: **UI (5797) open on VLAN 31** | it fetches whatever it's given; it has its own login, and the public index/snapshots/add view are turned off (the image defaults the index to public) |
 | ArchiveBox | uid 911 (the image's), **not `read_only`: exception E1** | its dirs are owned 911 (an arbitrary uid exits 3); `/opt/archivebox` holds the browser and plugin binaries and must be writable, so a tmpfs won't do and a volume would keep stale binaries across updates |
@@ -239,7 +241,7 @@ cloudflared healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (e
   - **First sign-in:** the MOS Hub card says the first start writes an admin password into the log. The current code doesn't: a fresh install opens with no sign-in at all, and older releases printed the password below the startup banner. That banner comes from the entrypoint, which this draft bypasses, and the draft sets the password in `config.yaml`. If the image's own entrypoint is ever used, the password line goes to journald → Fluent Bit → LogTide, and the admin password must be changed at first sign-in.
   - **To verify at build:** that the server starts as 2107 with the entrypoint bypassed and `read_only` (it needs `config.yaml` present and writes its database and `cache/` under `/config`). If it doesn't, the fallback is the image's entrypoint as root, dropping to 2107 with `setpriv` and `CHOWN`/`FOWNER`/`SETUID`/`SETGID`: that becomes exception E8.
 - **A-Q3:** Immich: where do the photos live (`${PHOTOS}`), and do existing photos come in as an external library (read-only) or by upload?
-- **A-Q4:** Immich ML on the N95: CPU (as drafted), OpenVINO (`release-openvino` + `/dev/dri`; upstream warns about integrated GPUs on low-RAM hosts), or ML off (Immich needs 6 GB minimum, 4 GB without ML)? Models need egress the first time; accept a permanent VLAN 31 address for ML instead?
+- **A-Q4:** Immich ML on the N95: CPU (as drafted), OpenVINO (`release-openvino` + `/dev/dri`; upstream warns about integrated GPUs on low-RAM hosts), or ML off (Immich needs 6 GB minimum, 4 GB without ML)? Models need the internet the first time (VLAN 31, then dropped); keep a permanent VLAN 31 address for ML instead?
 - **A-Q5:** The Immich Postgres version tag. Accept this one exception to `:latest`, updated with each Immich release?
 - **A-Q6:** paperless: how do scans reach `consume/` (CannonCommander upload, an SMB share, scanner e-mail)?
 - **A-Q8 — Atuin's tag:** `:latest` (lags releases, as drafted) or the `18.24` release tag?
@@ -258,6 +260,7 @@ cloudflared healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (e
     - Its own docs say it's "not designed for production".
   - What we have today: each Service has a grant, so only the named admins' devices reach it. `tailscale serve` also passes the user's identity (`Tailscale-User-Login`) for user devices, though these apps can't use it.
   - My pick: **no tinyauth in this phase.** Limit those Services to admins by grant (with ACL tests), set the Warrior's `http_password`, and revisit with public hostnames, where Cloudflare Access does this job.
+- **A-Q12 — the archivers to the lab?** (smaller, open.) ArchiveBox and the Warrior stay on VLAN 31 with internet-only UniFi rules in this draft. The review session suggested the lab; kaywoz ruled on 2026-11-16 that §8's "risky workloads" means security tooling, not these two (MISTAKES.md), so moving them would be for isolation (see the macvlan note under G8), not because §8 requires it.
 - **A-Q10 — two file managers and shared uids.** Filestash next to CannonCommander: both, as asked? Filestash's and Warrior's image uids may both be 1000; same uid means one compromised app can read the other's files where permissions allow. Check `docker run --rm --entrypoint id machines/filestash` at build.
 
 ## Stack 4 — storage (the storage host's own network)
@@ -360,7 +363,7 @@ Named exceptions to the container standard (CLAUDE.md §8). They go into the sec
 - **G3:** §8 calls the storage host "storage only". These stacks make it the home Docker host. That's the #314 scenario, but §8's host roles, `SECURITY.md` and `security/*.md` need rewriting in the same change as the build.
 - **G4 — resolved:** the #310 tests are done (§7b: the UI manages stacks, macvlan with a VLAN parent works; §7c: no remap; §7d: shim not usable). What's left before the build is listed under [Before the build](#before-the-build).
 - **G5:** Container logs off-box on MOS (no journald). Use Docker's `syslog` driver to the monitoring host, or wait for log shipping?
-- **G6:** VLANs 13/24/31 tagged on the storage host's switch port, and a small address block per VLAN outside DHCP for the macvlans. Today the guests' VLANs come from PCI passthrough and the LXC's own NIC.
+- **G6:** VLANs 13 and 31 tagged on the storage host's switch port (24 isn't needed by Docker), and a small address block per VLAN outside DHCP for the macvlans. Today the guests' VLANs come from PCI passthrough and the LXC's own NIC.
 - **G7 — 8 GB of RAM** (kaywoz, 2026-11-16). Limits were cut for it; they are caps, not reservations.
 
   | Stack | Sum of `mem_limit`s |
@@ -379,15 +382,8 @@ Named exceptions to the container standard (CLAUDE.md §8). They go into the sec
   - If it's still tight, the next cuts are ArchiveBox and the Warrior (start them only when needed), then Filestash, which duplicates CannonCommander.
   - MOS's root filesystem is RAM. With 8 GB, anything writing to `/` (logs, a misplaced cache: MISTAKES.md 2026-11-10) eats into the same memory.
   - Check `nproc` and `free -g` on the box before going live.
-- **G8 — internet access for everything that isn't a VLAN 13 member** (open).
-  - **Decided (kaywoz, 2026-11-17):** "i want jellyfin and homey to act as iot and belong to vlan13". Jellyfin and Homey are IoT members of VLAN 13 with fixed macvlan addresses. Komga and everything else are **not** on VLAN 13. Applied in the draft: the media sidecar now reaches Jellyfin over an internal bridge (`proxy-jellyfin`), so it needs no VLAN 13 membership; its VLAN 13 attachment is kept for egress only until this question is decided.
-  - **Open:** internet access for the rest: both sidecars, cloudflared, mediasort, the two archivers, and Immich ML's first model download. Internal bridges have none, and a plain bridge would give it through the storage host's own network, where the container can reach the MOS host (S-Q1).
-  - **Proposal (from the review session):** one **egress macvlan on VLAN 24** for all of them, a fixed address each, and per-address UniFi rules allowing the internet only; **no VLAN 31 macvlan**. The archivers go to the lab or onto VLAN 24. Tags stay as they are (`tag:docker` isn't tied to a VLAN).
-  - **To weigh before deciding:**
-    - Containers on the same macvlan reach each other directly: macvlan bridge mode switches between them inside the host, so UniFi never sees that traffic and can't filter it. On one shared egress network, a compromised archiver could reach both sidecars and cloudflared on every port. A second egress network (or VLAN) for the archivers avoids that.
-    - VLAN 24 is the tier 0 infra VLAN, so web crawlers would share it with the infra devices, behind the same per-address rules.
-    - The lab option conflicts with kaywoz's 2026-11-16 ruling that §8's "risky workloads" means security tooling (malware, analysis, forensics), not the archivers (MISTAKES.md). It's listed because the review proposed it; this draft keeps the archivers at home until kaywoz says otherwise.
-    - Immich ML needs the internet only for the first model download; it could get egress for that run and none afterwards.
+- **G8 — internet access: decided** (kaywoz, 2026-11-17). Jellyfin and Homey are VLAN 13's IoT members. Docker containers that need the internet get an address on the VLAN 31 macvlan: "services needing internet use vlan31 for docker. vlan24 is for servers needing internet". Everything else stays on internal bridges. The per-address internet-only UniFi rules on VLAN 31 for the archivers still apply (mitigation 2 for E1/E2). What's left is A-Q12.
+  - Containers on the same macvlan reach each other directly: macvlan bridge mode switches between them inside the host, so UniFi never sees that traffic. On VLAN 31 the archivers can therefore reach the sidecars, cloudflared, mediasort and Immich ML (while it's connected) on any listening port; the UniFi rules only cover traffic that leaves the host.
 
 ## Before the build
 
