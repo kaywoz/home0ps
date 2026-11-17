@@ -21,13 +21,13 @@ The candidates came from the 2026-11-13 discussion: a long list from kaywoz's Gi
 
 ### Zone stacks (media, infra, apps): reachability
 - **Two macvlans** on VLAN sub-interfaces, no IP on the host side (kaywoz, 2026-11-17):
-  - **`media-vlan13`:** only Jellyfin, Komga and Homey, as IoT members of VLAN 13 with fixed addresses. Komga gets its internet access here (M-Q2), the one exception to Docker's egress on VLAN 31.
+  - **`media-vlan13`:** only Jellyfin and Homey, as IoT members of VLAN 13 with fixed addresses.
   - **`apps-vlan31`:** every Docker container that needs the internet: both sidecars, cloudflared, mediasort, the archivers, and Immich ML for its first model download. "services needing internet use vlan31 for docker. vlan24 is for servers needing internet": **VLAN 24 isn't used by Docker.**
   - Everything else sits on internal bridges only. Traffic leaves through the VLAN, so the UniFi rules apply as they do to today's guests.
 - **Everything else sits on `internal: true` bridges** (§8: internal when no egress and no ports). Each app gets a `proxy-<app>` network (app + sidecar). Apps with a database also get a `<app>-backend` network (app + database/Redis), so the sidecar never reaches a database. An internal bridge never gets a gateway, so the macvlan is always the default route where a container has both: no `gw_priority` (Engine ≥ 28) needed.
 - **No `ports:`.** Macvlan containers can't be reached from the host (a kernel restriction, per Docker's macvlan docs), and port publishing doesn't work on macvlan or internal networks (moby source). So host-side `tailscale serve` to `127.0.0.1` can't reach them.
 - **One Tailscale sidecar per zone with admin UIs** (`tailscale/tailscale`, userspace networking: no TUN, no `NET_ADMIN`). It joins the zone's macvlan and that zone's `proxy-<app>` networks, and advertises the Services from a serve-config file (`TS_SERVE_CONFIG`, `ipn.ServeConfig` JSON with a `Services` key; auto-advertised since containerboot 1.96). It keeps the zone's tag (`tag:media`, `tag:docker`), so the policy mostly stays. Both sidecars are **defined in the infra stack** (shared services) but each stays in its own zone: no container joins two zones' networks (I-Q4).
-- **The infra stack owns the shared networks:** the macvlans (`media-vlan13`, `apps-vlan31`) and the `proxy-<app>` bridges the sidecars serve. The media and apps stacks join them as `external: true`, so **infra starts first**. The `<app>-backend` networks stay with their app's stack. Fixed addresses (`JELLYFIN_IP`, `KOMGA_IP`, `HOMEY_IP`, `ARCHIVEBOX_IP`, `WARRIOR_IP`) stay in the zone stacks' `.env`; the subnets move to the infra stack's.
+- **The infra stack owns the shared networks:** the macvlans (`media-vlan13`, `apps-vlan31`) and the `proxy-<app>` bridges the sidecars serve. The media and apps stacks join them as `external: true`, so **infra starts first**. The `<app>-backend` networks stay with their app's stack. Fixed addresses (`JELLYFIN_IP`, `HOMEY_IP`, `ARCHIVEBOX_IP`, `WARRIOR_IP`) stay in the zone stacks' `.env`; the subnets move to the infra stack's.
 - **What the macvlan isolation buys:** a zone container can't reach the MOS host: not the MOS UI, not SMB/NFS, not the rclone remote control (not started at boot; CLI only, #316 closed).
 - **What it costs:** on its macvlan IP every listening port of a container is open to that VLAN; Docker filters nothing there. Listed per service below.
 
@@ -101,7 +101,7 @@ On the host each uid above is 165536 + uid (2001 → 167537), except the two exe
 | Jellyfin | `/dev/dri/renderD128` + `group_add` render GID | hardware transcoding (Jellyfin's Intel docs: no privileged, no capabilities) |
 | Jellyfin | fixed IP on `media-vlan13`: **every port open on VLAN 13** (8096, 7359/udp; 8920/1900 only if HTTPS/DLNA get turned on) | Apple TV and other VLAN 13 clients play locally. Today's exception (8096 + 7359) becomes "all of Jellyfin's ports": keep HTTPS and DLNA off |
 | Komga | `/tmp` tmpfs with `exec` | the SQLite JDBC driver loads its native library from `/tmp` (as today) |
-| Komga | on `media-vlan13` with a fixed address (`KOMGA_IP`), for internet access | decided (M-Q2). Its UI (25600) is then open on VLAN 13 to IoT devices, behind Komga's own login; the sidecar still serves `svc:komga` through `proxy-komga` |
+| Komga | on `apps-vlan31` for internet access (M-Q2), next to the apps zone's containers | decided. Its UI (25600) is then open on VLAN 31, behind Komga's own login; same trade-off as the media sidecar. The sidecar still serves `svc:komga` through `proxy-komga` |
 | Homey | **the hardening tested in #229, unchanged:** no `privileged`, `read_only`, `no-new-privileges`, `cap_drop: [ALL]` + `SETUID`, `SETGID`, `SYS_CHROOT`, `CHOWN`, `/run` tmpfs | tested one capability at a time on the media LXC (2026-11-07). In that test, `docker top` showed Homey's core (`homey-shs`) and `homey-matter-daemon` as uid 0 in the container. D-Bus (100), avahi (101) and go2rtc dropped to their own users. Without userns-remap on MOS, uid 0 in the container is uid 0 on the host (M-Q1) |
 | Homey | fixed macvlan IP on VLAN 13 instead of `network_mode: host` | host network would be the homenas's own network; discovery/mDNS should work on the macvlan L2 segment (to verify) |
 | Homey | no healthcheck | none documented |
@@ -122,7 +122,7 @@ On the host each uid above is 165536 + uid (2001 → 167537), except the two exe
 
 **Open questions — media:**
 - **M-Q1 — decided: Homey stays uid 0, as tested** (kaywoz, 2026-11-17): no `privileged`, four capabilities, and remap makes an escape host uid 165536, not root. Homey's D-Bus, avahi and Matter under remap are tested at build.
-- **M-Q2 — decided: Komga joins `media-vlan13`** (kaywoz, 2026-11-17) with a fixed address (`KOMGA_IP`, inside `VLAN13_RANGE` like the others). It is then a VLAN 13 member next to Jellyfin and Homey.
+- **M-Q2 — decided: Komga gets internet access on `apps-vlan31`** (kaywoz, 2026-11-17), as G8 sets for every Docker container that needs it. No fixed address.
 
 ## Stack 2 — infra (shared services), replaces the infra VM
 
@@ -392,7 +392,7 @@ Named exceptions to the container standard (CLAUDE.md §8). They go into the sec
   - If it's still tight, the next cuts are ArchiveBox and the Warrior (start them only when needed), then Filestash, which duplicates CannonCommander.
   - MOS's root filesystem is RAM. With 8 GB, anything writing to `/` (logs, a misplaced cache: MISTAKES.md 2026-11-10) eats into the same memory.
   - Check `nproc` and `free -g` on the box before going live.
-- **G8 — internet access: decided** (kaywoz, 2026-11-17). Jellyfin, Komga and Homey are VLAN 13's IoT members (Komga added by M-Q2, so its internet access is on VLAN 13: the one exception to the next sentence). Docker containers that need the internet get an address on the VLAN 31 macvlan: "services needing internet use vlan31 for docker. vlan24 is for servers needing internet". Everything else stays on internal bridges. The per-address internet-only UniFi rules on VLAN 31 for the archivers still apply (mitigation 2 for E1/E2). What's left is A-Q12.
+- **G8 — internet access: decided** (kaywoz, 2026-11-17). Jellyfin and Homey are VLAN 13's IoT members. Docker containers that need the internet get an address on the VLAN 31 macvlan: "services needing internet use vlan31 for docker. vlan24 is for servers needing internet". Everything else stays on internal bridges. The per-address internet-only UniFi rules on VLAN 31 for the archivers still apply (mitigation 2 for E1/E2). What's left is A-Q12.
   - Containers on the same macvlan reach each other directly: macvlan bridge mode switches between them inside the host, so UniFi never sees that traffic. On VLAN 31 the archivers can therefore reach the sidecars, cloudflared, mediasort and Immich ML (while it's connected) on any listening port; the UniFi rules only cover traffic that leaves the host.
 
 ## Before the build
