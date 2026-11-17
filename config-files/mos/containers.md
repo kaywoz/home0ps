@@ -1,6 +1,6 @@
 # MOS containers — deploy-time settings
 
-Containers on the storage host are deployed from [MOS templates](https://github.com/kaywoz/mos-templates). The templates stay generic (upstream defaults); everything host-specific is added **when deploying** and recorded here. Secrets (keys, tokens) are entered in MOS only, never here. Security summary: [`security/storage.md`](../../security/storage.md).
+Containers on the homenas are deployed from [MOS templates](https://github.com/kaywoz/mos-templates). The templates stay generic (upstream defaults); everything host-specific is added **when deploying** and recorded here. Secrets (keys, tokens) are entered in MOS only, never here. Security summary: [`security/homenas.md`](../../security/homenas.md).
 
 Container names follow the [container register](../../docker-compose/CONTAINERS.md): take the next free group number there and add the container in the same change.
 

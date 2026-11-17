@@ -1,6 +1,6 @@
 # Onboarding an observed host (Dozzle + Beszel)
 
-How a host becomes visible to the monitoring host: Docker logs in Dozzle (remote-host mode through a read-only socket proxy) and metrics in Beszel. Design and reasons: kaywoz/home0ps#138, [`security/monitoring.md`](../../security/monitoring.md). Done so far: media LXC, storage host, infra VM; apps VM in progress.
+How a host becomes visible to the monitoring host: Docker logs in Dozzle (remote-host mode through a read-only socket proxy) and metrics in Beszel. Design and reasons: kaywoz/home0ps#138, [`security/monitoring.md`](../../security/monitoring.md). Done so far: media LXC, homenas, infra VM; apps VM in progress.
 
 Values used below — set them in the monitoring host's shell. The IP is looked up from the tailnet, so a value from an earlier host can't carry over:
 
@@ -63,7 +63,7 @@ Read OK, write refused:
 curl -s --max-time 5 http://$IP:2375/_ping; echo; curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 -X POST http://$IP:2375/containers/x/restart
 ```
 
-Expect `OK`, then `403`. From a LAN device, the host's LAN address on 2375 must be refused. From an admin's device it times out on every host except the storage host (admins have `*` there).
+Expect `OK`, then `403`. From a LAN device, the host's LAN address on 2375 must be refused. From an admin's device it times out on every host except the homenas (admins have `*` there).
 
 ## 5. Dozzle (monitoring host)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Media classifier (kaywoz/home0ps#260): decides which library a new download goes to.
 
-Stateless HTTP service on the apps VM. The mover on the storage host POSTs item names; this
+Stateless HTTP service on the apps VM. The mover on the homenas POSTs item names; this
 service never sees files, file contents or remote credentials, and never moves or deletes.
 
   POST /classify   Authorization: Bearer <token>

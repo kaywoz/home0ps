@@ -1,5 +1,5 @@
-# PROPOSAL — not deployed. Infra stack on the replacement storage host (MOS), replacing the infra VM.
-# Design, open questions and migration: docker-compose/storage/README.md. Nothing here runs until kaywoz OKs it.
+# PROPOSAL — not deployed. Infra stack on the replacement homenas (MOS), replacing the infra VM.
+# Design, open questions and migration: docker-compose/homenas/README.md. Nothing here runs until kaywoz OKs it.
 #
 # The shared services that serve other services (kaywoz, 2026-11-17): the per-zone Tailscale sidecars,
 # cloudflared, the read-only socket proxy and the Beszel agent. Each container still sits in the zone it

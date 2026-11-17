@@ -1,5 +1,5 @@
-# PROPOSAL — not deployed. Media stack on the replacement storage host (MOS), replacing the media LXC.
-# Design, open questions and migration: docker-compose/storage/README.md. Nothing here runs until kaywoz OKs it.
+# PROPOSAL — not deployed. Media stack on the replacement homenas (MOS), replacing the media LXC.
+# Design, open questions and migration: docker-compose/homenas/README.md. Nothing here runs until kaywoz OKs it.
 #
 # Zone: VLAN 13 (IoT). Docker runs directly on MOS (no LXC), one stack per zone (#314 scenario).
 # - media-vlan13: macvlan on the VLAN 13 sub-interface, no host IP on it. Jellyfin and Homey are IoT members
@@ -75,7 +75,7 @@ services:
     container_name: kr-ccp-homey-0201
     restart: unless-stopped
     # In the LXC Homey used network_mode: host to get the LXC's VLAN 13 address. On MOS, host network would
-    # be the storage host's own network, so it gets a fixed macvlan address on VLAN 13 instead (discovery and
+    # be the homenas's own network, so it gets a fixed macvlan address on VLAN 13 instead (discovery and
     # mDNS work on that L2 segment; to verify). Runs as the image's own user (root in the container) with
     # only the four capabilities tested on the media LXC (2026-11-07).
     read_only: true
