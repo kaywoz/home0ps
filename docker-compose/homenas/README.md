@@ -138,7 +138,7 @@ kaywoz, 2026-11-17: the infra stack holds the services that serve other services
 
 **What I counted in:** everything whose job is to serve other containers or the host: the access path (sidecars, tunnel) and the box's observability (proxy, agent). **Not moved:** databases and Redis (they serve one app and stay on its `<app>-backend` network), Scrutiny (no container at all now: native collector, #103), the host's own tailscaled (a MOS plugin, not a container) and the storage services (Kopia, Time Machine, RustFS). Later candidates for this stack: Diun (#101) and Trivy (#102).
 
-**Not here:** Dockhand-home. In the #314 scenario the MOS UI is the Docker UI and no other home guest is left for it to manage, so §8's Dockhand-home exception retires for home (I-Q1). Dockhand-lab is unaffected.
+**Not here:** Dockhand-home. In the #314 scenario the MOS UI is the Docker UI and no other home guest is left for it to manage, so §8's Dockhand-home exception retires for home (I-Q1, decided). Dockhand-lab is unaffected.
 
 | Service | Deviation | Why |
 |---|---|---|
@@ -170,16 +170,11 @@ cloudflared healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (e
 - **Socket proxy and Beszel agent:** remove the MOS-template containers, then start the stack. Same names, same data folder; the agent needs its key and token as files first.
 - **Dockhand:** nothing to carry over except its data, kept for rollback only (`dockhand/data` incl. `.encryption_key`). Retire the infra VM after the rollback window.
 
-**Open questions — infra:**
-- **I-Q1:** Retire Dockhand-home for home, as #314 proposes? (A CLAUDE.md §8 change in its own PR.)
-- **I-Q2:** How does cloudflared reach the public apps? With cloudflared on `apps-vlan31` (decided 2026-11-17) the answer changes:
-  - **Apps zone** (Immich, paperless, CannonCommander): cloudflared joins those apps' `proxy-<app>` networks. That stays inside one zone, so it bridges nothing.
-  - **Jellyfin** (VLAN 13): (a) a UniFi rule VLAN 31 → Jellyfin's VLAN 13 address, port 8096 only; (b) a second cloudflared for the media zone on `proxy-jellyfin`, with its own tunnel token, but it would need internet access too, which means VLAN 31 again; (c) the apps cloudflared joins `proxy-jellyfin`, which bridges the zones.
-  - My pick: apps zone as above; **(a)** for Jellyfin, if it goes public at all (I-Q3). Until I-Q3 names the public apps, the draft's cloudflared joins no app network; it reaches nothing until then.
-- **I-Q3:** Which apps are user-facing (tunnel + Access) and which are admin-only (Tailscale)? Candidates for the tunnel: Immich, paperless, CannonCommander, Jellyfin. Jellyfin through Cloudflare is a terms-of-service and client-compatibility question of its own.
-- **I-Q4 — one sidecar per zone (drafted) or one shared sidecar?**
-  - **(a) One per zone, defined in the infra stack** (drafted, my pick). Each keeps its zone's tag and networks; only the stack changes. Costs: two containers (2 × 128 MB caps, a few dozen MB real), two auth keys, two nodes, and the infra stack owning the zone networks (start order, see the deviation above).
-  - **(b) One shared sidecar** on every zone's macvlan and `proxy-<app>` networks. Saves one container and one key. Costs: it joins both zones' app networks (the same objection as I-Q2 (c)), so one compromised sidecar reaches every zone's apps; one tag for both zones, so the policy can no longer tell `tag:media` from `tag:docker` and the grants, auto-approvers and tests get rewritten; and one restart takes down every Service.
+**Infra decisions** (kaywoz, 2026-11-17):
+- **I-Q1 — decided: Dockhand-home retires for home** with this migration; the MOS UI is the home Docker UI. `CLAUDE.md` §8 records it (own PR). Dockhand-lab is unaffected.
+- **I-Q2 — decided:** apps-zone apps are reached by cloudflared joining their `proxy-<app>` networks (inside one zone, bridges nothing). Jellyfin, if it ever goes public: a UniFi rule VLAN 31 → Jellyfin's VLAN 13 address, port 8096 only. No second cloudflared, and cloudflared never joins `proxy-jellyfin`.
+- **I-Q3 — open (tbd):** no app is public for now; every UI is admin-only through Tailscale. cloudflared stays in the draft but joins no app network, so it reaches nothing until an app is picked. Candidates: Immich, paperless, CannonCommander, Jellyfin (Jellyfin through Cloudflare is a terms-of-service and client-compatibility question of its own).
+- **I-Q4 — decided: one sidecar per zone**, both defined in the infra stack. Each keeps its zone's tag and networks. Cost: two containers, two auth keys, two nodes, and the infra stack owning the zone networks (start order, pre-build test (a)).
 
 ## Stack 3 — apps (VLAN 31), replaces the apps VM
 
