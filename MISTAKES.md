@@ -846,3 +846,11 @@ mistakes, not a diary.
 - **Root cause:** tested a shortcut path instead of the path the OS uses at boot, and didn't read `mos-start` before concluding.
 - **Fix applied:** read `mos-start`, confirmed with a harmless flag through the UI, corrected the bug report and #310.
 - **Rule going forward:** test a setting through the same path the platform uses (boot script or UI), and read that path's code before saying a setting has no effect.
+
+### 2026-11-17 — homenas (terse answer read as an exception to a decision)
+
+- **Trigger:** misunderstood request
+- **What happened:** kaywoz answered M-Q2 (does the comics server need egress) with "vlan13". I put the container on the media macvlan and recorded it as the one exception to G8 (Docker egress via VLAN 31), with a fixed address. kaywoz meant every VLAN has internet access; the container belongs on VLAN 31 like the rest.
+- **Root cause:** the README's own fallback for the question named the media macvlan, which already contradicted G8, and I took a one-word answer as a decision to break a recorded rule instead of asking.
+- **Fix applied:** the container moved to `apps-vlan31`, no fixed address, no exception (#336, second commit).
+- **Rule going forward:** when a short answer would contradict a recorded decision (a G-item, §8), ask one clarifying question before recording an exception; and options offered in a question must themselves be consistent with recorded decisions.
