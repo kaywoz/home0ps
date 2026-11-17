@@ -6,9 +6,9 @@
 # host's own tailscaled (tag:storage, which already has svc:kopia and svc:rustfs), so they use
 # today's pattern: one bridge per app, ports on 127.0.0.1, `tailscale serve` on the host.
 # - proxy-kopia, proxy-rustfs: plain bridges (not internal, because internal networks can't publish ports).
-#   They need no egress. A container on a plain bridge can reach the MOS host through the bridge gateway, so
-#   the host firewall (#219) comes first (README S-Q1).
-# - Time Machine: macvlan on the host's own interface with a fixed address, so Macs reach SMB without
+#   They need no egress. A container on a plain bridge can reach the MOS host through the bridge gateway:
+#   accepted, every host listener needs a login or is tailnet-only (README S-Q1).
+# - Time Machine: macvlan on VLAN 11 (trusted clients) with a fixed address, so Macs reach SMB without
 #   clashing with MOS's own Samba on 445 (README S-Q2).
 # Docker runs with userns-remap, daemon-wide (kaywoz, 2026-11-17; #310 §7c, set up by #325): container uid N
 # is host uid 165536+N, so appdata and secret files are owned 165536+<the uid in `user:`> ("owned 165536+N"
@@ -100,8 +100,8 @@ services:
     volumes:
       - ${TIMEMACHINE}:/opt/timemachine
     networks:
-      storage-lan:
-        ipv4_address: ${TIMEMACHINE_IP}
+      clients-vlan11:
+        ipv4_address: ${TIMEMACHINE_IP}  # VLAN 13 Macs: UniFi rule to this address, tcp:445 only
     healthcheck:                       # the image ships none for the smb variant
       test: ["CMD", "pgrep", "smbd"]
       interval: 60s
@@ -135,7 +135,7 @@ services:
       - rustfs_access_key
       - rustfs_secret_key
     ports:
-      - "127.0.0.1:9000:9000"          # S3 API: a Service of its own (README S-Q3)
+      - "127.0.0.1:9000:9000"          # S3 API: tailscale serve --service=svc:s3 (README S-Q3)
       - "127.0.0.1:9001:9001"          # console: svc:rustfs
     volumes:
       - ${S3DATA}:/data
@@ -196,16 +196,16 @@ networks:
   proxy-scrutinycollector:           # egress only: pushes to svc:scrutiny over the host's tailscaled
     name: proxy-scrutinycollector
     driver: bridge
-  storage-lan:
-    name: storage-lan
+  clients-vlan11:                    # Time Machine only; owned here, since no other stack uses VLAN 11
+    name: clients-vlan11
     driver: macvlan
     driver_opts:
-      parent: ${LAN_PARENT}
+      parent: ${VLAN11_PARENT}         # e.g. <nic>.11, no IP on the host side
     ipam:
       config:
-        - subnet: ${LAN_SUBNET}
-          gateway: ${LAN_GATEWAY}
-          ip_range: ${LAN_RANGE}
+        - subnet: ${VLAN11_SUBNET}
+          gateway: ${VLAN11_GATEWAY}
+          ip_range: ${VLAN11_RANGE}    # a small block outside the gateway's DHCP pool
 
 secrets:
   timemachine_password:

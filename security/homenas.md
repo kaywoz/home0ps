@@ -14,7 +14,7 @@ Containers are deployed from [MOS templates](https://github.com/kaywoz/mos-templ
 | Docker API exposure | `docker-socket-proxy` (`CONTAINERS`, `INFO`, `EVENTS`; `POST=0`) on **bridge**, published on `127.0.0.1:2375` only, exposed on the tailnet address via `tailscale serve --tcp=2375`. Never host networking: the proxy listens on all interfaces of its namespace. Read from the monitoring host and locally (`_ping` OK, Dozzle shows the host, 2026-11-08); write refused (`POST`→403) and LAN refused *(untested)* |
 | Beszel agent listening | Host networking (upstream requirement for interface stats), `LISTEN` bound to the tailnet IP only, so not on the LAN; pushes to `svc:beszel` (verified in the hub, 2026-11-08) |
 | Media library exposure | rclone crypt mount is read-only and bound read-only into the media LXC (`config-files/mos/media-mount.sh`, kaywoz/home0ps#197) |
-| Host firewall | None yet; the ACL and loopback bindings are the controls *(planned, kaywoz/home0ps#219)* |
+| Host firewall | None: MOS ships no firewall tooling. The ACL and loopback bindings are the controls. Containers on plain bridges can reach the host's listeners: accepted (every TCP listener needs a login or is tailnet-only; NFS exports, if enabled, never cover Docker subnets; kaywoz, 2026-11-17). A MOS firewall plugin is parked *(kaywoz/home0ps#339)* |
 
 ## Authentication
 
@@ -61,7 +61,7 @@ Containers are deployed from [MOS templates](https://github.com/kaywoz/mos-templ
 
 ## Open issues
 
-- Host firewall, Tailscale SSH as the only SSH path — kaywoz/home0ps#219
+- Host firewall: a MOS plugin — kaywoz/home0ps#339; Tailscale SSH as the only SSH path — kaywoz/home0ps#219
 - Healthchecks register incl. the media mount watchdog — kaywoz/home0ps#225
 - Homenas app UIs (`svc:archivebox`, `svc:archivewarrior`, `svc:scrutiny`, `svc:kopia`, `svc:rustfs`) are defined in the policy and `iac/tailscale-services/` but not served on the host (2026-11-07): planned or stale — to decide
 - Separate cloud account for the media library — kaywoz/home0ps#197

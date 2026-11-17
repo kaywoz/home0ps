@@ -291,7 +291,7 @@ The host's own storage services. They're served by the host's own tailscaled (`t
 | Kopia | repository password in `/app/config/*.kopia-password` (600) | Kopia has no `KOPIA_PASSWORD_FILE`. `KOPIA_PERSIST_CREDENTIALS_ON_CONNECT=true` stores it there at the one-time `repository create/connect` |
 | Kopia | `user:` non-root | the image has no `USER` or entrypoint script; the official compose runs root + privileged only for `kopia mount`, which isn't used. To verify at build |
 | Time Machine | **runs as root, not `read_only`**, `cap_add` CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, NET_BIND_SERVICE | its entrypoint creates the SMB user, writes `smb.conf` and the avahi service into `/etc`, then runs smbd/nmbd/avahi. `privileged` isn't needed (not in upstream's compose). Capabilities read from the entrypoint, each to be confirmed at build |
-| Time Machine | own macvlan address on the host's network (`storage-lan`) | MOS's own Samba holds 445 on the host, so host networking or a published 445 would clash. The image's author runs it on macvlan, and avahi then advertises it on that segment |
+| Time Machine | own macvlan address on VLAN 11, trusted clients (`clients-vlan11`, S-Q2) | MOS's own Samba holds 445 on the host, so host networking or a published 445 would clash. The image's author runs it on macvlan, and avahi then advertises it on that segment. The only Docker container on VLAN 11 |
 | RustFS | keys as files (`RUSTFS_*_KEY_FILE`) | never the built-in default `rustfsadmin`/`rustfsadmin` (it only warns) |
 | RustFS | console CORS limited to its Service URL | the image defaults to `*` |
 
@@ -301,22 +301,21 @@ The host's own storage services. They're served by the host's own tailscaled (`t
 - **RustFS:** `access_key` and `secret_key`.
 
 **Tailscale follow-ups** (own PRs, not built):
-- `svc:kopia` and `svc:rustfs` exist already. Add a Service for the S3 API, or decide it stays local (S-Q3).
+- `svc:kopia` and `svc:rustfs` (console) exist already. Add `svc:s3` for the S3 API (S-Q3): `tailscale serve --service=svc:s3` → `127.0.0.1:9000`, auto-approved for `tag:storage`, grant to admins first (with ACL tests), then per client host as #28 names them.
 - `svc:scrutiny` moves to the hub on the monitoring host (#103), plus one push grant `tag:storage` → `svc:scrutiny` with an ACL test. That's a new push flow to the monitoring host, outside §8's list (logtide-api, healthchecks, beszel), so it needs kaywoz's OK as an addition to that list.
 - Grants per backup client to `svc:kopia`.
 - Time Machine over the tailnet isn't covered: the host can't reach the macvlan address (S-Q2).
+
+**UniFi follow-ups** (with #322): VLAN 13 → Time Machine's address, tcp:445 only; mDNS on for VLANs 11 and 13 if Macs on VLAN 13 should discover it.
 
 **Migration:**
 - **Kopia and RustFS** are new on this box. If the current homenas runs either from a MOS template (#136 mentions RustFS), it has no registered container name. Its data is migrated or retired separately.
 - **Time Machine:** existing Mac backups start fresh, or are copied over with the share's owner changed to 2303.
 
 **Open questions — storage:**
-- **S-Q1:** The host firewall (#219) comes before this stack. Kopia and RustFS on plain bridges can reach every port the MOS host listens on.
-- **S-Q2:** Time Machine.
-  - Which network are the Macs on? With the macvlan on the host's network, discovery works on that segment only; from other VLANs it's a manual connect (`smb://<address>/TimeMachine`) plus a UniFi rule.
-  - Over the tailnet it would need its own sidecar.
-  - The alternative is MOS's own Samba with a Time Machine share, if MOS supports `fruit:time machine` (unverified).
-- **S-Q3:** RustFS's S3 API. Is it local only (the box's own backups, #30), or a Tailscale Service for other hosts (#28 "secure s3 endpoint")?
+- **S-Q1 — decided: accepted** (kaywoz, 2026-11-17). MOS ships no host firewall tooling, so #219's approach doesn't apply here. Kopia and RustFS on plain bridges can reach the host's listening ports, but every TCP listener needs a login (SMB, the MOS UI, sshd) or listens on the tailnet address only; the rest is NFS plumbing (rpcbind, statd), discovery and NTP. **Condition:** if NFS is enabled, its exports name the LAN clients explicitly, never `*` or a Docker subnet. A MOS firewall plugin is parked as #339.
+- **S-Q2 — decided: Time Machine in a container, on a macvlan on VLAN 11** (trusted clients; kaywoz, 2026-11-17). Not MOS's own Samba, although it ships `fruit`, `streams_xattr` and `catia`: MOS writes `smb.conf` into RAM `/etc`, so the options would need another boot hook. Macs on VLAN 11 discover it directly; Macs on VLAN 13 reach it through a UniFi rule VLAN 13 → its address, port 445 only, and discover it if UniFi's mDNS is on for VLANs 11 and 13 (else a manual `smb://<address>/TimeMachine`). Over the tailnet: not covered.
+- **S-Q3 — decided: the S3 API becomes a Tailscale Service** (kaywoz, 2026-11-17; #28), served by the host's tailscaled like `svc:kopia`. Name and grants in the Tailscale follow-up below.
 - **S-Q4 — Scrutiny: decided** (kaywoz, 2026-11-17, replaces #103's native collector): a **collector-only container**, run once a day by a MOS UI cron job (`docker-compose --profile cron run --rm`), pushing to the hub on the monitoring host. Not privileged: `SYS_RAWIO` + `SYS_ADMIN`, the NVMe controller devices only (no namespaces, so no direct disk read/write), `read_only`, no UI or port. Not remapped (R4); exception E5. Residual risk: NVMe admin commands through the controller, the same as a native collector running as root. Why a container: the MOS UI manages it, the image brings `smartctl`, and no binary has to live on an executable path (`/boot` is `noexec`).
 
 ## Exception register
@@ -408,7 +407,6 @@ Tests on the new box before the first real stack, each with throwaway containers
 Security gaps from the 2026-11-17 attack-path review. None of them is in these files; each must be closed before the stacks hold real data:
 
 - **#322 — UniFi:** block VLANs 13, 24 and 31 → the homenas's own address, so a zone container can't reach the host through the router either.
-- **#219 — host firewall:** the storage stack's bridges → host, allowing only what's needed.
 - **#255 — offsite copy that host root can't delete:** today root on the homenas holds the Storage Box login and the USB disk, so one compromised host can remove all copies (Storage Box snapshots or an append-only receiver).
 
 ## Unverified (checked at build, before anything goes live)
