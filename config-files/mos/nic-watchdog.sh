@@ -1,5 +1,5 @@
 #!/bin/bash
-# nic-watchdog.sh: detect and clear the onboard NIC's receive wedge on the MOS storage host
+# nic-watchdog.sh: detect and clear the onboard NIC's receive wedge on the MOS homenas
 # (kaywoz/home0ps#310).
 #
 # The fault (RTL8126A on the in-tree r8169 driver, MOS kernel 6.18, linked at 5G): after loss

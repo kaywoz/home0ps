@@ -1,13 +1,13 @@
-# PROPOSAL — not deployed. Storage stack on the replacement storage host (MOS): the host's own storage
-# services. Design, open questions and migration: docker-compose/storage/README.md. Nothing here runs until
+# PROPOSAL — not deployed. Storage stack on the replacement homenas (MOS): the host's own storage
+# services. Design, open questions and migration: docker-compose/homenas/README.md. Nothing here runs until
 # kaywoz OKs it.
 #
-# Zone: the storage host's own network (no zone VLAN). Unlike the other three stacks, these are served by the
+# Zone: the homenas's own network (no zone VLAN). Unlike the other three stacks, these are served by the
 # host's own tailscaled (tag:storage, which already has svc:kopia and svc:rustfs), so they use
 # today's pattern: one bridge per app, ports on 127.0.0.1, `tailscale serve` on the host.
 # - proxy-kopia, proxy-rustfs: plain bridges (not internal, because internal networks can't publish ports).
 #   They need no egress. A container on a plain bridge can reach the MOS host through the bridge gateway, so
-#   the host firewall (#219) and the rclone rc fix (#316) come first (README S-Q1).
+#   the host firewall (#219) comes first (README S-Q1).
 # - Time Machine: macvlan on the host's own interface with a fixed address, so Macs reach SMB without
 #   clashing with MOS's own Samba on 445 (README S-Q2).
 # Docker runs with userns-remap, daemon-wide (kaywoz, 2026-11-17; #310 §7c, set up by #325): container uid N

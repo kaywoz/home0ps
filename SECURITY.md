@@ -8,9 +8,9 @@ Shared controls for every home0ps system. Each host role adds its own summary in
 |---|---|
 | Monitoring host (Raspberry Pi 5) | [`security/monitoring.md`](security/monitoring.md) |
 | Apps host (Intel N305) | [`security/apps.md`](security/apps.md) |
-| Media LXC (on the storage host, VLAN 13) | [`security/media.md`](security/media.md) |
-| Infra VM (on the storage host, VLAN 24, tier 0) | [`security/infra.md`](security/infra.md) |
-| Storage host (MOS NAS) | [`security/storage.md`](security/storage.md) |
+| Media LXC (on the homenas, VLAN 13) | [`security/media.md`](security/media.md) |
+| Infra VM (on the homenas, VLAN 24, tier 0) | [`security/infra.md`](security/infra.md) |
+| Homenas (MOS NAS) | [`security/homenas.md`](security/homenas.md) |
 | Honeypot (untrusted, not home0ps production; Hetzner server retired 2026-11-12, moving to HOSTKEY) | [`security/honeypot.md`](security/honeypot.md) |
 | Lab (XCP-ng) | `security/lab.md` — later, not home0ps production |
 

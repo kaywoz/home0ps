@@ -231,8 +231,9 @@ change explicitly if one no longer fits.
 
 - **Host roles** (real device names never in git, §4): monitoring host
   (Raspberry Pi 5, observation-only: reads everything, changes nothing
-  elsewhere), apps host (Intel N305, trusted well-known apps only), storage
-  host (MOS NAS, storage only, pulls backups). Risky or `privileged`
+  elsewhere), apps host (Intel N305, trusted well-known apps only), homenas
+  (MOS NAS: storage, pulls backups, and the home Docker stacks once
+  kaywoz/home0ps#321 is built; kaywoz, 2026-11-17). Risky or `privileged`
   workloads go to the separate XCP-ng lab, not home0ps.
 - **Two access planes:** admin UIs as Tailscale Services
   (`svc:<app>` on 443); user-facing apps via Cloudflare Tunnel + Access.
@@ -251,7 +252,7 @@ change explicitly if one no longer fits.
     Hawser (standard mode, token, tcp:2376 over the tailnet) the apps VM and
     the media LXC — so it is ≈ root on those hosts (accepted). Hawser runs
     only on the infra VM, apps VM and media LXC unless kaywoz says otherwise:
-    **not the storage host** (kaywoz, 2026-11-09), **never the monitoring
+    **not the homenas** (kaywoz, 2026-11-09), **never the monitoring
     host** (backup copy 1 stays outside central control) and **never lab
     agents**.
   - **Dockhand-lab** runs next to Xen Orchestra in the **lab management

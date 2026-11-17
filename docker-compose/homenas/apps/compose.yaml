@@ -1,5 +1,5 @@
-# PROPOSAL — not deployed. Apps stack on the replacement storage host (MOS), replacing the apps VM.
-# Design, open questions and migration: docker-compose/storage/README.md. Nothing here runs until kaywoz OKs it.
+# PROPOSAL — not deployed. Apps stack on the replacement homenas (MOS), replacing the apps VM.
+# Design, open questions and migration: docker-compose/homenas/README.md. Nothing here runs until kaywoz OKs it.
 #
 # Zone: VLAN 31 (apps). Trusted, well-known apps only (CLAUDE.md §8).
 # - apps-vlan31: macvlan on the VLAN 31 sub-interface, no host IP on it: egress for the containers that
