@@ -39,7 +39,7 @@ say()  { echo "== $*"; }
 warn() { echo "WARN $*" >&2; }
 die()  { echo "FAIL $*" >&2; exit 1; }
 
-MODE=install
+MODE=install; ALREADY=0
 case "${1:-}" in
   "") ;; --now) MODE=now ;; --reseal) MODE=reseal ;; --uninstall) MODE=uninstall ;;
   *) die "unknown option: $1" ;;
@@ -99,7 +99,7 @@ done
 if docker info >/dev/null 2>&1; then
   root=$(docker info --format '{{.DockerRootDir}}')
   case "$root" in
-    */"$REMAP_BASE.$REMAP_BASE") say "Docker already runs remapped ($root)" ;;
+    */"$REMAP_BASE.$REMAP_BASE") say "Docker already runs remapped ($root)"; ALREADY=1 ;;
     *) n=$(docker ps -aq | wc -l)
        if [ "$n" -gt 0 ]; then
          [ "${FORCE:-}" = 1 ] || die "$n container(s) in the unremapped store ($root): they won't be visible after remap. Recreate them afterwards, re-own their appdata to $REMAP_BASE+uid, then rerun with FORCE=1"
@@ -140,7 +140,7 @@ chmod 600 "$PRE"
 # writes the config; restarts Docker only if it runs unremapped
 if [ "$MODE" = now ]; then
   bash "$HOOK" || warn "hook reported a problem: see /var/log/docker-userns.log"
-else
+elif [ "$ALREADY" = 0 ]; then
   say "remap applies at the next Docker start (reboot), or rerun with --now"
 fi
 bash "$HOOK" --check || true
@@ -148,7 +148,8 @@ bash "$HOOK" --check || true
 cat <<EOF
 
 == by hand, in the MOS UI:
-   cron jobs: add   $CRON_LINE
+   cron jobs: $(grep -qxF "$CRON_LINE" /var/spool/cron/crontabs/root 2>/dev/null \
+                && echo "present ($CRON_LINE)" || echo "add   $CRON_LINE")
    containers/stacks: autostart on for everything that should come back after a reboot
    (MOS's Docker stop runs 'docker stop', so restart: unless-stopped alone doesn't bring them back)
    Docker start parameters: leave without --userns-remap
