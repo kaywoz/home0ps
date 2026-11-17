@@ -790,3 +790,11 @@ mistakes, not a diary.
 - **Root cause:** read "risky" in §8 by its everyday meaning instead of asking what kaywoz meant by it; the lab placement in an earlier long list was taken as support.
 - **Fix applied:** the Warrior stays in the apps stack; the lab question was dropped from the proposal. Its real gaps (no read-only root, UI without auth by default) are handled as a registered exception with mitigations.
 - **Rule going forward:** "risky workloads go to the lab" (CLAUDE.md §8) means security tooling: malware, analysis, forensics and similar. Don't move ordinary apps to the lab on that rule; flag their specific gaps instead.
+
+### 2026-11-17 — compose (pushed to a merged PR, third time)
+
+- **Trigger:** commit missed `main` (repeat of 2026-11-03 and 2026-11-11)
+- **What happened:** the userns-remap update for the storage stacks was pushed to PR 321's branch after kaywoz had merged it and the branch was deleted. The push recreated the branch, and the merged PR's description was edited to describe a change it doesn't contain.
+- **Root cause:** a long session that had pushed to the same open draft PR several times; the state was assumed, not checked. The 2026-11-11 gate wasn't used.
+- **Fix applied:** the merged PR's description was restored; the commit was cherry-picked onto a new branch from `main` with a new PR; the recreated branch was deleted.
+- **Rule going forward:** unchanged from 2026-11-11, and it applies to every push and every `gh pr edit`, also in long sessions: `[ "$(gh pr view N --json state --jq .state)" = OPEN ] && …`.

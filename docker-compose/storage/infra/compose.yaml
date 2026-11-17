@@ -16,7 +16,10 @@
 #   No host IP on any of them: the MOS host can't reach macvlan containers, and they can't reach it.
 # - proxy-<app>: internal bridges, one per served app (app + its zone's sidecar). No egress, no ports.
 # - socketproxy: a plain bridge, the proxy's port on 127.0.0.1 for the host's `tailscale serve` (tag:storage).
-# No userns-remap (#310 §7c: works at runtime but doesn't persist on MOS; settled): `user:` uids are host uids.
+# Docker runs with userns-remap, daemon-wide (kaywoz, 2026-11-17; #310 §7c, set up by #325): container uid N
+# is host uid 165536+N, so appdata and secret files are owned 165536+<the uid in `user:`> ("owned 165536+N"
+# below). Distinct non-root uids per service on top of it. Exemptions (`userns_mode: host`) are listed in the
+# README with a reason. The stack needs MOS autostart on: `restart:` alone doesn't bring it back.
 services:
   # Media zone sidecar: a node of its own (tag:media, as the media LXC is today) that serves svc:jellyfin
   # and svc:komga. Userspace networking: no TUN device, no NET_ADMIN. Auth key and serve config as files.
@@ -141,6 +144,7 @@ services:
     image: tecnativa/docker-socket-proxy:latest
     container_name: kr-ccp-socketproxy-0301
     restart: unless-stopped
+    userns_mode: host                  # remap exemption R1: remapped root (host 165536) can't open docker.sock
     read_only: true
     tmpfs:
       - /run
@@ -174,6 +178,8 @@ services:
     container_name: kr-ccp-beszelagent-0201
     restart: unless-stopped
     network_mode: host
+    userns_mode: host                  # remap exemption R2: Docker can't share the host network namespace
+                                       # with a remapped container (docs.docker.com/engine/security/userns-remap)
     user: "65534:65534"
     read_only: true
     cap_drop: [ALL]
@@ -191,7 +197,7 @@ services:
       - beszel_key
       - beszel_token
     volumes:
-      - ${APPDATA}/beszel/agent:/var/lib/beszel-agent   # owned 65534
+      - ${APPDATA}/beszel/agent:/var/lib/beszel-agent   # owned 65534 (not remapped)
     healthcheck:                       # upstream's suggestion: fails if the health file is older than 91 s
       test: ["CMD", "/agent", "health"]
       interval: 60s
@@ -263,12 +269,12 @@ networks:
 
 secrets:
   ts_authkey_media:
-    file: ${APPDATA}/tailscale-media/authkey   # 600, owned 2210; delete after the node has joined
+    file: ${APPDATA}/tailscale-media/authkey   # 600, owned 165536+2210; delete after the node has joined
   ts_authkey_apps:
-    file: ${APPDATA}/tailscale-apps/authkey    # 600, owned 2211; delete after the node has joined
+    file: ${APPDATA}/tailscale-apps/authkey    # 600, owned 165536+2211; delete after the node has joined
   cf_tunnel_token:
-    file: ${APPDATA}/cloudflared/token         # from the Cloudflare dashboard; 600, owned 2201
+    file: ${APPDATA}/cloudflared/token         # from the Cloudflare dashboard; 600, owned 165536+2201
   beszel_key:
-    file: ${APPDATA}/beszel/secrets/key          # from the hub's "Add system"; 600, owned 65534
+    file: ${APPDATA}/beszel/secrets/key          # from the hub's "Add system"; 600, owned 65534 (not remapped)
   beszel_token:
-    file: ${APPDATA}/beszel/secrets/token        # 600, owned 65534
+    file: ${APPDATA}/beszel/secrets/token        # 600, owned 65534 (not remapped)
