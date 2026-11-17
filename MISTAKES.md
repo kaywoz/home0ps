@@ -798,3 +798,51 @@ mistakes, not a diary.
 - **Root cause:** a long session that had pushed to the same open draft PR several times; the state was assumed, not checked. The 2026-11-11 gate wasn't used.
 - **Fix applied:** the merged PR's description was restored; the commit was cherry-picked onto a new branch from `main` with a new PR; the recreated branch was deleted.
 - **Rule going forward:** unchanged from 2026-11-11, and it applies to every push and every `gh pr edit`, also in long sessions: `[ "$(gh pr view N --json state --jq .state)" = OPEN ] && …`.
+
+### 2026-11-16 — mos (`btrfs device stats` with two paths)
+
+- **Trigger:** command failed on the host
+- **What happened:** a diagnostics block for the candidate storage host ran `btrfs device stats` with two mount paths. It failed with "exactly 1 argument expected", so the error counters weren't shown.
+- **Root cause:** the command's usage wasn't checked; I assumed it takes several paths like `df`.
+- **Fix applied:** loop over `findmnt -t btrfs -n -o TARGET`, one `btrfs device stats` per mount.
+- **Rule going forward:** for any CLI not used before in this repo, check its usage line (`<cmd> --help` or the man page) before handing it over; one path per call unless the usage says otherwise.
+
+### 2026-11-16 — mos (soak script aborted on `smartctl`'s exit code)
+
+- **Trigger:** script bug on the host
+- **What happened:** the soak script (`set -euo pipefail`) aborted early because `smartctl -A` exits non-zero when a drive's error log has entries, even though the read succeeded.
+- **Root cause:** assumed exit 0 means "read OK" for `smartctl`; its exit status is a bitmask that also reports drive state.
+- **Fix applied:** `smartctl … || true` in the reader, plus an `ERR` trap that prints the failing line.
+- **Rule going forward:** in `set -e` scripts, check the exit-code semantics of every monitoring tool (`smartctl`, `nvme`, `ipmitool`, …) and tolerate the non-fatal codes explicitly; add an `ERR` trap that names the line.
+
+### 2026-11-16 — mos (`<placeholder>` read as a redirect)
+
+- **Trigger:** command failed on the host
+- **What happened:** a soak start command contained the placeholder `<old-host-ip>`. It was run unedited, bash read `<` as a redirect, and the soak never started (an empty test folder was left behind).
+- **Root cause:** placeholders written with angle brackets, which are shell syntax.
+- **Fix applied:** folder removed, command re-sent with a placeholder without brackets.
+- **Rule going forward:** placeholders in commands handed to kaywoz never use `<>` (or other shell metacharacters); use plain words such as `OLD_HOST_IP`.
+
+### 2026-11-17 — mos (remap checked before Docker was up)
+
+- **Trigger:** wrong diagnosis
+- **What happened:** the first runtime test of Docker `userns-remap` was reported as failed ("no socket"). The check ran right after `/etc/init.d/docker restart`, but the init script starts `dockerd` in the background, so it wasn't up yet.
+- **Root cause:** assumed the init script returns once the daemon is ready.
+- **Fix applied:** wait loop (`docker info` until it answers, max 60 s) before any check.
+- **Rule going forward:** after starting or restarting a daemon, poll for readiness (socket/API answers) before checking its state; never treat the first failed probe as a result.
+
+### 2026-11-17 — mos (watchdog lock inherited by `dockerd`)
+
+- **Trigger:** script bug on the host
+- **What happened:** `docker-userns.sh` held a `flock` on fd 9 and then restarted Docker. `dockerd` inherited fd 9 and held the lock for its lifetime, so every later run, including `--check`, exited silently.
+- **Root cause:** an open lock fd is inherited by every process the script starts, including long-running daemons.
+- **Fix applied:** the init script is called with `9>&-`; `--check` takes no lock (#325).
+- **Rule going forward:** scripts that hold a lock close the lock fd for every child that may outlive them (`9>&-`), and read-only modes take no lock.
+
+### 2026-11-17 — mos (`docker_options` tested through the wrong path)
+
+- **Trigger:** wrong conclusion
+- **What happened:** I concluded that MOS ignores `docker_options` in `docker.json` and drafted a bug report saying so. The test had restarted Docker with `/etc/init.d/docker` directly, which doesn't read the key; `mos-start` and the UI do pass it at start. The UI also has a field for it, which I said didn't exist.
+- **Root cause:** tested a shortcut path instead of the path the OS uses at boot, and didn't read `mos-start` before concluding.
+- **Fix applied:** read `mos-start`, confirmed with a harmless flag through the UI, corrected the bug report and #310.
+- **Rule going forward:** test a setting through the same path the platform uses (boot script or UI), and read that path's code before saying a setting has no effect.
