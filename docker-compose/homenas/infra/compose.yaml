@@ -108,8 +108,8 @@ services:
       retries: 3
 
   # cloudflared: the Cloudflare Tunnel for user-facing apps (second access plane, CLAUDE.md §8). Outbound
-  # only. Token as a file. Ingress rules are kept in Cloudflare (remotely managed tunnel). How it reaches
-  # apps in other zones is open (README I-Q2); until then it joins no app network.
+  # only. Token as a file. Ingress rules are kept in Cloudflare (remotely managed tunnel). It reaches public
+  # apps-zone apps via their proxy-<app> networks (README I-Q2); no app is public yet (I-Q3), so it joins none.
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: kr-ccp-cloudflared-0101
@@ -134,7 +134,7 @@ services:
       timeout: 5s
       retries: 3
     networks:
-      - apps-vlan31                    # internet access; how it reaches apps: README I-Q2
+      - apps-vlan31                    # internet access; reaching apps: README I-Q2
 
   # Read-only Docker API for Dozzle (monitoring host) and the Beszel agent. One Docker daemon serves all
   # stacks, so one proxy sees every container. Never host networking: the proxy would listen on every
