@@ -124,6 +124,7 @@ What each dropped layer would have bought, and why it went:
 | cloudflared | metrics pinned to `127.0.0.1:20241` | container builds otherwise bind `0.0.0.0` |
 | socket proxy | **E6:** root, no `cap_drop` | it opens `docker.sock`; `POST=0` is the control, as today |
 | Beszel agent | `network_mode: host` | upstream requirement for interface stats; key and token as files |
+| socket proxy, Beszel agent | compose profile `monitoring`, off | they only feed the monitoring host, which isn't running now (kaywoz, 2026-11-18); started with the profile once it's back |
 
 **Secrets:** the tunnel token as a file (`TUNNEL_TOKEN_FILE`; never `TUNNEL_TOKEN`, env vars are readable through the socket proxy); the Beszel `key` and `token` (owned 65534).
 
