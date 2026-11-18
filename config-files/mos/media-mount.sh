@@ -1,6 +1,7 @@
 #!/bin/bash
 # media-mount.sh — read-only rclone mount of the media library on the MOS host, then start the
-# LXCs that bind it (kaywoz/home0ps#197, #174). Idempotent: run it at boot and as a watchdog.
+# LXCs and Docker containers that bind it (kaywoz/home0ps#197, #174, #320). Idempotent: run it at
+# boot and as a watchdog.
 #
 # Cron: add the lines in the MOS UI's cron jobs section. `crontab` entries are lost at reboot on MOS
 # (verified 2026-11-16):
@@ -8,9 +9,9 @@
 #   */5 * * * *  bash /boot/config/home0ps/media-mount.sh     # watchdog: remounts if the mount died
 # (via bash: /boot on MOS doesn't allow executing files directly)
 #
-#   media-mount.sh            mount (if needed), then start/restart the LXCs (if needed)
+#   media-mount.sh            mount (if needed), then start/restart the LXCs and containers (if needed)
 #   media-mount.sh --check    report only, change nothing; exit 1 if anything is wrong
-#   media-mount.sh --umount   stop the LXCs that use it, then unmount
+#   media-mount.sh --umount   stop the LXCs and containers that use it, then unmount
 #
 # Settings come from a host-local env file (NOT in git: remote names and paths stay on the host):
 #   /boot/config/home0ps/media-mount.env   (override with MEDIA_MOUNT_ENV=<file>)
@@ -23,11 +24,15 @@
 #     LXCS="kr-cxp-media-0101"            LXCs with a bind entry for $MNT, started after the mount.
 #                                         Set their autostart off: if one starts before the
 #                                         mount, its bind shows the empty directory underneath.
+#     CONTAINERS="kr-ccp-jellyfin-0201:/media kr-ccp-komga-0201:/data"
+#                                         Docker containers with a bind of $MNT, as name:target.
+#                                         They keep MOS autostart on; one that started before the
+#                                         mount sees an empty target and is restarted here.
 #     RCLONE_BIN=rclone
 #
 # rclone flags (rclone docs, commands/rclone_mount): --read-only; --allow-other so the LXC's
-# remapped uids can read (FUSE only checks user_allow_other for non-root mounters);
-# --umask 0022 → files 0644, dirs 0755, readable as "others" through the uid mapping;
+# remapped uids and the containers' own uids can read (FUSE only checks user_allow_other for
+# non-root mounters); --umask 0022 → files 0644, dirs 0755, readable as "others";
 # --daemon waits up to --daemon-wait for a ready mount.
 set -euo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -37,7 +42,7 @@ MODE=apply
 case "${1:-}" in
   --check) MODE=check ;;
   --umount) MODE=umount ;;
-  -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+  -h|--help) sed -n '2,36p' "$0"; exit 0 ;;
   "") ;;
   *) echo "unknown option: $1" >&2; exit 1 ;;
 esac
@@ -52,6 +57,7 @@ die() { log "ABORT: $*"; exit 1; }
 RCLONE_BIN="${RCLONE_BIN:-rclone}"; MNT="${MNT:-/mnt/media}"
 CACHE_MAX_SIZE="${CACHE_MAX_SIZE:-100G}"; CACHE_MAX_AGE="${CACHE_MAX_AGE:-168h}"
 READ_AHEAD="${READ_AHEAD:-256M}"; DIR_CACHE_TIME="${DIR_CACHE_TIME:-15m}"; LXCS="${LXCS:-}"
+CONTAINERS="${CONTAINERS:-}"
 for v in RCLONE_CONFIG REMOTE CACHE_DIR LOG_FILE; do [ -n "${!v:-}" ] || die "$v not set in $ENV_FILE"; done
 [ -r "$RCLONE_CONFIG" ] || die "rclone config $RCLONE_CONFIG not readable"
 command -v "$RCLONE_BIN" >/dev/null || die "$RCLONE_BIN not found"
@@ -67,6 +73,9 @@ fuse_umount() { fusermount3 -uz "$MNT" 2>/dev/null || fusermount -uz "$MNT" 2>/d
 lxc_running() { lxc-info -n "$1" -s 2>/dev/null | grep RUNNING >/dev/null; }
 # the LXC sees the media when its bind target is non-empty
 lxc_sees_media() { [ -n "$(lxc-attach -n "$1" -- ls -A /mnt/media 2>/dev/null | head -1)" ]; }
+# containers: entries are name:target (where the container binds $MNT)
+ct_running() { [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = true ]; }
+ct_sees_media() { [ -n "$(docker exec "$1" ls -A "$2" 2>/dev/null | head -1)" ]; }
 
 if [ "$MODE" = check ]; then
   rc=0
@@ -77,11 +86,18 @@ if [ "$MODE" = check ]; then
     elif lxc_sees_media "$c"; then echo "OK   LXC $c sees the media"
     else echo "FAIL LXC $c runs but /mnt/media is empty (started before the mount?)"; rc=1; fi
   done
+  for e in $CONTAINERS; do
+    c="${e%%:*}"; t="${e#*:}"
+    if ! ct_running "$c"; then echo "FAIL container $c not running"; rc=1
+    elif ct_sees_media "$c" "$t"; then echo "OK   container $c sees the media"
+    else echo "FAIL container $c runs but $t is empty (started before the mount?)"; rc=1; fi
+  done
   exit "$rc"
 fi
 
 if [ "$MODE" = umount ]; then
   for c in $LXCS; do lxc_running "$c" && { log "stopping LXC $c"; lxc-stop -n "$c"; }; done
+  for e in $CONTAINERS; do c="${e%%:*}"; ct_running "$c" && { log "stopping container $c"; docker stop "$c" >/dev/null; }; done
   is_mounted && { log "unmounting $MNT"; fuse_umount; }
   exit 0
 fi
@@ -122,5 +138,15 @@ for c in $LXCS; do
     if [ "$MOUNTED_NOW" = 1 ]; then log "starting LXC $c"; lxc-start -n "$c" 9>&-; fi
   elif ! lxc_sees_media "$c"; then
     log "LXC $c started before the mount: restarting it"; lxc-stop -n "$c"; lxc-start -n "$c" 9>&-
+  fi
+done
+
+# ---- containers: same rule as the LXCs -------------------------------------------
+for e in $CONTAINERS; do
+  c="${e%%:*}"; t="${e#*:}"
+  if ! ct_running "$c"; then
+    if [ "$MOUNTED_NOW" = 1 ]; then log "starting container $c"; docker start "$c" >/dev/null 9>&- || log "container $c didn't start"; fi
+  elif ! ct_sees_media "$c" "$t"; then
+    log "container $c started before the mount: restarting it"; docker restart "$c" >/dev/null 9>&- || log "container $c didn't restart"
   fi
 done
