@@ -2,435 +2,275 @@
 
 > **Status: proposal — nothing is deployed or built.** kaywoz OKs (or changes) this before anything runs. The four compose files next to this README are drafts that validate (`docker compose config --quiet`), not deploy instructions.
 >
-> **Decided 2026-11-17 (kaywoz):** Docker runs directly on MOS and **all** stacks go there: no LXC and no VM stays ("go with mos only and prepare"). The #310 tests are done; verdict "viable, with conditions". What they settled is built in below; what's left is under [Before the build](#before-the-build) and [Go-live prerequisites](#go-live-prerequisites).
+> **Decided 2026-11-17 (kaywoz):** Docker runs directly on MOS and **all** stacks go there: no LXC and no VM stays. The #310 tests are done; verdict "viable, with conditions". Later the same day the design was cut back to need and proportionality ([Baseline](#baseline)).
 
-Four separate stacks for MOS on the replacement homenas (the 4-bay NVMe box tested in kaywoz/home0ps#310). The app lineup is kaywoz's (2026-11-16, extended the same day from `kaywoz/mos-templates`). On 2026-11-17 he moved the services that serve other services into the infra stack:
+| Stack | File | Apps | Replaces |
+|---|---|---|---|
+| **media** | [`media/compose.yaml`](media/compose.yaml) | Jellyfin, Komga, Homey | the media LXC |
+| **infra** | [`infra/compose.yaml`](infra/compose.yaml) | cloudflared, the box's socket proxy and Beszel agent | the infra VM; the proxy and agent move from MOS-template deploys |
+| **apps** | [`apps/compose.yaml`](apps/compose.yaml) | mediasort, paperless-ngx, CannonCommander, Immich, ArchiveBox, ArchiveTeam Warrior, Atuin, HedgeDoc, Filestash, RackPeek | the apps VM |
+| **storage** | [`storage/compose.yaml`](storage/compose.yaml) | Kopia, Time Machine, RustFS, Scrutiny collector (once a day from MOS cron) | new (#43, #39, #103) |
 
-| Stack | File | Apps | Replaces | Zone |
-|---|---|---|---|---|
-| **media** | [`media/compose.yaml`](media/compose.yaml) | Jellyfin, Komga, Homey | the media LXC | VLAN 13 (IoT) |
-| **infra** | [`infra/compose.yaml`](infra/compose.yaml) | the shared services: Tailscale sidecars (media and apps zones), cloudflared, the box's socket proxy and Beszel agent | the infra VM; the proxy and agent move from MOS-template deploys | each container in the zone it serves; internet access through VLAN 31 |
-| **apps** | [`apps/compose.yaml`](apps/compose.yaml) | mediasort, paperless-ngx, CannonCommander, Immich, ArchiveBox, ArchiveTeam Warrior, Atuin, HedgeDoc, Filestash, RackPeek | the apps VM | VLAN 31 (apps) |
-| **storage** | [`storage/compose.yaml`](storage/compose.yaml) | Kopia, Time Machine, RustFS, Scrutiny collector (run once a day from MOS cron, #103) | new (#43, #39) | the homenas's own network |
+The MOS UI is the homenas's only management portal and its Docker UI (#312; Dockhand-home retires, I-Q1). The app lineup is kaywoz's (2026-11-16, from his GitHub stars, `kaywoz/mos-templates` and the MOS Hub catalogue). Off the table for now: Pocket ID, Ollama, copyparty, the S3 alternatives to RustFS.
 
-This follows the scenario in kaywoz/home0ps#314: Docker runs **directly on MOS**, one stack per zone, the zone stacks on a macvlan network on their VLAN sub-interface **with no host IP on those VLANs**. The MOS UI is the homenas's only management portal (#312). All three guests (the media LXC, the infra VM and the apps VM) move onto the new box (kaywoz, 2026-11-17; G1 resolved).
+## Baseline
 
-The candidates came from the 2026-11-13 discussion: a long list from kaywoz's GitHub stars, `kaywoz/mos-templates`, the MOS Hub catalogue (mos-official.net) and generic homeserver apps, then a short list checked against the Hub. kaywoz picked the four stacks above from it and added the rest from his MOS templates. Off the table for now: Pocket ID, Ollama, copyparty, the S3 alternatives to RustFS. The git-pull deployer (#314) isn't a stack; for now stacks are deployed through the MOS UI (below).
+kaywoz, 2026-11-17: "if we simply want to deploy stacks with reasonable defaults which are safe [...] what do we actually need to do". The earlier draft (userns-remap, a macvlan zone per VLAN, per-zone Tailscale sidecars, an infra stack owning every network) cost hours of platform workarounds for little risk reduction (MISTAKES.md, homenas proportionality). The design is now what comparable NAS platforms do, plus the per-container standard:
+
+| | Synology / UGREEN / Unraid / TrueNAS apps | This design |
+|---|---|---|
+| Docker daemon | as shipped, root, no remap | **as MOS ships it**, no remap, no boot hooks |
+| Containers | often root, `PUID`/`PGID` | non-root `user:` where the image allows, `cap_drop: [ALL]`, `no-new-privileges`, memory and pid limits (CLAUDE.md §8) |
+| Networks | bridge, ports on the host IP | one bridge per app, **ports on `127.0.0.1`**; macvlan only where layer 2 or isolation is needed |
+| Remote access | vendor relay or reverse proxy | **the host's own `tailscale serve`**, one Service per admin UI, grants per Service |
+
+What each dropped layer would have bought, and why it went:
+
+| Dropped | Threat | Already covered by | What it cost |
+|---|---|---|---|
+| userns-remap | container root escaping to host root | non-root uids, `cap_drop: [ALL]` and `no-new-privileges` on all but four containers (E3–E6); a kernel exploit gets root either way | boot hook + cron guard (MOS keeps `/etc` in RAM), re-owning all appdata to 165536+N, five exemptions, a group bug after a reboot, and Docker found running on RAM after restarts outside MOS (cause not confirmed) |
+| macvlan zones + sidecars | containers egressing or reachable on the wrong VLAN | Tailscale grants per Service, the apps' own logins, UniFi (#322) | two sidecars and auth keys, cross-stack networks, a boot-order dependency, no host access to the containers |
+| `read_only` at any cost | writes to the image filesystem | non-root already blocks most | per-app workarounds; now: kept where it works, **dropped at build where it doesn't** (no workaround, noted in the stack's table) |
+
+**Where the effort goes instead:** #255 (an offsite copy host root can't delete: the most likely serious loss on a NAS is data and backups wiped together) and #322 (UniFi).
 
 ## Common design
 
-### Zone stacks (media, infra, apps): reachability
-- **Two macvlans** on VLAN sub-interfaces, no IP on the host side (kaywoz, 2026-11-17):
-  - **`media-vlan13`:** only Jellyfin and Homey, as IoT members of VLAN 13 with fixed addresses.
-  - **`apps-vlan31`:** every Docker container that needs the internet: both sidecars, cloudflared, mediasort, the archivers, and Immich ML for its first model download. "services needing internet use vlan31 for docker. vlan24 is for servers needing internet": **VLAN 24 isn't used by Docker.**
-  - Everything else sits on internal bridges only. Traffic leaves through the VLAN, so the UniFi rules apply as they do to today's guests.
-- **Everything else sits on `internal: true` bridges** (§8: internal when no egress and no ports). Each app gets a `proxy-<app>` network (app + sidecar). Apps with a database also get a `<app>-backend` network (app + database/Redis), so the sidecar never reaches a database. An internal bridge never gets a gateway, so the macvlan is always the default route where a container has both: no `gw_priority` (Engine ≥ 28) needed.
-- **No `ports:`.** Macvlan containers can't be reached from the host (a kernel restriction, per Docker's macvlan docs), and port publishing doesn't work on macvlan or internal networks (moby source). So host-side `tailscale serve` to `127.0.0.1` can't reach them.
-- **One Tailscale sidecar per zone with admin UIs** (`tailscale/tailscale`, userspace networking: no TUN, no `NET_ADMIN`). It joins the zone's macvlan and that zone's `proxy-<app>` networks, and advertises the Services from a serve-config file (`TS_SERVE_CONFIG`, `ipn.ServeConfig` JSON with a `Services` key; auto-advertised since containerboot 1.96). It keeps the zone's tag (`tag:media`, `tag:docker`), so the policy mostly stays. Both sidecars are **defined in the infra stack** (shared services) but each stays in its own zone: no container joins two zones' networks (I-Q4).
-- **The infra stack owns the shared networks:** the macvlans (`media-vlan13`, `apps-vlan31`) and the `proxy-<app>` bridges the sidecars serve. The media and apps stacks join them as `external: true`, so **infra starts first**. The `<app>-backend` networks stay with their app's stack. Fixed addresses (`JELLYFIN_IP`, `HOMEY_IP`, `ARCHIVEBOX_IP`, `WARRIOR_IP`) stay in the zone stacks' `.env`; the subnets move to the infra stack's.
-- **What the macvlan isolation buys:** a zone container can't reach the MOS host: not the MOS UI, not SMB/NFS, not the rclone remote control (not started at boot; CLI only, #316 closed).
-- **What it costs:** on its macvlan IP every listening port of a container is open to that VLAN; Docker filters nothing there. Listed per service below.
+### Networks and access
+- **Default:** each app gets a plain bridge `proxy-<app>` and publishes its UI on `127.0.0.1`. The host serves it: `tailscale serve --service=svc:<app> http://127.0.0.1:<port>`. Every Service is advertised by the homenas's own node (`tag:storage`). Databases and Redis sit on an internal `<app>-backend` bridge with the app only.
+- **Each stack owns its networks.** No `external:` networks, so stacks start in any order.
+- **macvlan only where needed**, each owned by the one stack that uses it, no host IP on the VLAN:
 
-| Alternative considered | Why not (for now) |
-|---|---|
-| Bridges + `127.0.0.1` ports + host `tailscale serve` (today's pattern) | Egress leaves from the homenas's own network instead of the zone's, and every container can reach the MOS host via the bridge gateway (MOS UI, SMB/NFS). Used only for the **storage** stack, whose services belong to the host anyway |
-| MOS "Docker Local Host Access" plugin (shim) | **Tested, not usable** (#310 §7d): no settings; one shim on the main interface only, no IP of its own, the host's LAN routed through it as two /25s; nothing on the VLAN sub-interfaces, so host ↔ VLAN container stays blocked. Uninstalled |
-| tsdproxy | Needs a network path to every target, so one instance would bridge all zones. Stable v2 makes a node per container, not Services (Services only in the v3 betas). Adds a dashboard, REST API, webhooks |
-| DockTail | Native Services, read-only Docker API (works behind the socket proxy, `POST=0`), but drives a tailscaled that must reach the container, so it still needs the per-zone sidecar. Its documented sidecar uses `network_mode: host`. Parked: revisit if the number of Services grows |
+  | Network | Stack | Containers | Why |
+  |---|---|---|---|
+  | `media-vlan13` | media | Jellyfin, Homey | layer 2 on VLAN 13: Apple TV playback and discovery, Homey's device bridging |
+  | `apps-vlan31` | apps | ArchiveBox, ArchiveTeam Warrior | they fetch arbitrary URLs: they leave through VLAN 31 under internet-only UniFi rules and can't reach the host directly (A-Q12, G8) |
+  | `clients-vlan11` | storage | Time Machine | SMB on 445 next to MOS's own Samba; discovery on the trusted clients' VLAN (S-Q2) |
 
-### Container standard (CLAUDE.md §8) and MOS specifics
-- **Applied everywhere** unless a service's table says otherwise: non-root `user:`, `read_only` + `tmpfs`, `cap_drop: [ALL]`, `no-new-privileges`, `mem_limit`, `pids_limit`, healthcheck where the image has or allows one, secrets as files (600, owned by the service uid), images on `:latest` (two exceptions under apps).
-- **userns-remap — adopted** (kaywoz, 2026-11-17; #310 §7c, verified across a reboot; implementation in #325). Docker runs remapped daemon-wide, range pinned `dockremap:165536:65536` (LXC holds `root:100000`): **container uid N is host uid 165536 + N**. MOS runs `pre-start.sh` before Docker at boot, which writes the remap config into RAM `/etc`; `docker-userns.sh` re-checks it every minute from a MOS UI cron job. So a container's root is an unprivileged host uid if it escapes. **Distinct non-root uids per service stay on top of it**, so one compromised app still can't read another's data.
-  - **Ownership:** appdata and secret files are owned by 165536 + the container uid (secret files 600). The compose comments say "owned 165536+N". The exempt services below keep real host uids.
-  - **Autostart:** each stack needs **MOS autostart on**. `restart: unless-stopped` alone doesn't bring it back, because MOS's stop runs `docker stop`.
-  - **Exemptions** (`userns_mode: host`; each needs a reason, and they belong in `security/homenas.md`'s "Container escape" row, which #325 adds):
+- **Reaching macvlan containers:** the host can't talk to its own macvlan children directly (a kernel restriction), but it can through the router: the host sends to the container's VLAN address via its gateway, UniFi routes it, and it comes back in tagged on the VLAN. So `svc:jellyfin`, `svc:archivebox` and `svc:archivewarrior` target the containers' VLAN addresses. Needs one UniFi allow rule, the homenas → those addresses and ports (8096, 5797, 8001); #322's block of VLAN → homenas doesn't affect replies. **To verify before the build** (test (d)).
+- **What bridges allow:** a container on a plain bridge has egress via the host and can reach the MOS host's own listeners through the bridge gateway. Accepted (S-Q1): every host TCP listener needs a login or is tailnet-only.
+- **Considered and not used:** the MOS "Docker Local Host Access" plugin (tested in #310 §7d: one shim on the main interface only, no help for VLAN containers); tsdproxy and DockTail (both still need a path to every container; parked).
 
-    | # | Service | Why it can't run remapped |
-    |---|---|---|
-    | **R1** | socket proxy (infra) | it opens `docker.sock` as root; remapped root is host uid 165536, which has no access to the socket. Not in Docker's docs: reasoned from the socket's permissions, to confirm at build. `POST=0` stays the control (E6) |
-    | **R2** | Beszel agent (infra) | `network_mode: host`, which Docker doesn't allow with a remapped container (docs.docker.com/engine/security/userns-remap, "known limitations"). It runs as 65534 |
-    | **(R3)** | Jellyfin, Immich server | **only if the build test fails:** the render node's host group doesn't map into a remapped container, so `group_add: RENDER_GID` may not grant `/dev/dri/renderD128`. Two fixes: a boot step that sets the node's group to 165536 + `RENDER_GID` (keeps them remapped; it would go into #325's hook), or `userns_mode: host` for both (still non-root uids). Not an exemption in the draft |
-    | **R4** | Scrutiny collector (storage) | NVMe SMART needs `SYS_ADMIN` on the host's controller devices; a capability inside a remapped namespace doesn't count for host devices. Runs once a day, collector only (E5) |
+### Container standard and MOS specifics
+- **Applied everywhere** unless a stack's table says otherwise: non-root `user:`, `read_only` + `tmpfs` where it works, `cap_drop: [ALL]`, `no-new-privileges`, `mem_limit`, `pids_limit`, healthcheck where the image has one, secrets as files (600, owned by the uid in `user:`), images on `:latest` (one exception, E7).
+- **No userns-remap** (kaywoz, 2026-11-17). A uid in `user:` is the same uid on the host, so appdata and secret files are owned by it. Distinct uids per service keep one app out of another's data.
 
-  - Everything else runs remapped, including the root containers: Homey (E3) and Time Machine (E4) now run as host uid 165536, not host root.
+  | Range | Stack | uids |
+  |---|---|---|
+  | 20xx | media | 2001 Jellyfin, 2002 Komga (Homey: root, E3) |
+  | 21xx | apps | 2104 mediasort, 2105 paperless, 2106 paperless Redis, 2111 Immich server, 2112 Immich ML, 2113 Immich Postgres, 2114 Immich Valkey, 2121 Atuin, 2123 HedgeDoc; CannonCommander runs as the Samba-only data user (A-Q2) |
+  | image uids | apps | ArchiveBox 911, ArchiveTeam Warrior 1000, RackPeek 1654, Filestash its image's own user (unverified, likely 1000: A-Q10) |
+  | 22xx | infra | 2201 cloudflared; Beszel agent 65534; socket proxy root (E6) |
+  | 23xx | storage | 2301 Kopia, 2302 RustFS, 2303 Time Machine share owner (the process is root, E4) |
 
-Service uids:
-
-| Range | Stack | uids |
-|---|---|---|
-| 20xx | media | 2001 Jellyfin, 2002 Komga (Homey: see M-Q1) |
-| 21xx | apps | 2104 mediasort (as today), 2105 paperless, 2106 paperless Redis, 2107 CannonCommander, 2111 Immich server, 2112 Immich ML, 2113 Immich Postgres, 2114 Immich Valkey, 2121 Atuin, 2123 HedgeDoc |
-| image uids | apps | ArchiveBox 911, ArchiveTeam Warrior 1000, RackPeek 1654, Filestash its image's own user (uid unverified, likely 1000). These images only work with their own uid. **Warrior and Filestash may share 1000** (A-Q10) |
-| 22xx | infra | 2201 cloudflared, 2210 media sidecar, 2211 apps sidecar; Beszel agent 65534 (as today, not remapped: R2); socket proxy root (E6, not remapped: R1) |
-| 23xx | storage | 2301 Kopia, 2302 RustFS, 2303 Time Machine share owner (the process is root) |
-
-On the host each uid above is 165536 + uid (2001 → 167537), except the two exemptions.
-
-- **Paths:** MOS's root filesystem is RAM. All data lives under variables pointing at the pool (`${APPDATA}`, `${PHOTOS}`, `${BACKUPS}`, …). There's no `/srv/docker`, and no relative paths: the MOS UI runs each stack from its own folder (`appdata/compose_<stack>/`), so mediasort's build context is an absolute path too (`MEDIASORT_SRC`, A-Q1).
-- **One file per stack, not one per host:** decided (G2); §8's host layout has a homenas exception for it.
-- **Monitoring:** one Docker daemon serves all stacks, so one read-only socket proxy (`kr-ccp-socketproxy-0301`, `POST=0`) and one Beszel agent (`kr-ccp-beszelagent-0201`) see every container. Both move from MOS-template deploys into the infra stack under the same names (`observed-hosts.md`: compose hosts keep them in their compose). **No Dozzle agent:** Dozzle already reads this host in remote-host mode through the proxy (verified 2026-11-08); an agent would need the full socket and allows exec (MISTAKES.md 2026-10-18). The guests' proxies, Hawser agents and native Beszel agents retire with the guests.
-- **Logs:** MOS has no journald (Devuan). Container logs go to the monitoring host (G5, decided); Dozzle for live viewing.
+- **Paths:** MOS's root filesystem is RAM. All data lives under variables pointing at the pool (`${APPDATA}`, `${PHOTOS}`, `${BACKUPS}`, …); no relative paths.
+- **One file per stack** (G2); each folder is one MOS stack.
+- **Monitoring:** one read-only socket proxy (`POST=0`) and one Beszel agent see every container. Dozzle reads this host through the proxy (no Dozzle agent: it would need the full socket). The guests' proxies, Hawser agents and native Beszel agents retire with the guests.
+- **Logs:** MOS has no journald (Devuan). Container logs go to the monitoring host (G5); Dozzle for live viewing.
 
 ### MOS: deploy, restarts, NIC and backups (from #310)
 
-**Deploy procedure** (#310 §7b: the MOS UI creates, edits, starts/stops, updates and shows logs of stacks; there's no load-from-file):
-1. **Before the first stack:** #325 is installed on the host, `docker-userns.sh --check` passes (Docker runs remapped), and appdata is empty or already re-owned.
-2. Put the secret files and data folders on the pool, owned by **165536 + each service's uid** (tables per stack); R1 and R2 by their real uids.
-3. **Per stack, infra first:** create the stack in the MOS UI, paste `compose.yaml` into its Compose YAML field and the filled-in `.env` values into its environment variables field, turn its **autostart on**, then start it. Order: **infra → storage → media → apps** (infra creates the networks the zone stacks join).
-4. Later changes go through the UI too. MOS keeps **two copies** of each stack: the boot stick's (`/boot/config/system/docker/compose/<stack>/`) and the live one in appdata (`compose_<stack>/`). An edit on disk plus a restart applies, but leaves the stick copy stale, so edit in the UI, or treat the stick copy as stale until the next UI save. The repo's file stays the source of truth; what runs is checked against it with a `diff` (CLAUDE.md §2: merged isn't deployed).
+**Deploy procedure:**
+1. Put the secret files and data folders on the pool, owned by each service's uid (tables per stack).
+2. Per stack, in any order: create the stack in the MOS UI, paste `compose.yaml` and the filled-in `.env` values, turn its **autostart on**, start it.
+3. Add the host's `tailscale serve --service=…` lines for the stack's Services.
+4. Later changes go through the UI too. MOS keeps two copies of each stack (the boot stick's and appdata's `compose_<stack>/`); an edit on disk leaves the stick copy stale. The repo's file stays the source of truth; what runs is checked against it with a `diff` (CLAUDE.md §2).
 
-**macvlan with a VLAN parent works from compose** (#310 §7b): a stack-defined macvlan with `parent: <nic>.13` makes Docker create the VLAN sub-interface itself, with no host IP on it.
+**Restarts:** `restart: unless-stopped` alone isn't enough: MOS's stop runs `docker stop`, so stacks come back through **MOS autostart**. Start and restart Docker **only from the MOS UI** (or a reboot): a restart of the init script by hand doesn't bring the stacks back, and Docker isn't guaranteed to come up on MOS's data-root mount (2026-11-17: it ran on RAM after a manual restart).
 
-**Restarts:** every service has `restart: unless-stopped`, but that alone isn't enough: MOS's stop runs `docker stop`, so stacks come back through **MOS autostart**, which must be on for each stack (#325). After a **reboot** MOS brought the test stacks back by itself, remapped (#310 §7c); after a **restart of Docker's init script** it didn't (#310 §7c): the containers stayed stopped until they were started from the UI. After such a restart, start the stacks from the UI in the order above.
+**NIC watchdog:** every macvlan container (Jellyfin, Homey, the archivers, Time Machine) hangs off the built-in NIC, as does the host's own Tailscale. A receive wedge takes them off the network until the watchdog clears it, about a minute end to end. Whether `<nic>.<vlan>` and the containers recover after the watchdog's down/up is test (b).
 
-**NIC watchdog:** every macvlan container (both sidecars, cloudflared, Jellyfin, Homey, mediasort, the archivers) hangs off the built-in NIC. A receive wedge takes them all off the network until the watchdog clears it, about a minute end to end (watchdog verified in #310); the homenas's own Tailscale is affected the same way. Whether `<nic>.<vlan>` and the containers recover after the watchdog's down/up is a pre-build test (below).
+**Backups of appdata:** SnapRAID excludes appdata and Docker's folders (live data; #310), so appdata is protected only by the backup chain: MOS Backup plugin → `2.backup` → Kopia → the USB disk and the Storage Box. Restore with `tar --numeric-owner` so files keep their uids. The offsite gap is #255.
 
-**Backups of appdata:** SnapRAID excludes `/appdata/`, `/docker/`, `/system/docker/`, `/rclone/` and `/rclone-cache/` (live, changing data; #310). So **appdata is protected only by the backup chain**: MOS Backup plugin → `2.backup` on the pool → Kopia → the USB disk and the Storage Box. The plugin has no encryption and no restore UI. **Restore with `tar --numeric-owner`**, so files keep their host uids (165536 + the service uid, e.g. 167537) instead of being mapped through user names that don't exist on MOS. The offsite copy has a gap of its own (#255, under go-live prerequisites).
+## Stack 1 — media, replaces the media LXC
 
-## Stack 1 — media (VLAN 13), replaces the media LXC
+| App | Container | Network | Served as |
+|---|---|---|---|
+| Jellyfin | `kr-ccp-jellyfin-0201` | `media-vlan13`, fixed address | `svc:jellyfin` → its VLAN 13 address, 8096 |
+| Komga | `kr-ccp-komga-0201` | `proxy-komga`, `127.0.0.1:25600` | `svc:komga` |
+| Homey SHS | `kr-ccp-homey-0201` | `media-vlan13`, fixed address | its own app/cloud (no Service) |
 
-| App | Container | Notes |
-|---|---|---|
-| Jellyfin | `kr-ccp-jellyfin-0201` | hardware transcoding on the N95's iGPU |
-| Komga | `kr-ccp-komga-0201` | |
-| Homey SHS | `kr-ccp-homey-0201` | the most important data to back up |
-| Tailscale sidecar | `kr-ccp-tailscale-0101` | serves `svc:jellyfin`, `svc:komga` (tag:media); **defined in the infra stack** |
-
-| Service | Deviation from the standard | Why |
+| Service | Deviation | Why |
 |---|---|---|
 | Jellyfin | `/dev/dri/renderD128` + `group_add` render GID | hardware transcoding (Jellyfin's Intel docs: no privileged, no capabilities) |
-| Jellyfin | fixed IP on `media-vlan13`: **every port open on VLAN 13** (8096, 7359/udp; 8920/1900 only if HTTPS/DLNA get turned on) | Apple TV and other VLAN 13 clients play locally. Today's exception (8096 + 7359) becomes "all of Jellyfin's ports": keep HTTPS and DLNA off |
-| Komga | `/tmp` tmpfs with `exec` | the SQLite JDBC driver loads its native library from `/tmp` (as today) |
-| Komga | no egress (internal bridge only) | Komga reads embedded metadata; if it turns out to need the internet, it joins `media-vlan13` and is then open on VLAN 13 (M-Q2) |
-| Homey | **the hardening tested in #229, unchanged:** no `privileged`, `read_only`, `no-new-privileges`, `cap_drop: [ALL]` + `SETUID`, `SETGID`, `SYS_CHROOT`, `CHOWN`, `/run` tmpfs | tested one capability at a time on the media LXC (2026-11-07). In that test, `docker top` showed Homey's core (`homey-shs`) and `homey-matter-daemon` as uid 0 in the container. D-Bus (100), avahi (101) and go2rtc dropped to their own users. Without userns-remap on MOS, uid 0 in the container is uid 0 on the host (M-Q1) |
-| Homey | fixed macvlan IP on VLAN 13 instead of `network_mode: host` | host network would be the homenas's own network; discovery/mDNS should work on the macvlan L2 segment (to verify) |
-| Homey | no healthcheck | none documented |
+| Jellyfin | every port open on VLAN 13 (8096, 7359/udp; keep HTTPS and DLNA off) | VLAN 13 clients play locally; egress via VLAN 13 |
+| Komga | `/tmp` tmpfs with `exec` | the SQLite JDBC driver loads its native library from `/tmp` |
+| Komga | plain bridge, egress via the host (M-Q2) | metadata downloads; no layer-2 need |
+| Homey | **E3:** root, `read_only`, `no-new-privileges`, `cap_drop: [ALL]` + `SETUID`, `SETGID`, `SYS_CHROOT`, `CHOWN` | the hardening tested in #229 (core and Matter daemon run as uid 0). Without remap that is host root; on the macvlan it can't reach the host's addresses (M-Q1) |
+| Homey | fixed macvlan address instead of `network_mode: host` | host network would be the homenas's own network; mDNS on the macvlan segment to verify |
 
-**Secrets:** none in this stack; the media sidecar's auth key is with the infra stack.
-
-**Tailscale follow-ups** (own PRs, not built): `svc:jellyfin`, `svc:komga` already exist with `tag:media` auto-approval; the sidecar node takes over from the LXC node. Retire the Hawser grant (`tag:infra` → `tag:media:2376`) and the LXC's monitoring grants with the LXC.
+**Tailscale follow-ups:** `svc:jellyfin` and `svc:komga` exist; their auto-approval moves from `tag:media` to `tag:storage`. Retire the Hawser grant to `tag:media` and the LXC's monitoring grants with the LXC.
+**UniFi follow-up:** allow the homenas → Jellyfin's address, tcp:8096 (for `svc:jellyfin`).
 
 **Migration from the media LXC:**
-1. #310 passes and kaywoz decides the swap.
-2. Back up `jellyfin/config`, `komga/config`, `homey/` (`jellyfin/cache` is rebuilt; the Hawser token retires).
-3. **Re-own** the restored data to 165536 + the service uid (167537 Jellyfin, 167538 Komga): the LXC's files are owned by the LXC's own mapped uids.
-4. **Homey: start from an empty data folder and re-pair** (#229: restored data crashed the Matter daemon and caused `EACCES` on `apps/`). Its Homey cloud backup is the first choice.
-5. `media-mount.sh`: replace `LXCS=` with a list of containers to (re)start after a remount (a FUSE remount isn't seen through an existing bind mount). Own PR in `config-files/mos/`.
-6. Start the stack with the LXC stopped; reuse Jellyfin's VLAN 13 address so Apple TV keeps pointing at it.
-7. Check: playback with hardware transcoding (Intel GPU top plugin), Homey devices, `svc:jellyfin`/`svc:komga`, Dozzle.
-8. Keep the LXC stopped (autostart off) for a week, then archive it.
+1. Back up `jellyfin/config`, `komga/config`, `homey/` (`jellyfin/cache` is rebuilt).
+2. Re-own the restored data to 2001 (Jellyfin) and 2002 (Komga): the LXC's files carry its mapped uids.
+3. **Homey: start empty and re-pair** (#229: restored data crashed the Matter daemon); its cloud backup first.
+4. `media-mount.sh`: restart these containers instead of the LXC after a remount (own PR).
+5. Start the stack with the LXC stopped; reuse Jellyfin's VLAN 13 address so Apple TV keeps pointing at it.
+6. Check playback with hardware transcoding, Homey devices, both Services, Dozzle. Keep the LXC stopped for a week, then archive it.
 
-**Open questions — media:**
-- **M-Q1 — Homey as uid 0.** The tested setup removes `privileged` and all but four capabilities, but the core still runs as uid 0. With remap that's host uid 165536 if it escapes, not host root, which takes most of the weight off this question. I found no record of a run with a non-root `user:`. Options: (a) accept, as tested; (b) test `user:` with a non-root uid on the media LXC before it retires: D-Bus, avahi and go2rtc switch users themselves and may fail without root. Remap must be tested with Homey's D-Bus, avahi and Matter at build.
-- **M-Q2:** Does Komga need egress?
+## Stack 2 — infra, replaces the infra VM
 
-## Stack 2 — infra (shared services), replaces the infra VM
-
-kaywoz, 2026-11-17: the infra stack holds the services that serve other services. The stack is where they're defined, not a network: each container stays in the zone it serves.
-
-| App | Container | Zone / network | Serves |
+| App | Container | Network | Serves |
 |---|---|---|---|
-| Tailscale sidecar, media | `kr-ccp-tailscale-0101` | `proxy-jellyfin` + `proxy-komga`; `apps-vlan31` for internet access (not a VLAN 13 member) | `svc:jellyfin`, `svc:komga` (tag:media) |
-| Tailscale sidecar, apps | `kr-ccp-tailscale-0201` | `apps-vlan31` + the apps' `proxy-<app>` networks | the apps stack's Services and the mover's `tcp:8089` (tag:docker) |
-| cloudflared | `kr-ccp-cloudflared-0101` | `apps-vlan31` | the Cloudflare Tunnel for user-facing apps, §8's second access plane; outbound only |
-| socket proxy | `kr-ccp-socketproxy-0301` | plain bridge, `127.0.0.1:2375` | read-only Docker API for Dozzle and the Beszel agent; moves from its MOS-template deploy |
-| Beszel agent | `kr-ccp-beszelagent-0201` | host network | host metrics and container stats for all stacks; moves from its MOS-template deploy |
-
-**What I counted in:** everything whose job is to serve other containers or the host: the access path (sidecars, tunnel) and the box's observability (proxy, agent). **Not moved:** databases and Redis (they serve one app and stay on its `<app>-backend` network), Scrutiny (no container at all now: native collector, #103), the host's own tailscaled (a MOS plugin, not a container) and the storage services (Kopia, Time Machine, RustFS). Later candidates for this stack: Diun (#101) and Trivy (#102).
-
-**Not here:** Dockhand-home. In the #314 scenario the MOS UI is the Docker UI and no other home guest is left for it to manage, so §8's Dockhand-home exception retires for home (I-Q1, decided). Dockhand-lab is unaffected.
+| cloudflared | `kr-ccp-cloudflared-0101` | own bridge, egress only | the Cloudflare Tunnel for user-facing apps (§8's second access plane) |
+| socket proxy | `kr-ccp-socketproxy-0301` | bridge, `127.0.0.1:2375` | read-only Docker API for Dozzle and the Beszel agent (`tailscale serve --tcp=2375`, tag:monitoring only) |
+| Beszel agent | `kr-ccp-beszelagent-0201` | host network | host metrics and container stats, `LISTEN` on the tailnet IP only |
 
 | Service | Deviation | Why |
 |---|---|---|
-| infra stack | owns the zone macvlans and the `proxy-<app>` networks; media and apps join them as `external` | the sidecars are defined here, and a network is defined in one stack only. Start order: infra, then the zone stacks. Adding an app with a UI means a `proxy-<app>` network here and in the app's stack. `docker compose down` on infra can't remove networks while zone containers are attached |
-| Tailscale sidecars | non-root + `read_only` | **unverified**: the image has no `USER`; userspace mode needs no TUN/caps (containerboot source); writable: state dir and `/tmp` (socket). Fallback: root with `cap_drop: [ALL]` |
-| media sidecar | its internet access is on `apps-vlan31`, next to the apps zone's containers | Docker's egress is VLAN 31 (decided). Its only listener is `127.0.0.1:9002`, but a compromised media sidecar would sit between VLAN 31 and the media apps' internal bridges. Accepted with the decision; the alternative is a second Docker egress network |
-| Tailscale sidecars | Service targets by container name (`kr-ccp-komga-0201`, …) | Docker's DNS resolves names on a shared network across stacks; compose service names are per-project aliases |
-| cloudflared | on `apps-vlan31` (internet access), so open on VLAN 31 | it has no service port; metrics pinned to `127.0.0.1:20241` (container builds otherwise bind `0.0.0.0`) |
-| cloudflared | `read_only` | no writable path documented; to verify at build |
-| socket proxy | not `cap_drop`/non-root (E6); **not remapped** (R1) | as deployed and verified today: it needs root to open `docker.sock`; `POST=0` is the control |
-| Beszel agent | `network_mode: host`, **not remapped** (R2) | upstream requirement for interface stats; `LISTEN` on the tailnet IP only, as today. Key and token now as files (`KEY_FILE`, `TOKEN_FILE`), where the template has them in MOS's variables |
+| cloudflared | metrics pinned to `127.0.0.1:20241` | container builds otherwise bind `0.0.0.0` |
+| socket proxy | **E6:** root, no `cap_drop` | it opens `docker.sock`; `POST=0` is the control, as today |
+| Beszel agent | `network_mode: host` | upstream requirement for interface stats; key and token as files |
 
-cloudflared healthcheck: `cloudflared tunnel --metrics 127.0.0.1:20241 ready` (exec form; the image is distroless).
+**Secrets:** the tunnel token as a file (`TUNNEL_TOKEN_FILE`; never `TUNNEL_TOKEN`, env vars are readable through the socket proxy); the Beszel `key` and `token` (owned 65534).
 
-**Secrets** (kaywoz, on the host only):
-- **Tailscale:** two tagged, single-use, pre-approved auth keys, one for `tag:media`, one for `tag:docker` (files, deleted after each node joins).
-- **cloudflared:** the tunnel token as a file (`TUNNEL_TOKEN_FILE`, cloudflared ≥ 2025.4.0). Never `TUNNEL_TOKEN`: env vars are readable through the socket proxy.
-- **Beszel agent:** `key` and `token` from the hub's "Add system" (owned 65534).
+**Decisions** (kaywoz, 2026-11-17):
+- **I-Q1:** Dockhand-home retires for home; the MOS UI is the home Docker UI. Dockhand-lab is unaffected.
+- **I-Q2:** a public app is reached by cloudflared joining that app's `proxy-<app>` network. Jellyfin, if ever public: a UniFi rule from cloudflared's egress to Jellyfin's address, 8096 only.
+- **I-Q3 — open (tbd):** no app is public yet; cloudflared joins no app network until one is picked.
+- **I-Q4 — superseded by the baseline:** no sidecars; the host serves every Service.
 
-**Tailscale follow-ups** (own PRs, not built):
-- The sidecar nodes keep the zone tags, so the Services, auto-approvers and grants listed under media and apps don't change because of this move.
-- The socket proxy's `tailscale serve --tcp=2375` (host, `tag:storage`) and its `tag:monitoring` grant stay as they are.
-- Retire `svc:dockhand`, the `tag:infra` → Hawser grant and its tests, and the infra VM's monitoring grants.
+**Tailscale follow-ups:** the socket proxy's serve and grant stay. Retire `svc:dockhand`, the Hawser grants and tests, and the infra VM's monitoring grants. **Cloudflare:** tunnel, hostnames and Access policies once I-Q3 is decided.
 
-**Other follow-ups:** Cloudflare: the tunnel, public hostnames and Access policies (`iac/cloudflare/`).
+**Migration:** remove the MOS-template socket proxy and Beszel agent, then start the stack (same names, same data folder; the agent needs its key and token as files first). Keep Dockhand's data for rollback only; retire the infra VM after the rollback window.
 
-**Migration:**
-- **Infra stack first:** it creates the networks the zone stacks join.
-- **Socket proxy and Beszel agent:** remove the MOS-template containers, then start the stack. Same names, same data folder; the agent needs its key and token as files first.
-- **Dockhand:** nothing to carry over except its data, kept for rollback only (`dockhand/data` incl. `.encryption_key`). Retire the infra VM after the rollback window.
+## Stack 3 — apps, replaces the apps VM
 
-**Infra decisions** (kaywoz, 2026-11-17):
-- **I-Q1 — decided: Dockhand-home retires for home** with this migration; the MOS UI is the home Docker UI. `CLAUDE.md` §8 records it (own PR). Dockhand-lab is unaffected.
-- **I-Q2 — decided:** apps-zone apps are reached by cloudflared joining their `proxy-<app>` networks (inside one zone, bridges nothing). Jellyfin, if it ever goes public: a UniFi rule VLAN 31 → Jellyfin's VLAN 13 address, port 8096 only. No second cloudflared, and cloudflared never joins `proxy-jellyfin`.
-- **I-Q3 — open (tbd):** no app is public for now; every UI is admin-only through Tailscale. cloudflared stays in the draft but joins no app network, so it reaches nothing until an app is picked. Candidates: Immich, paperless, CannonCommander, Jellyfin (Jellyfin through Cloudflare is a terms-of-service and client-compatibility question of its own).
-- **I-Q4 — decided: one sidecar per zone**, both defined in the infra stack. Each keeps its zone's tag and networks. Cost: two containers, two auth keys, two nodes, and the infra stack owning the zone networks (start order, pre-build test (a)).
-
-## Stack 3 — apps (VLAN 31), replaces the apps VM
-
-| App | Container | Notes |
-|---|---|---|
-| mediasort | `kr-ccp-mediasort-0201` | the media classifier (#260), moved unchanged; Claude/OpenAI API (no local LLM: Ollama is dropped) |
-| paperless-ngx | `kr-ccp-paperless-0101` + `kr-ccp-paperlessredis-0101` | SQLite + Redis, no Postgres, no Tika/Gotenberg |
-| CannonCommander | `kr-ccp-cannoncommander-0101` | two-panel file manager from the MOS Hub (kaywoz's choice, replaces FileBrowser Quantum; it's a fork of it). Users, groups, 2FA, passkeys, OIDC |
-| Immich | `kr-ccp-immich-0101`, `-immichml-0101`, `-immichdb-0101`, `-immichredis-0101` | photos; as the upstream release compose |
-| ArchiveBox | `kr-ccp-archivebox-0101` | archives web pages |
-| ArchiveTeam Warrior | `kr-ccp-archivewarrior-0101` | contributes to ArchiveTeam projects |
-| Atuin | `kr-ccp-atuin-0101` | shell history sync server; SQLite, one container |
-| HedgeDoc | `kr-ccp-hedgedoc-0101` | collaborative Markdown editor, the open-source line of HackMD (replaces Dillinger: A-Q9) |
-| Filestash | `kr-ccp-filestash-0101` | file manager with storage backends (next to CannonCommander) |
-| RackPeek | `kr-ccp-rackpeek-0101` | homelab inventory |
-| Tailscale sidecar (infra stack) | `kr-ccp-tailscale-0201` | serves `svc:paperless`, `svc:cannoncommander`, `svc:immich`, `svc:archivebox`, `svc:archivewarrior`, `svc:atuin`, `svc:hedgedoc`, `svc:filestash`, `svc:rackpeek` and the mover's `tcp:8089` (tag:docker) |
+| App | Container | Network / port | Served as |
+|---|---|---|---|
+| mediasort | `kr-ccp-mediasort-0201` | `127.0.0.1:8089` | the mover on this host calls it directly; no Service |
+| paperless-ngx | `kr-ccp-paperless-0101` + `-paperlessredis-0101` | `127.0.0.1:8000` | `svc:paperless` |
+| CannonCommander | `kr-ccp-cannoncommander-0101` | `127.0.0.1:8080` | `svc:cannoncommander` |
+| Immich | `kr-ccp-immich-0101`, `-immichml-0101`, `-immichdb-0101`, `-immichredis-0101` | `127.0.0.1:2283` | `svc:immich` |
+| ArchiveBox | `kr-ccp-archivebox-0101` | `apps-vlan31`, fixed address | `svc:archivebox` → its VLAN 31 address, 5797 |
+| ArchiveTeam Warrior | `kr-ccp-archivewarrior-0101` | `apps-vlan31`, fixed address | `svc:archivewarrior` → its VLAN 31 address, 8001 |
+| Atuin | `kr-ccp-atuin-0101` | `127.0.0.1:8888` | `svc:atuin` |
+| HedgeDoc | `kr-ccp-hedgedoc-0101` | `127.0.0.1:3000` | `svc:hedgedoc` |
+| Filestash | `kr-ccp-filestash-0101` | `127.0.0.1:8334` | `svc:filestash` |
+| RackPeek | `kr-ccp-rackpeek-0101` | `127.0.0.1:8081` | `svc:rackpeek` |
 
 | Service | Deviation | Why |
 |---|---|---|
-| mediasort | on `apps-vlan31` (egress to TMDB + the LLM provider): **8089 open on VLAN 31** | was `127.0.0.1` + tailnet only; it's bearer-token protected and only classifies names |
-| mediasort | `build:` on the host from `${MEDIASORT_SRC}` (absolute) | our own image; a host build needs a repo checkout on the pool, and the MOS UI runs the stack from its own folder, so a relative path doesn't resolve (A-Q1) |
-| paperless-ngx | `read_only` via `S6_READ_ONLY_ROOT=1` + tmpfs `/run`, `/tmp`, `/var/cache/fontconfig` | rootless (`user:`) is supported upstream; read-only + rootless together isn't tested upstream |
-| paperless-ngx | OCR language limited to the image's built-ins | extra languages install at start, which rootless mode can't do |
-| paperless Redis | password in a config file, not `*_FILE` | Redis has no `*_FILE` support; healthcheck reads the file at run time (visible to processes inside that container only) |
-| CannonCommander | the image's entrypoint bypassed (`entrypoint: tini -- /app/cannoncommander`), `user: 2107` | the entrypoint needs root: it chowns `/remotes`, adds a passwd entry and drops to `PUID` with `setpriv`. Without it, `config.yaml` is copied in by hand at deploy |
-| CannonCommander | admin password (and any OIDC secret) in `config.yaml` (600), not env | a fresh install opens **without a sign-in** until a password is set (upstream changelog, v1.1.x). A password in the config closes that window; it's re-applied on every start. `CC_ADMIN_PASSWORD` in env would be readable through the socket proxy |
-| CannonCommander | `http.port: 8080` in `config.yaml`, own healthcheck | port 80 as non-root needs `NET_BIND_SERVICE`; the image's healthcheck is hard-coded to 80 |
-| CannonCommander | no `/dev/fuse`, `SYS_ADMIN`, `DAC_READ_SEARCH`, `DAC_OVERRIDE`, `apparmor:unconfined` (all in upstream's template) | they serve rclone mounts and Unraid's root-only paths. **rclone remotes are out of scope** (they would store cloud credentials in its config folder) unless kaywoz says otherwise |
-| CannonCommander | `/remotes` source dropped from `config.yaml`; terminal, MCP server and WebDAV left off | the terminal is a shell in the container for admins, the MCP server gives AI assistants file access. All three are off until an admin switches them on |
-| Immich server | `/dev/dri/renderD128` + render GID | Quick Sync transcoding |
-| Immich server/ML | tag `release`, not `latest` | Immich publishes no `latest`; `release` is the moving tag |
-| Immich Postgres | **a version tag** (`14-vectorchord0.4.3-pgvectors0.2.0`) | no `latest` or moving tag exists; upstream ties the extension version to each Immich release, so this tag must follow the release compose on upgrades (A-Q5). The one real exception to "images on `:latest`" |
-| Immich (all) | `read_only` | not documented upstream for any service; Postgres needs tmpfs `/etc/postgresql` and `/var/run/postgresql`; to verify at build |
-| Immich DB password | two files with the same value (server 2111, database 2113) | a 600 file has one owner. Both images export the value into the process environment at start (`start.sh`, `set-env.sh`), so the file only keeps it out of `docker inspect` |
-| Immich ML | on `apps-vlan31` for the **first model download only**, then that line is dropped | its API (3003) has no auth, so it's open on VLAN 31 while connected. Once the models are cached it's internal only (A-Q4) |
-| Immich Valkey | `valkey/valkey:latest` with a password file | upstream pins `valkey:9` by digest; `:latest` per §8, so a major version bump can arrive unannounced |
-| ArchiveBox | on `apps-vlan31`: **UI (5797) open on VLAN 31** | it fetches whatever it's given; it has its own login, and the public index/snapshots/add view are turned off (the image defaults the index to public) |
-| ArchiveBox | uid 911 (the image's), **not `read_only`: exception E1** | its dirs are owned 911 (an arbitrary uid exits 3); `/opt/archivebox` holds the browser and plugin binaries and must be writable, so a tmpfs won't do and a volume would keep stale binaries across updates |
-| ArchiveBox | admin account by a one-off `createsuperuser` | no `*_FILE` support; `ADMIN_PASSWORD` in env would be readable through the socket proxy |
-| ArchiveTeam Warrior | on `apps-vlan31`; **UI (8001) has no auth** unless `http_password` is set | the password goes in a pre-made `projects/config.json` (600), not env |
-| ArchiveTeam Warrior | uid 1000 (the image's), **not `read_only`: exception E2** | `/home/warrior/data` holds its baked-in `wget-at` binaries and must be writable; `no-new-privileges` also blocks the image's passwordless `sudo` |
-| Atuin | `:latest` | upstream's `latest` lags (18.24.2 vs 18.24.8) and its docs warn against it; the moving release tag is `18.24` (A-Q8) |
-| Atuin | SQLite (`sqlite:///config/atuin.db`) | kaywoz's choice; server support since 18.7/18.8. No database container, no password |
-| HedgeDoc | uid 2123, `read_only` (to verify) | the entrypoint drops to its user only when started as root, so `user:` works; uploads and the DB folder are pre-owned |
-| HedgeDoc | SQLite; session secret as a Docker secret named `sessionsecret` | HedgeDoc reads secrets by name from `/run/secrets/` (no `*_FILE` env) |
-| HedgeDoc | `latest` = 1.12.0 | upstream withdrew 1.12.1 and 1.12.2 (a migration bug); its docs example still shows 1.12.2 |
-| Filestash | image's own user (uid unverified), no `user:` override | its binary is mode 730: another uid can't execute it |
-| Filestash | `/admin/setup` is open until an admin password is set | set it right after the first start; only reachable through the sidecar. The password is stored as a bcrypt hash in `config.json` |
-| Filestash | no egress | backends on other hosts (SFTP, S3) would need it |
-| RackPeek | uid 1654 (the image's); **no authentication on its UI** | Tailscale only, admins only |
+| mediasort | prebuilt `ghcr.io/kaywoz/mediasort:latest` | built in GitHub Actions (A-Q1) |
+| paperless-ngx | `read_only` via `S6_READ_ONLY_ROOT=1`; OCR languages limited to the built-ins | rootless mode can't install languages at start |
+| Redis / Valkey | password in a config file | no `*_FILE` support; the healthcheck reads the file at run time |
+| CannonCommander | entrypoint bypassed (`tini -- /app/cannoncommander`), `user: "${SHARE_UID}:${SHARE_GID}"`, admin password in `config.yaml` (600), port 8080 | the entrypoint needs root; a fresh install opens without a sign-in until a password is set; it writes the same files as SMB (A-Q2). No FUSE, `SYS_ADMIN` or `DAC_*` from upstream's template: rclone remotes, terminal, MCP server and WebDAV stay off |
+| Immich server/ML | tag `release` | Immich publishes no `latest` |
+| Immich Postgres | **E7:** a version tag | no moving tag; follows the release compose (A-Q5) |
+| Immich ML | profile `immich-ml`, off (A-Q4) | the 8 GB box can't spare it; if enabled, egress via its own bridge, API unpublished |
+| ArchiveBox | **E1:** uid 911, not `read_only`; admin by a one-off `createsuperuser` | `/opt/archivebox` holds the browser and plugin binaries; no `*_FILE` support |
+| ArchiveTeam Warrior | **E2:** uid 1000, not `read_only`; `http_password` in a pre-made `projects/config.json` (600) | `/home/warrior/data` holds its `wget-at` binaries; the UI has no login without it |
+| Atuin | `:latest`, SQLite | upstream's `latest` lags (A-Q8) |
+| HedgeDoc | SQLite; session secret as the Docker secret `sessionsecret`; `latest` = 1.12.0 | HedgeDoc reads secrets by name; upstream withdrew 1.12.1/1.12.2 |
+| Filestash | image's own user, no `user:` | its binary is mode 730; `/admin/setup` is open until an admin password is set: set it right after the first start |
+| RackPeek | uid 1654; **no authentication on its UI** | admins only, by grant (A-Q11) |
 
-**Secrets** (the sidecar's auth key is with the infra stack): mediasort: `token`, `tmdb`, `llm` (as today). paperless: `secret_key`, `redis_url`, `redis.conf`. CannonCommander: `config.yaml` (admin password). Immich: `db_password` (two copies), `redis_password`, `valkey.conf`. HedgeDoc: `session_secret`. ArchiveTeam Warrior: `projects/config.json` with `http_password`. Filestash: admin hash in its `config.json`. ArchiveBox: its superuser in its database.
+**Secrets:** mediasort `token`, `tmdb`, `llm`; paperless `secret_key`, `redis_url`, `redis.conf`; CannonCommander `config.yaml`; Immich `db_password` (two copies, one per uid), `redis_password`, `valkey.conf`; HedgeDoc `session_secret`; Warrior `projects/config.json`; Filestash's admin hash in its `config.json`; ArchiveBox's superuser in its database.
 
-**Tailscale follow-ups** (own PRs, not built):
-- `iac/tailscale-services/`: add `svc:paperless`, `svc:cannoncommander`, `svc:immich`, `svc:atuin`, `svc:hedgedoc`, `svc:filestash` and `svc:rackpeek`.
-- `svc:archivebox` and `svc:archivewarrior` already exist. Today the policy auto-approves them only when a `tag:storage` node advertises them, because they were planned on the homenas. Here, the apps zone's sidecar (a `tag:docker` node, defined in the infra stack) advertises them. So their `autoApprovers.services` entries in `policy.hujson` change from `tag:storage` to `tag:docker`; the names, URLs and the Service definitions in `iac/tailscale-services/` stay.
-- Atuin's clients (every machine that syncs shell history) need a grant to `svc:atuin`.
-- `policy.hujson`: auto-approve them for `tag:docker`, plus a grant per Service.
-- The mover's grant (`tag:storage` → `tag:docker:8089`) and its tests stay; `CLASSIFIER_URL` becomes the sidecar's MagicDNS name.
-- Retire the Hawser grant to `tag:docker`, the apps VM's monitoring grants and its Cockpit Service.
+**Tailscale follow-ups:** add `svc:paperless`, `svc:cannoncommander`, `svc:immich`, `svc:atuin`, `svc:hedgedoc`, `svc:filestash`, `svc:rackpeek`, auto-approved for `tag:storage`, a grant per Service (Atuin: every syncing machine). `svc:archivebox` and `svc:archivewarrior` already auto-approve `tag:storage`. Retire the mover's grant to `tag:docker:8089` (the mover is local now), the Hawser grant, the apps VM's monitoring grants and its Cockpit Service.
+**UniFi follow-ups:** internet-only rules for both archiver addresses (block RFC1918 and the other VLANs); allow the homenas → them on 5797 and 8001; **device isolation on VLAN 31** (G9).
 
-**Migration from the apps VM:**
-1. Copy `mediasort/secrets/` and re-own it from the apps VM's remapped uid (102104) to 167640 (165536 + 2104).
-2. Start mediasort, point the mover at the sidecar, run one dry run.
-3. paperless, CannonCommander and Immich are new. Immich imports existing photos through its CLI or an external library (A-Q3).
-4. Retire the apps VM once the mover has run cleanly for a day. Ollama's models are dropped with it.
+**Migration from the apps VM:** copy `mediasort/secrets/`, re-own to 2104, set the mover's `CLASSIFIER_URL=http://127.0.0.1:8089`, run one dry run. Immich imports existing photos as an external library (A-Q3). Retire the VM once the mover has run cleanly for a day.
 
-**Open questions — apps:**
-- **A-Q1:** mediasort's image. Build it on the host (a checkout on the pool, `MEDIASORT_SRC`; whether the MOS UI's stack update rebuilds is untested), or build it in GitHub Actions and push to ghcr.io? With UI deploys the second is simpler; it means our own supply chain, flagged in #314.
-- **A-Q2 — CannonCommander.**
-  - Which folders does it serve (`${SHARES}`, mounted where its default source expects `/mnt/user`)? Local accounts or OIDC, and which provider (Pocket ID is off the list)?
-  - **Ownership under remap:** CannonCommander runs as host uid 167643 (165536 + 2107). Shares that MOS's SMB users also write stay owned by them, so CannonCommander can only read what's world-readable and write nothing. Either it serves its own folders (owned 167643), or a shared group is set up. Which?
-  - **Maturity — decided:** kaywoz accepted CannonCommander (2026-11-17), although the repository is young (created 2026-11-03, one maintainer). No FileBrowser Quantum fallback.
-  - **First sign-in:** the MOS Hub card says the first start writes an admin password into the log. The current code doesn't: a fresh install opens with no sign-in at all, and older releases printed the password below the startup banner. That banner comes from the entrypoint, which this draft bypasses, and the draft sets the password in `config.yaml`. If the image's own entrypoint is ever used, the password line goes to journald → Fluent Bit → LogTide, and the admin password must be changed at first sign-in.
-  - **To verify at build:** that the server starts as 2107 with the entrypoint bypassed and `read_only` (it needs `config.yaml` present and writes its database and `cache/` under `/config`). If it doesn't, the fallback is the image's entrypoint as root, dropping to 2107 with `setpriv` and `CHOWN`/`FOWNER`/`SETUID`/`SETGID`: that becomes exception E8.
-- **A-Q3:** Immich: where do the photos live (`${PHOTOS}`), and do existing photos come in as an external library (read-only) or by upload?
-- **A-Q4:** Immich ML on the N95: CPU (as drafted), OpenVINO (`release-openvino` + `/dev/dri`; upstream warns about integrated GPUs on low-RAM hosts), or ML off (Immich needs 6 GB minimum, 4 GB without ML)? Models need the internet the first time (VLAN 31, then dropped); keep a permanent VLAN 31 address for ML instead?
-- **A-Q5:** The Immich Postgres version tag. Accept this one exception to `:latest`, updated with each Immich release?
-- **A-Q6:** paperless: how do scans reach `consume/` (CannonCommander upload, an SMB share, scanner e-mail)?
-- **A-Q8 — Atuin's tag:** `:latest` (lags releases, as drafted) or the `18.24` release tag?
-- **A-Q9 — Markdown editor: HedgeDoc (drafted) or another?** Dillinger is dropped (no current image). Candidates checked:
-  - **HedgeDoc 1.x:** HackMD's open-source line. One container, SQLite, local accounts or OIDC, collaborative. HedgeDoc 2 is still alpha.
-  - **SilverBullet:** one container, Markdown files in a folder (no DB), its own login. A personal notes app rather than shared documents.
-  - **Memos:** one container, SQLite. A notes timeline, not a document editor.
-  - **Outline / Docmost:** need Postgres + Redis (Outline also needs an external sign-in): too heavy for 8 GB.
-  - **StackEdit:** unmaintained since 2019–2023.
-  - HackMD itself is a hosted SaaS (hackmd.io), not self-hostable.
-- **A-Q11 — tinyauth for UIs without a login** (RackPeek, the Warrior without `http_password`; Scrutiny's UI moves to the monitoring host).
-  - What tinyauth needs:
-    - It's forward-auth only, so it needs a reverse proxy (Caddy, Traefik, nginx) between `tailscale serve` and the app. That's one more container per stack.
-    - Its session cookie goes on the parent domain of `APP_URL`. With `tinyauth.<tailnet>.ts.net` that's `<tailnet>.ts.net`. That works without a public domain: `ts.net` is on the Public Suffix List, so `<tailnet>.ts.net` is a valid cookie domain. But the cookie then reaches every host and Service in the tailnet.
-    - It runs as root by default.
-    - Its own docs say it's "not designed for production".
-  - What we have today: each Service has a grant, so only the named admins' devices reach it. `tailscale serve` also passes the user's identity (`Tailscale-User-Login`) for user devices, though these apps can't use it.
-  - My pick: **no tinyauth in this phase.** Limit those Services to admins by grant (with ACL tests), set the Warrior's `http_password`, and revisit with public hostnames, where Cloudflare Access does this job.
-- **A-Q12 — the archivers to the lab?** (smaller, open.) ArchiveBox and the Warrior stay on VLAN 31 with internet-only UniFi rules in this draft. The review session suggested the lab; kaywoz ruled on 2026-11-16 that §8's "risky workloads" means security tooling, not these two (MISTAKES.md), so moving them would be for isolation (see the macvlan note under G8), not because §8 requires it.
-- **A-Q10 — two file managers and shared uids.** Filestash next to CannonCommander: both, as asked? Filestash's and Warrior's image uids may both be 1000; same uid means one compromised app can read the other's files where permissions allow. Check `docker run --rm --entrypoint id machines/filestash` at build.
+**Decisions** (kaywoz, 2026-11-17):
+- **A-Q1:** mediasort built in GitHub Actions and pushed to ghcr.io; the workflow is its own PR.
+- **A-Q2:** CannonCommander serves `1.data` and `tmp` only (`${SHARE_DATA}`, `${SHARE_TMP}`, under `/mnt/user`), local accounts. It runs as the **Samba-only data user** that owns both folders and that the MOS SMB shares use, so SMB and CannonCommander write as the same owner. Done on the host: both folders owned by that user and MOS's `mos` group, 755. To verify at build: it starts with the entrypoint bypassed and `read_only`; fallback is the image's root entrypoint dropping to the data user (E8).
+- **A-Q3:** existing photos as a read-only external library (`${PHOTOS_LIBRARY}:/external:ro`), readable by uid 2111.
+- **A-Q4:** Immich ML off. **A-Q5:** the Postgres version tag accepted. **A-Q6:** upload through paperless's UI or app. **A-Q8:** Atuin on `:latest`. **A-Q9:** HedgeDoc 1.x. **A-Q10:** both file managers; at build check Filestash's uid against the Warrior's 1000. **A-Q11:** no tinyauth; RackPeek and the Warrior limited by grant.
+- **A-Q12:** the archivers on VLAN 31 with internet-only UniFi rules; revisit once the lab is built.
 
-## Stack 4 — storage (the homenas's own network)
+## Stack 4 — storage
 
-The host's own storage services. They're served by the host's own tailscaled (`tag:storage`, which already has `svc:kopia` and `svc:rustfs`), so this stack uses today's pattern: one bridge per app, ports on `127.0.0.1`, `tailscale serve` on the host. Time Machine is the exception.
-
-| App | Container | Notes |
-|---|---|---|
-| Kopia | `kr-ccp-kopia-0101` | repository server for the other machines' backups (#43), repository on the pool |
-| Time Machine | `kr-ccp-timemachine-0101` | SMB share for the Macs' backups |
-| RustFS | `kr-ccp-rustfs-0101` | local S3 (#39) |
+| App | Container | Network / port | Served as |
+|---|---|---|---|
+| Kopia | `kr-ccp-kopia-0101` | `127.0.0.1:51515` | `svc:kopia` (`https+insecure://`) |
+| Time Machine | `kr-ccp-timemachine-0101` | `clients-vlan11`, fixed address | SMB on VLAN 11 (no Service) |
+| RustFS | `kr-ccp-rustfs-0101` | `127.0.0.1:9000` (S3), `:9001` (console) | `svc:s3`, `svc:rustfs` |
+| Scrutiny collector | `kr-ccp-scrutinycollector-0101` | own bridge, egress only | pushes to `svc:scrutiny` on the monitoring host |
 
 | Service | Deviation | Why |
 |---|---|---|
-| Kopia, RustFS | plain bridges (not internal), `127.0.0.1` ports | internal networks can't publish ports; neither app needs egress. A container on a plain bridge can reach the MOS host through the bridge gateway (S-Q1) |
-| Kopia | TLS with its own certificate, served as `https+insecure://` | the repository server's gRPC needs TLS (Kopia docs). The earlier `svc:kopia` was UI-only over plain HTTP (MISTAKES.md 2026-10-18) |
-| Kopia | UI login from an htpasswd file (`--htpasswd-file`, a hidden, older flag) | `--server-password` and `KOPIA_SERVER_PASSWORD` would land in the command line or env, both readable through the socket proxy |
-| Kopia | repository password in `/app/config/*.kopia-password` (600) | Kopia has no `KOPIA_PASSWORD_FILE`. `KOPIA_PERSIST_CREDENTIALS_ON_CONNECT=true` stores it there at the one-time `repository create/connect` |
-| Kopia | `user:` non-root | the image has no `USER` or entrypoint script; the official compose runs root + privileged only for `kopia mount`, which isn't used. To verify at build |
-| Time Machine | **runs as root, not `read_only`**, `cap_add` CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, NET_BIND_SERVICE | its entrypoint creates the SMB user, writes `smb.conf` and the avahi service into `/etc`, then runs smbd/nmbd/avahi. `privileged` isn't needed (not in upstream's compose). Capabilities read from the entrypoint, each to be confirmed at build |
-| Time Machine | own macvlan address on the host's network (`storage-lan`) | MOS's own Samba holds 445 on the host, so host networking or a published 445 would clash. The image's author runs it on macvlan, and avahi then advertises it on that segment |
-| RustFS | keys as files (`RUSTFS_*_KEY_FILE`) | never the built-in default `rustfsadmin`/`rustfsadmin` (it only warns) |
-| RustFS | console CORS limited to its Service URL | the image defaults to `*` |
+| Kopia | TLS with its own certificate; UI login from an htpasswd file; repository password persisted by Kopia (600) | the repository server's gRPC needs TLS; no password on the command line or in env |
+| Time Machine | **E4:** root, not `read_only`, six capabilities (CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, NET_BIND_SERVICE) | its entrypoint writes users and the Samba config into `/etc`; each capability confirmed at build |
+| Time Machine | macvlan on VLAN 11 | MOS's own Samba holds 445 on the host |
+| RustFS | keys as files; console CORS limited to its Service URL | never the default `rustfsadmin`; the image defaults CORS to `*` |
+| Scrutiny collector | **E5:** root, `SYS_RAWIO` + `SYS_ADMIN`, the NVMe controller devices only, `read_only`, profile `cron` | NVMe SMART needs them; collector only, runs seconds a day from MOS cron |
 
-**Secrets:**
-- **Kopia:** the repository password (stored by Kopia itself), `htpasswd`, and the TLS key and certificate (`openssl`, once).
-- **Time Machine:** `password` (root-owned, 600).
-- **RustFS:** `access_key` and `secret_key`.
+**Secrets:** Kopia's repository password (stored by Kopia), `htpasswd`, TLS key and certificate; Time Machine `password` (root, 600); RustFS `access_key`, `secret_key`.
 
-**Tailscale follow-ups** (own PRs, not built):
-- `svc:kopia` and `svc:rustfs` exist already. Add a Service for the S3 API, or decide it stays local (S-Q3).
-- `svc:scrutiny` moves to the hub on the monitoring host (#103), plus one push grant `tag:storage` → `svc:scrutiny` with an ACL test. That's a new push flow to the monitoring host, outside §8's list (logtide-api, healthchecks, beszel), so it needs kaywoz's OK as an addition to that list.
-- Grants per backup client to `svc:kopia`.
-- Time Machine over the tailnet isn't covered: the host can't reach the macvlan address (S-Q2).
+**Tailscale follow-ups:** add `svc:s3` (S-Q3), auto-approved for `tag:storage`, admins first, then per client host (#28). Grants per backup client to `svc:kopia`. `svc:scrutiny` on the monitoring host plus one push grant `tag:storage` → `svc:scrutiny`: a new push flow outside §8's list, so it needs kaywoz's OK.
+**UniFi follow-ups:** VLAN 13 → Time Machine's address, tcp:445 only; mDNS on for VLANs 11 and 13 if Macs on VLAN 13 should discover it.
 
-**Migration:**
-- **Kopia and RustFS** are new on this box. If the current homenas runs either from a MOS template (#136 mentions RustFS), it has no registered container name. Its data is migrated or retired separately.
-- **Time Machine:** existing Mac backups start fresh, or are copied over with the share's owner changed to 2303.
+**Migration:** Kopia and RustFS are new here (a MOS-template RustFS, if any, is migrated or retired separately). Mac backups start fresh, or are copied with the share's owner changed to 2303.
 
-**Open questions — storage:**
-- **S-Q1:** The host firewall (#219) comes before this stack. Kopia and RustFS on plain bridges can reach every port the MOS host listens on.
-- **S-Q2:** Time Machine.
-  - Which network are the Macs on? With the macvlan on the host's network, discovery works on that segment only; from other VLANs it's a manual connect (`smb://<address>/TimeMachine`) plus a UniFi rule.
-  - Over the tailnet it would need its own sidecar.
-  - The alternative is MOS's own Samba with a Time Machine share, if MOS supports `fruit:time machine` (unverified).
-- **S-Q3:** RustFS's S3 API. Is it local only (the box's own backups, #30), or a Tailscale Service for other hosts (#28 "secure s3 endpoint")?
-- **S-Q4 — Scrutiny: decided** (kaywoz, 2026-11-17, replaces #103's native collector): a **collector-only container**, run once a day by a MOS UI cron job (`docker-compose --profile cron run --rm`), pushing to the hub on the monitoring host. Not privileged: `SYS_RAWIO` + `SYS_ADMIN`, the NVMe controller devices only (no namespaces, so no direct disk read/write), `read_only`, no UI or port. Not remapped (R4); exception E5. Residual risk: NVMe admin commands through the controller, the same as a native collector running as root. Why a container: the MOS UI manages it, the image brings `smartctl`, and no binary has to live on an executable path (`/boot` is `noexec`).
+**Decisions** (kaywoz, 2026-11-17):
+- **S-Q1:** containers on plain bridges reaching the host's listeners is accepted; MOS ships no firewall tooling. Condition: NFS exports, if enabled, never cover `*` or a Docker subnet. A MOS firewall plugin is parked (#339).
+- **S-Q2:** Time Machine in a container on a VLAN 11 macvlan, not MOS's Samba (its `smb.conf` is in RAM `/etc`).
+- **S-Q3:** the S3 API becomes `svc:s3`.
+- **S-Q4:** Scrutiny as a collector-only container from MOS UI cron, pushing to the hub on the monitoring host.
 
 ## Exception register
 
-Named exceptions to the container standard (CLAUDE.md §8). They go into the security summaries when built. Smaller deviations, like a tmpfs with `exec`, stay in the per-stack tables.
+Named exceptions to the container standard (CLAUDE.md §8). Without remap, container root is host root, so E3–E6 are the containers that matter most if one is compromised.
 
-| # | Service | Exception | Why it can't meet the standard |
+| # | Service | Exception | Contained by |
 |---|---|---|---|
-| **E1** | ArchiveBox | not `read_only`; fixed image uid 911 | `/opt/archivebox` holds the browser and plugin binaries and must be writable; its directories are owned 911 |
-| **E2** | ArchiveTeam Warrior | not `read_only`; fixed image uid 1000; UI has no login unless `http_password` is set | `/home/warrior/data` holds its `wget-at` binaries and must be writable |
-| E3 | Homey | core runs as uid 0, four capabilities | tested in #229 (M-Q1). Remapped: host uid 165536 |
-| E4 | Time Machine | root, not `read_only`, six capabilities | its entrypoint writes users and the Samba config into `/etc`. Remapped: host uid 165536 |
-| E5 | Scrutiny collector (storage stack) | root, `SYS_RAWIO` + `SYS_ADMIN`, the NVMe controller devices, not remapped (R4) | NVMe SMART reads need them (Scrutiny README). Narrowed: collector only, controller devices only, `read_only`, runs for seconds once a day (S-Q4) |
-| E6 | socket proxy (infra stack) | root (no `user:`), not remapped (R1): real host root | needs to open `docker.sock`; `POST=0` is the control, as today |
-| E7 | Immich Postgres | a version tag instead of `:latest` | no moving tag exists (A-Q5) |
-| (E8) | CannonCommander | only if the bypassed entrypoint fails at build: root entrypoint dropping to 2107, four capabilities | see A-Q2; not an exception in the draft |
+| E1 | ArchiveBox | not `read_only`; image uid 911 | non-root, `cap_drop: [ALL]`, VLAN 31 macvlan with internet-only rules |
+| E2 | ArchiveTeam Warrior | not `read_only`; image uid 1000; UI login only with `http_password` | as E1; `no-new-privileges` also blocks its passwordless `sudo` |
+| E3 | Homey | root, four capabilities | tested in #229; no `privileged`; VLAN 13 macvlan, no path to the host's addresses |
+| E4 | Time Machine | root, not `read_only`, six capabilities | no `privileged`; VLAN 11 macvlan, no path to the host's addresses |
+| E5 | Scrutiny collector | root, `SYS_RAWIO` + `SYS_ADMIN`, NVMe controller devices | collector only, controller devices only (no namespaces), runs seconds a day |
+| E6 | socket proxy | root | `POST=0`, `read_only`, `127.0.0.1` + tailnet (tag:monitoring) only |
+| E7 | Immich Postgres | a version tag | no moving tag exists (A-Q5) |
+| (E8) | CannonCommander | only if the bypassed entrypoint fails at build: root entrypoint dropping to the data user | see A-Q2 |
 
-### Mitigations for E1 and E2 (and what else is available)
+**Further mitigations for E1 and E2**, when built: Beszel alerts on sustained CPU/network spikes, Diun (#101) and Trivy (#102) for the two images, IDS/IPS on VLAN 31 if the gateway allows it (#202). Not proposed: Falco or Tetragon (privileged eBPF agents; proportionality).
 
-**Already in the draft:**
-- **Hardening that still applies:**
-  - each runs as its image's non-root uid
-  - `cap_drop: [ALL]`
-  - `no-new-privileges` (which also blocks the Warrior's passwordless `sudo`)
-  - Docker's default seccomp profile
-  - memory and pid limits
-- **Network isolation:** each sits on a macvlan, so neither can reach the MOS host at all: not its UI, its shares, or the rclone remote control.
-- **Data:** each gets one data folder of its own, owned by its uid.
+## General decisions
 
-**Proposed, to add when built:**
-1. **Read-only root anyway (to test):**
-   - Set `read_only: true` and put only the binaries folder (`/opt/archivebox`, `/home/warrior/data`) on an **anonymous volume**. Docker seeds an anonymous volume from the image when it's created.
-   - Renew it on every image update with `docker compose up -d --renew-anon-volumes <service>`, so the binaries never go stale.
-   - Everything else stays read-only.
-   - Unverified for both images. If it works, E1 and E2 shrink to one writable folder each.
-2. **Egress filtering in UniFi** (the strongest control here; both have fixed addresses on VLAN 31): these two addresses may reach the internet only.
-   - Block RFC1918 and the other VLANs, so a compromised archiver can't move sideways in the home network.
-   - Turn on IDS/IPS for VLAN 31 if the gateway's throughput allows it (#202).
-3. **Monitoring:**
-   - **Beszel:** per-container CPU, memory and network graphs, with alerts to Slack on sustained spikes, for example a crawler gone wild or a miner.
-   - **Dozzle:** for their logs.
-   - **Diun (#101) and Trivy (#102):** image update notices and scheduled vulnerability scans of both images.
-   - **Healthchecks:** for their health status.
-4. **OS level:**
-   - **userns-remap — in place** (#310 §7c, #325): uid 911 or 1000 inside the archivers is host uid 166447 or 166536, an unprivileged uid with no access to other services' data.
-   - **AppArmor/SELinux** are not available on MOS's kernel (#174: "no AppArmor layer"; to re-check on the new box: `cat /sys/module/apparmor/parameters/enabled`).
-   - **Pool mount options:** if the data pool can be mounted `nosuid,nodev`, a planted setuid file in a data folder is harmless. To check on MOS.
-5. **Not proposed (proportionality):** runtime detection with Falco or Tetragon. They need privileged eBPF agents, and the kernel support on MOS is unknown.
-
-## General open questions
-
-- **G1 — resolved:** all stacks run on MOS; no LXC and no VM stays (kaywoz, 2026-11-17).
-- **G2 — decided:** one compose file per stack, in its own folder (`docker-compose/homenas/<stack>/compose.yaml`), as drafted (kaywoz, 2026-11-17). Each folder is one MOS stack, so MOS's per-stack autostart, start and stop work as tested in #310. `CLAUDE.md` §8's host layout now has the homenas exception; #314's deployer works per stack folder.
-- **G3 — decided:** the role is called **homenas** (kaywoz, 2026-11-17): storage, backups and the home Docker stacks. Renamed in `CLAUDE.md` §8, `README.md`, `SECURITY.md` and `security/homenas.md`. The Tailscale tag stays `tag:storage`. The rows that describe today's guests (media LXC, infra VM, apps VM) are rewritten with the build.
-- **G4 — resolved:** the #310 tests are done (§7b: the UI manages stacks, macvlan with a VLAN parent works; §7c: remap persists through a pre-start hook, #325; §7d: shim not usable). What's left before the build is listed under [Before the build](#before-the-build).
-- **G5 — decided:** container logs are sent to the monitoring host (kaywoz, 2026-11-17). The driver and transport (Docker `syslog` driver or a shipper) are chosen with the monitoring host's revival (#225).
-- **G6 — done** (kaywoz, 2026-11-17): VLANs 13 and 31 are tagged on the homenas's switch port (24 isn't needed by Docker), with an address block per VLAN outside DHCP for the macvlans. VLAN 31's UniFi network is named `vlan31-apps` (no longer `docker`).
-- **G7 — 8 GB of RAM** (kaywoz, 2026-11-16). Limits were cut for it; they are caps, not reservations.
-
-  | Stack | Sum of `mem_limit`s |
-  |---|---|
-  | media | 2.8 GB (Jellyfin 1.5 GB, Komga 768 MB with a 512 MB heap, Homey 512 MB) |
-  | infra | 0.6 GB (two sidecars, cloudflared, Beszel agent at 128 MB each; socket proxy 64 MB) |
-  | apps | 5.4 GB without Immich ML (+1.5 GB with it) |
-  | storage | 1.3 GB, plus 128 MB for the Scrutiny collector while it runs (seconds a day) |
-  | **total** | **≈ 10 GB of caps** on an 8 GB box, before MOS itself, its RAM root filesystem and the rclone mount's buffers |
-
-  - Caps over physical RAM are normal as long as the peaks don't line up. The peaks here are Jellyfin transcoding, paperless OCR (one worker now), ArchiveBox's Chromium and Immich imports. Real usage is unmeasured: watch it in Beszel for the first weeks and alert near the top.
-  - Already done for 8 GB:
-    - **Immich ML** is off by default (compose profile `immich-ml`). Immich needs 6 GB with ML and 4 GB without. ML could run on another machine instead, e.g. the Mac mini, since Immich takes a remote ML URL (A-Q4).
-    - **paperless** uses one worker.
-    - **Komga's** heap is 512 MB.
-  - If it's still tight, the next cuts are ArchiveBox and the Warrior (start them only when needed), then Filestash, which duplicates CannonCommander.
-  - MOS's root filesystem is RAM. With 8 GB, anything writing to `/` (logs, a misplaced cache: MISTAKES.md 2026-11-10) eats into the same memory.
-  - Check `nproc` and `free -g` on the box before going live.
-- **G8 — internet access: decided** (kaywoz, 2026-11-17). Jellyfin and Homey are VLAN 13's IoT members. Docker containers that need the internet get an address on the VLAN 31 macvlan: "services needing internet use vlan31 for docker. vlan24 is for servers needing internet". Everything else stays on internal bridges. The per-address internet-only UniFi rules on VLAN 31 for the archivers still apply (mitigation 2 for E1/E2). What's left is A-Q12.
-  - Containers on the same macvlan reach each other directly: macvlan bridge mode switches between them inside the host, so UniFi never sees that traffic. On VLAN 31 the archivers can therefore reach the sidecars, cloudflared, mediasort and Immich ML (while it's connected) on any listening port; the UniFi rules only cover traffic that leaves the host.
+- **G1:** all stacks on MOS; no LXC and no VM stays.
+- **G2:** one compose file per stack, one MOS stack per folder (CLAUDE.md §8's homenas exception).
+- **G3:** the role is **homenas**; the Tailscale tag stays `tag:storage`.
+- **G5:** container logs go to the monitoring host; driver chosen with its revival (#225).
+- **G6:** VLANs 11, 13 and 31 tagged on the homenas's switch port, each with an address block outside DHCP for the macvlans.
+- **G7 — 8 GB of RAM.** Sum of `mem_limit`s: media 2.8 GB, infra 0.3 GB, apps 5.4 GB (Immich ML off), storage 1.3 GB, ≈ 9.8 GB of caps before MOS itself. Caps over physical RAM are fine while peaks don't line up (Jellyfin transcoding, paperless OCR, ArchiveBox's Chromium, Immich imports). Watch Beszel the first weeks; next cuts are the archivers (start on demand), then Filestash.
+- **G8 — egress** (narrowed 2026-11-17): containers get egress through their bridge via the host; only the archivers leave through VLAN 31 (macvlan), and Jellyfin and Homey through VLAN 13 as its members. VLAN 24 isn't used by Docker.
+- **G9 — device isolation on VLAN 31** (kaywoz, 2026-11-18): VLAN 31 also holds containers from other hosts, so UniFi's device isolation is on for that network: VLAN 31 clients can't reach each other through the switch, only the gateway (internet, and routed traffic such as the macvlan Services' path from the homenas). Services that need to talk across hosts do it over Tailscale with a grant. It doesn't cover macvlan containers on the same host (the kernel switches those internally); on the homenas that is only the two archivers. To verify after enabling: test (d) still answers.
 
 ## Before the build
 
-Tests on the new box before the first real stack, each with throwaway containers:
+Tests on the new box, each with throwaway containers. The remap hook was uninstalled and the remapped store removed on 2026-11-18.
 
-- **(a) Boot order.** After a reboot, do the media and apps stacks come up when they depend on the infra stack's networks (`external: true`)? If MOS starts stacks in no fixed order and they fail, fall back to **each zone stack owning its own networks**: the zone sidecar then lives in that zone's stack again (I-Q4's cost changes accordingly).
-- **(b) NIC watchdog bounce.** With macvlan stacks running, bounce the built-in NIC (down/up, as the watchdog does). Do `<nic>.<vlan>` and the macvlan containers recover by themselves, or do the stacks need a restart (then the watchdog gets a hook)?
-- **(c) NIC name.** The built-in NIC is `eth0` only while the USB adapter is unplugged, and every `parent: <nic>.<vlan>` depends on that name. Leave the adapter out, or pin the interface name (by MAC) before the build.
+- **(b) NIC watchdog bounce.** With macvlan containers running, bounce the built-in NIC as the watchdog does. Do `<nic>.<vlan>` and the containers recover, or does the watchdog need a hook that restarts them?
+- **(c) NIC name.** The built-in NIC is `eth0` only while the USB adapter is unplugged; every `parent: <nic>.<vlan>` depends on it. Leave the adapter out, or pin the name.
+- **(d) Host → macvlan via the router.** From the host, `curl` a test container's VLAN 31 address. If it doesn't answer, the three macvlan Services need another path (decided then).
+- **(e) Docker stays on disk — passed** (2026-11-18): after a reboot with Docker started only by MOS, the data root is `/var/lib/docker` on the pool, unremapped, no `daemon.json`, no pre-start script.
 
 ## Go-live prerequisites
 
-Security gaps from the 2026-11-17 attack-path review. None of them is in these files; each must be closed before the stacks hold real data:
+Not in these files; each closed before the stacks hold real data:
 
-- **#322 — UniFi:** block VLANs 13, 24 and 31 → the homenas's own address, so a zone container can't reach the host through the router either.
-- **#219 — host firewall:** the storage stack's bridges → host, allowing only what's needed.
-- **#255 — offsite copy that host root can't delete:** today root on the homenas holds the Storage Box login and the USB disk, so one compromised host can remove all copies (Storage Box snapshots or an append-only receiver).
+- **#322 — UniFi:** block VLANs 13, 24 and 31 → the homenas's own address; the archivers' internet-only rules; device isolation on VLAN 31 (G9); the allow rules for the macvlan Services above.
+- **#255 — an offsite copy host root can't delete** (Storage Box snapshots or an append-only receiver).
 
-## Unverified (checked at build, before anything goes live)
+## Unverified (checked at build)
 
-- **Tailscale sidecar:** non-root with `read_only`, and whether it serves Services in userspace mode to another container's IP. The containerboot source supports the config; the behaviour hasn't been tested.
-- **`read_only`** for cloudflared, paperless-ngx (rootless), CannonCommander (entrypoint bypassed), Kopia, RustFS and all four Immich containers. Every writable path listed comes from reading the code, not from upstream docs.
-- **Running as a non-root uid:** Immich Postgres with an arbitrary uid (nss_wrapper), and Kopia as non-root.
-- **Image uids:** Filestash's (not read from the image layers).
-- **Capability sets:** ArchiveTeam Warrior's per-project needs and target hosts.
-- **Time Machine:** its capability set.
-- **Networking:** Homey's discovery on a macvlan address, and Komga without egress.
-- **MOS:** the Docker version (not recorded in #310). Settled by #310 and no longer listed here: the UI manages stacks, macvlan with a VLAN parent works, remap persists (#325).
-- **Under remap:** the socket proxy's need for R1; the GPU for Jellyfin and Immich (R3); Homey and Time Machine as remapped root (D-Bus, avahi, Samba's user setup); whether the remapped uids can read the host's rclone media mount (FUSE `--uid`/`--gid` and `allow_other`); folders on the pool shared with host users (CannonCommander's `${SHARES}`, A-Q2).
-- **MOS stack copies** (still open from #310 §7b): which copy MOS uses if the appdata copy is missing (pool not mounted), and whether a UI save overwrites a direct disk edit.
+- `read_only` for cloudflared, paperless-ngx, CannonCommander, Kopia, RustFS, HedgeDoc, Filestash and the Immich containers. **Where it fails, drop it** and note it in the stack's table.
+- Non-root: Immich Postgres with an arbitrary uid, Kopia.
+- Image uids and ports: Filestash's uid, RackPeek's container port.
+- Capability sets: Time Machine; ArchiveTeam Warrior per project.
+- Homey's discovery on a macvlan address.
+- Whether the containers' uids can read the host's rclone media mount (FUSE `allow_other`).
+- MOS stack copies: which one MOS uses if appdata is missing, and whether a UI save overwrites a disk edit.
 
 ## Follow-ups (not built; each its own PR after the OK)
 
-- **Tailscale:** Services and grants per stack as listed above; retire Hawser, `svc:dockhand` and the guests' monitoring grants.
-- **Cloudflare:** the tunnel(s), public hostnames and Access policies.
-- **`config-files/mos/media-mount.sh`:** restart containers instead of LXCs after a remount.
-- **Docs:** CLAUDE.md §8 (host roles, Dockhand-home, host layout), `SECURITY.md`, `security/*.md`.
+- **Tailscale:** Services, auto-approvers and grants per stack as listed; retire `tag:media`/`tag:docker` with the guests, Hawser, `svc:dockhand`.
+- **UniFi** (#322): the rules listed per stack.
+- **Cloudflare:** tunnel, hostnames and Access policies (I-Q3).
+- **`config-files/mos/media-mount.sh`:** restart containers instead of the LXC after a remount.
 - **`docker-compose/CONTAINERS.md`:** move the reserved names into the main table when built.
-- **MOS feature request:** a working `docker_options` field (the UI resets it today), so remap wouldn't need the pre-start hook (#310 §7c; kaywoz files the report).
-- **`security/homenas.md`:** the remap exemptions (R1, R2, and R3 if it comes to that) in the "Container escape" row, once #325 has merged.
-- **Scrutiny (#103):** the hub on the monitoring host, the collector container + MOS UI cron job here, the push grant.
+- **mediasort image workflow** (A-Q1).
+- **Scrutiny hub** on the monitoring host (#103).

@@ -66,6 +66,7 @@ ours()     { grep -q "\"userns-remap\": \"$REMAP_USER\"" "$CONF" 2>/dev/null; }
 if [ "$MODE" = check ]; then   # read-only: no lock needed
   init_ok && echo "init script: as reviewed${INIT_SHA:+ (checksum matches)}" || echo "WARN init script changed since review"
   ours && echo "config: $CONF in place" || echo "WARN $CONF missing or not ours"
+  getent group "$REMAP_USER" >/dev/null && echo "group: $REMAP_USER present" || echo "WARN group $REMAP_USER missing: dockerd won't start"
   if running && remapped; then echo "OK   Docker runs remapped ($(docker info --format '{{.DockerRootDir}}'))"; exit 0; fi
   running && echo "FAIL Docker runs WITHOUT userns-remap" || echo "FAIL Docker not running"
   exit 1
@@ -94,7 +95,19 @@ for f in /etc/subuid /etc/subgid; do
   fi
   sed -i "/^${REMAP_USER}:/d" "$f"; echo "${REMAP_USER}:${BASE}:${RANGE}" >> "$f"
 done
-getent passwd "$REMAP_USER" >/dev/null || useradd --system --no-create-home --shell /bin/false "$REMAP_USER"
+# User and group are checked separately: MOS keeps users in /boot/config/system/passwd (rewritten when a
+# user is added in its UI, so it can pick up this one) but not their groups. After a reboot the user can
+# then exist without its group, and dockerd refuses to start ("getent unable to find entry ... in group").
+if ! getent passwd "$REMAP_USER" >/dev/null; then
+  getent group "$REMAP_USER" >/dev/null || groupadd --system "$REMAP_USER"
+  useradd --system --no-create-home --shell /bin/false -g "$REMAP_USER" "$REMAP_USER"
+fi
+if ! getent group "$REMAP_USER" >/dev/null; then
+  gid=$(getent passwd "$REMAP_USER" | cut -d: -f4)
+  if [ -n "$gid" ] && ! getent group "$gid" >/dev/null; then groupadd --system -g "$gid" "$REMAP_USER"
+  else groupadd --system "$REMAP_USER"; fi
+  log "group $REMAP_USER recreated (the user existed without it)"; event "group-recreated"
+fi
 if ! ours; then
   mkdir -p /etc/docker
   printf '{\n  "userns-remap": "%s"\n}\n' "$REMAP_USER" > "$CONF"

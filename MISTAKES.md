@@ -847,10 +847,10 @@ mistakes, not a diary.
 - **Fix applied:** read `mos-start`, confirmed with a harmless flag through the UI, corrected the bug report and #310.
 - **Rule going forward:** test a setting through the same path the platform uses (boot script or UI), and read that path's code before saying a setting has no effect.
 
-### 2026-11-17 — homenas (terse answer read as an exception to a decision)
+### 2026-11-17 — mos (remap user restored without its group)
 
-- **Trigger:** misunderstood request
-- **What happened:** kaywoz answered M-Q2 (does the comics server need egress) with "vlan13". I put the container on the media macvlan and recorded it as the one exception to G8 (Docker egress via VLAN 31), with a fixed address. kaywoz meant every VLAN has internet access; the container belongs on VLAN 31 like the rest.
-- **Root cause:** the README's own fallback for the question named the media macvlan, which already contradicted G8, and I took a one-word answer as a decision to break a recorded rule instead of asking.
-- **Fix applied:** the container moved to `apps-vlan31`, no fixed address, no exception (#336, second commit).
-- **Rule going forward:** when a short answer would contradict a recorded decision (a G-item, §8), ask one clarifying question before recording an exception; and options offered in a question must themselves be consistent with recorded decisions.
+- **Trigger:** apply broke something (Docker didn't start after a reboot)
+- **What happened:** after a Samba-only user was created in the MOS UI, MOS saved its user list, `dockremap` included, to `/boot/config/system/passwd`, but not the group. At the next boot the user came back without its group; `docker-userns.sh` only created the user when it was missing, so it skipped, and `dockerd` refused to start.
+- **Root cause:** the hook treated user and group as one unit and assumed nothing else in MOS touches `/etc/passwd`.
+- **Fix applied:** `groupadd` by hand on the host; the hook now checks user and group separately and `--check` reports a missing group (#341).
+- **Rule going forward:** a hook that recreates RAM `/etc` state checks every piece it depends on (user, group, subuid, subgid, config) on its own, and after any change in the MOS UI that touches users, reboot-test before relying on it.

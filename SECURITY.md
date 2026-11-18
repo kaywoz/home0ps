@@ -43,7 +43,7 @@ Two independent planes:
 
 | Risk | Control |
 |---|---|
-| Container escape to root | `userns-remap` daemon-wide; exemptions only where technically required, listed per role |
+| Container escape to root | `userns-remap` daemon-wide; exemptions only where technically required, listed per role. **Homenas: no remap** (Docker as MOS ships it; root containers named per role, kaywoz 2026-11-17) |
 | Privilege escalation, persistence | Non-root `user`, `read_only` + `tmpfs`, `cap_drop: [ALL]`, `no-new-privileges` (also daemon-wide) |
 | App-to-app spread | One bridge network per app; `internal: true` where possible; `icc: false` |
 | Docker control via tooling | Only `docker-socket-proxy` mounts `docker.sock`, `POST=0` — except the tier-0 Dockhand-home and its Hawser agents ([`security/infra.md`](security/infra.md)) |
@@ -62,7 +62,7 @@ Two independent planes:
 | Risk | Control |
 |---|---|
 | Leak via repository | `.env`, `*.env`, secret YAML, private keys and Terraform state are gitignored; only `*.example` templates are committed |
-| Leak via files on hosts | Secret files `600`, owned by the container's (remapped) host UID |
+| Leak via files on hosts | Secret files `600`, owned by the container's host UID (remapped where remap is used) |
 | Exposure via `docker inspect` | Secrets as files where the app supports it |
 | Exposed credentials | Rotate after any disclosure — open: kaywoz/home0ps#114 |
 
