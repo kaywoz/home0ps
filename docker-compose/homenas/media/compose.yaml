@@ -1,22 +1,14 @@
 # PROPOSAL — not deployed. Media stack on the replacement homenas (MOS), replacing the media LXC.
 # Design, open questions and migration: docker-compose/homenas/README.md. Nothing here runs until kaywoz OKs it.
 #
-# Zone: VLAN 13 (IoT). Docker runs directly on MOS (no LXC), one stack per zone (#314 scenario).
-# - media-vlan13: macvlan on the VLAN 13 sub-interface, no host IP on it. Jellyfin and Homey are IoT members
-#   of VLAN 13 with fixed addresses (kaywoz, 2026-11-17: Apple TV, discovery, Homey bridges); nothing else in
-#   this stack is on VLAN 13.
-# - apps-vlan31: Komga's internet access (README M-Q2), as for every Docker container that needs it. The MOS host can't reach
-#   macvlan containers, and they can't reach it — wanted here.
-# - proxy-jellyfin, proxy-komga: internal bridges, app + the media sidecar only. No egress, no published ports.
-#   Jellyfin is on proxy-jellyfin too, so the sidecar reaches it without a VLAN 13 address of its own.
-# - No `ports:` anywhere: Tailscale Services are served by the media zone's Tailscale sidecar (tag:media),
-#   because host-side `tailscale serve` to 127.0.0.1 can't reach macvlan containers. The sidecar and both
-#   networks are defined in the infra stack (shared services, kaywoz 2026-11-17); this stack joins them.
-# Docker runs with userns-remap, daemon-wide (kaywoz, 2026-11-17; #310 §7c, set up by #325): container uid N
-# is host uid 165536+N, so appdata and secret files are owned 165536+<the uid in `user:`> ("owned 165536+N"
-# below). Distinct non-root uids per service on top of it. Exemptions (`userns_mode: host`) are listed in the
-# README with a reason. The stack needs MOS autostart on: `restart:` alone doesn't bring it back.
-# Service uids per the table in the README.
+# Baseline (kaywoz, 2026-11-17): Docker as MOS ships it (no userns-remap), this stack owns its networks,
+# admin UIs are served by the host's own tailscaled (tag:storage). Appdata is owned by the uid in `user:`.
+# - media-vlan13: macvlan on the VLAN 13 sub-interface, no host IP on it. Only Jellyfin and Homey, the two
+#   that need layer 2 on VLAN 13 (Apple TV playback and discovery, Homey's device bridging). The host can't
+#   reach a macvlan container directly, so svc:jellyfin is served to Jellyfin's VLAN 13 address through the
+#   router (README "Reaching macvlan containers").
+# - proxy-komga: a plain bridge, Komga's port on 127.0.0.1 for the host's `tailscale serve`, egress via the host.
+# The stack needs MOS autostart on: `restart:` alone doesn't bring it back.
 # Data lives on the pool (${APPDATA}), never on MOS's RAM rootfs. Media comes read-only from the host's
 # rclone mount (config-files/mos/media-mount.sh, #197).
 services:
@@ -26,7 +18,7 @@ services:
     restart: unless-stopped
     user: "2001:2001"
     group_add:
-      - ${RENDER_GID}                         # host render group (getent group render on MOS); see R3 under remap
+      - ${RENDER_GID}                         # host render group (getent group render on MOS)
     devices:
       - /dev/dri/renderD128:/dev/dri/renderD128   # Intel QSV / VA-API: render node only
     read_only: true
@@ -41,8 +33,7 @@ services:
       JELLYFIN_PublishedServerUrl: http://${JELLYFIN_IP}:8096   # what LAN discovery hands out
     networks:
       media-vlan13:
-        ipv4_address: ${JELLYFIN_IP}          # fixed: Apple TV and other VLAN 13 clients
-      proxy-jellyfin: {}                      # internal: the media sidecar serves svc:jellyfin through it
+        ipv4_address: ${JELLYFIN_IP}          # fixed: Apple TV and other VLAN 13 clients; svc:jellyfin targets it
     volumes:
       - ${APPDATA}/jellyfin/config:/config
       - ${APPDATA}/jellyfin/cache:/cache
@@ -64,9 +55,10 @@ services:
     mem_limit: 768m
     environment:
       JAVA_TOOL_OPTIONS: -Xmx512m        # 8 GB box: heap capped below mem_limit
+    ports:
+      - "127.0.0.1:25600:25600"               # tailscale serve --service=svc:komga
     networks:
-      - apps-vlan31                           # internet access (README M-Q2); UI open on VLAN 31, Komga login
-      - proxy-komga                           # internal: the media sidecar serves svc:komga through it
+      - proxy-komga                           # plain bridge: egress (metadata) via the host
     volumes:
       - ${APPDATA}/komga/config:/config
       - ${MEDIA_MNT}:/data:ro
@@ -78,8 +70,9 @@ services:
     restart: unless-stopped
     # In the LXC Homey used network_mode: host to get the LXC's VLAN 13 address. On MOS, host network would
     # be the homenas's own network, so it gets a fixed macvlan address on VLAN 13 instead (discovery and
-    # mDNS work on that L2 segment; to verify). Runs as the image's own user (root in the container) with
-    # only the four capabilities tested on the media LXC (2026-11-07).
+    # mDNS work on that L2 segment; to verify). Runs as the image's own user, root, with only the four
+    # capabilities tested on the media LXC (2026-11-07): exception E3. Without remap that is host root; the
+    # macvlan keeps it off the host's own addresses.
     read_only: true
     cap_drop: [ALL]
     cap_add:
@@ -102,12 +95,16 @@ services:
     volumes:
       - ${APPDATA}/homey:/homey/user
 
-networks:                                     # owned by the infra stack (start it first)
+networks:
   media-vlan13:
-    external: true
-  apps-vlan31:
-    external: true
-  proxy-jellyfin:
-    external: true
+    name: media-vlan13
+    driver: macvlan
+    driver_opts:
+      parent: ${VLAN13_PARENT}         # e.g. <nic>.13, no IP on the host side
+    ipam:
+      config:
+        - subnet: ${VLAN13_SUBNET}
+          gateway: ${VLAN13_GATEWAY}
+          ip_range: ${VLAN13_RANGE}    # a small block outside the gateway's DHCP pool
   proxy-komga:
-    external: true
+    name: proxy-komga
