@@ -64,6 +64,7 @@ What each dropped layer would have bought, and why it went:
   | 23xx | storage | 2301 Kopia, 2302 RustFS, 2303 Time Machine share owner (the process is root, E4) |
 
 - **Paths:** MOS's root filesystem is RAM. All data lives under variables pointing at the pool (`${APPDATA}`, `${PHOTOS}`, `${BACKUPS}`, …); no relative paths.
+- **App data** (kaywoz, 2026-11-18): `APPDATA` is MOS's own appdata folder, `/var/mergerfs/merger-nvme/disk1/mos-docker/appdata` (as in `/boot/config/docker.json`), the same for every stack. The box starts fresh where possible: no app data is carried over from the old host's `appdata` unless a stack's migration step says so.
 - **One file per stack** (G2); each folder is one MOS stack.
 - **Monitoring:** one read-only socket proxy (`POST=0`) and one Beszel agent see every container. Dozzle reads this host through the proxy (no Dozzle agent: it would need the full socket). The guests' proxies, Hawser agents and native Beszel agents retire with the guests.
 - **Logs:** MOS has no journald (Devuan). Container logs go to the monitoring host (G5); Dozzle for live viewing.
