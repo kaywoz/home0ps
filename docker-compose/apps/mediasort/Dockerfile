@@ -1,4 +1,5 @@
-# Media classifier (kaywoz/home0ps#260). Built on the apps VM by compose (`build:`).
+# Media classifier (kaywoz/home0ps#260). Built by .github/workflows/build-mediasort.yml and pushed to
+# ghcr.io/kaywoz/mediasort:latest; the apps VM still builds it locally (`build:`) until it retires.
 FROM python:3.13-slim
 RUN pip install --no-cache-dir guessit anthropic openai
 WORKDIR /app
