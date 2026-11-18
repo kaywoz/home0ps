@@ -66,6 +66,7 @@ services:
   timemachine:
     image: mbentley/timemachine:smb
     container_name: kr-ccp-timemachine-0101
+    hostname: timemachine              # the name avahi advertises and Finder shows (default: the container ID)
     restart: unless-stopped
     cap_drop: [ALL]
     cap_add:                           # from the entrypoint; each to be confirmed one at a time at build
