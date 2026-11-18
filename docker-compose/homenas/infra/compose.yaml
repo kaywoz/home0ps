@@ -2,6 +2,9 @@
 # Design, open questions and migration: docker-compose/homenas/README.md. Nothing here runs until kaywoz OKs it.
 #
 # The services that serve other services: cloudflared, the read-only socket proxy and the Beszel agent.
+# The proxy and the agent only feed the monitoring host, which isn't running now (kaywoz, 2026-11-18): both are
+# behind the profile `monitoring`, so `up` (and MOS autostart) start cloudflared only. Enable the profile when
+# the monitoring host is back; their secret files are only needed then.
 # Baseline (kaywoz, 2026-11-17): Docker as MOS ships it (no userns-remap), each stack owns its networks,
 # admin UIs are served by the host's own tailscaled (`tailscale serve`, tag:storage) to 127.0.0.1 ports.
 # No Tailscale sidecars. Appdata and secret files are owned by the uid in `user:`. The stack needs MOS
@@ -40,6 +43,7 @@ services:
   # interface. `tailscale serve --tcp=2375 tcp://127.0.0.1:2375` on the host; only tag:monitoring may reach
   # it (existing grant + tests). Same name as today's MOS-template deploy.
   socketproxy:
+    profiles: [monitoring]             # off until the monitoring host is back (kaywoz, 2026-11-18)
     image: tecnativa/docker-socket-proxy:latest
     container_name: kr-ccp-socketproxy-0301
     restart: unless-stopped
@@ -72,6 +76,7 @@ services:
   # Docker only through the read-only proxy, pushes to svc:beszel. As deployed today (containers.md), same
   # name.
   beszelagent:
+    profiles: [monitoring]             # off until the monitoring host is back (kaywoz, 2026-11-18)
     image: henrygd/beszel-agent:latest
     container_name: kr-ccp-beszelagent-0201
     restart: unless-stopped
