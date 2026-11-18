@@ -854,3 +854,11 @@ mistakes, not a diary.
 - **Root cause:** the hook treated user and group as one unit and assumed nothing else in MOS touches `/etc/passwd`.
 - **Fix applied:** `groupadd` by hand on the host; the hook now checks user and group separately and `--check` reports a missing group (#341).
 - **Rule going forward:** a hook that recreates RAM `/etc` state checks every piece it depends on (user, group, subuid, subgid, config) on its own, and after any change in the MOS UI that touches users, reboot-test before relying on it.
+
+### 2026-11-17 — homenas (design drifted past need and proportionality)
+
+- **Trigger:** kaywoz had to redirect after hours of troubleshooting
+- **What happened:** the homenas Docker plan stacked daemon-wide userns-remap (boot hook, cron guard, re-owned appdata, five exemptions), per-VLAN macvlan zones, per-zone Tailscale sidecars, and an infra stack owning every network. Each layer was defended on its own; together they produced a chain of MOS-specific failures (RAM `/etc`, a missing group, Docker running on RAM after an out-of-band restart) and test after test, for a home NAS that appliance vendors run with none of it.
+- **Root cause:** each control was judged by whether it reduced some risk, not by whether the risk was worth its cost on a homelab box (CLAUDE.md §8 proportionality), and nobody compared the design with what comparable NAS platforms do by default.
+- **Fix applied:** consolidation of the design against need and proportionality, with a smaller baseline proposed to kaywoz.
+- **Rule going forward:** before adding a control that needs platform workarounds (boot hooks, patched OS state, exemptions), state the concrete threat, what the per-container defaults already cover, and what comparable appliances do; propose it only if the residual risk is clearly worth the upkeep, and ask kaywoz first.
