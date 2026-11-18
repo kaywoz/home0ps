@@ -245,7 +245,7 @@ Tests on the new box, each with throwaway containers. The remap hook was uninsta
 
 - **(b) NIC watchdog bounce.** With macvlan containers running, bounce the built-in NIC as the watchdog does. Do `<nic>.<vlan>` and the containers recover, or does the watchdog need a hook that restarts them?
 - **(c) NIC name.** The built-in NIC is `eth0` only while the USB adapter is unplugged; every `parent: <nic>.<vlan>` depends on it. Leave the adapter out, or pin the name.
-- **(d) Host → macvlan via the router.** From the host, `curl` a test container's VLAN 31 address. If it doesn't answer, the three macvlan Services need another path (decided then).
+- **(d) Host → macvlan via the router — passed** (2026-11-18): with UniFi's allow policy (the homenas → the VLAN 31 block, TCP 5797/8001) and device isolation on, the host got HTTP 200 from a test container on VLAN 31. Without the policy the zone's default block drops it. Jellyfin's policy (TCP 8096) is checked when Jellyfin runs.
 - **(e) Docker stays on disk — passed** (2026-11-18): after a reboot with Docker started only by MOS, the data root is `/var/lib/docker` on the pool, unremapped, no `daemon.json`, no pre-start script.
 
 ## Go-live prerequisites
