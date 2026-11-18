@@ -170,7 +170,7 @@ What each dropped layer would have bought, and why it went:
 **Secrets:** mediasort `token`, `tmdb`, `llm`; paperless `secret_key`, `redis_url`, `redis.conf`; CannonCommander `config.yaml`; Immich `db_password` (two copies, one per uid), `redis_password`, `valkey.conf`; HedgeDoc `session_secret`; Warrior `projects/config.json`; Filestash's admin hash in its `config.json`; ArchiveBox's superuser in its database.
 
 **Tailscale follow-ups:** add `svc:paperless`, `svc:cannoncommander`, `svc:immich`, `svc:atuin`, `svc:hedgedoc`, `svc:filestash`, `svc:rackpeek`, auto-approved for `tag:storage`, a grant per Service (Atuin: every syncing machine). `svc:archivebox` and `svc:archivewarrior` already auto-approve `tag:storage`. Retire the mover's grant to `tag:docker:8089` (the mover is local now), the Hawser grant, the apps VM's monitoring grants and its Cockpit Service.
-**UniFi follow-ups:** internet-only rules for both archiver addresses (block RFC1918 and the other VLANs); allow the homenas → them on 5797 and 8001.
+**UniFi follow-ups:** internet-only rules for both archiver addresses (block RFC1918 and the other VLANs); allow the homenas → them on 5797 and 8001; **device isolation on VLAN 31** (G9).
 
 **Migration from the apps VM:** copy `mediasort/secrets/`, re-own to 2104, set the mover's `CLASSIFIER_URL=http://127.0.0.1:8089`, run one dry run. Immich imports existing photos as an external library (A-Q3). Retire the VM once the mover has run cleanly for a day.
 
@@ -237,6 +237,7 @@ Named exceptions to the container standard (CLAUDE.md §8). Without remap, conta
 - **G6:** VLANs 11, 13 and 31 tagged on the homenas's switch port, each with an address block outside DHCP for the macvlans.
 - **G7 — 8 GB of RAM.** Sum of `mem_limit`s: media 2.8 GB, infra 0.3 GB, apps 5.4 GB (Immich ML off), storage 1.3 GB, ≈ 9.8 GB of caps before MOS itself. Caps over physical RAM are fine while peaks don't line up (Jellyfin transcoding, paperless OCR, ArchiveBox's Chromium, Immich imports). Watch Beszel the first weeks; next cuts are the archivers (start on demand), then Filestash.
 - **G8 — egress** (narrowed 2026-11-17): containers get egress through their bridge via the host; only the archivers leave through VLAN 31 (macvlan), and Jellyfin and Homey through VLAN 13 as its members. VLAN 24 isn't used by Docker.
+- **G9 — device isolation on VLAN 31** (kaywoz, 2026-11-18): VLAN 31 also holds containers from other hosts, so UniFi's device isolation is on for that network: VLAN 31 clients can't reach each other through the switch, only the gateway (internet, and routed traffic such as the macvlan Services' path from the homenas). Services that need to talk across hosts do it over Tailscale with a grant. It doesn't cover macvlan containers on the same host (the kernel switches those internally); on the homenas that is only the two archivers. To verify after enabling: test (d) still answers.
 
 ## Before the build
 
@@ -251,7 +252,7 @@ Tests on the new box, each with throwaway containers. The remap hook was uninsta
 
 Not in these files; each closed before the stacks hold real data:
 
-- **#322 — UniFi:** block VLANs 13, 24 and 31 → the homenas's own address; the archivers' internet-only rules; the allow rules for the macvlan Services above.
+- **#322 — UniFi:** block VLANs 13, 24 and 31 → the homenas's own address; the archivers' internet-only rules; device isolation on VLAN 31 (G9); the allow rules for the macvlan Services above.
 - **#255 — an offsite copy host root can't delete** (Storage Box snapshots or an append-only receiver).
 
 ## Unverified (checked at build)
