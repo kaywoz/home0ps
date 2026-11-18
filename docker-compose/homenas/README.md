@@ -240,12 +240,12 @@ Named exceptions to the container standard (CLAUDE.md §8). Without remap, conta
 
 ## Before the build
 
-Tests on the new box, each with throwaway containers, after the remap hook is uninstalled:
+Tests on the new box, each with throwaway containers. The remap hook was uninstalled and the remapped store removed on 2026-11-18.
 
 - **(b) NIC watchdog bounce.** With macvlan containers running, bounce the built-in NIC as the watchdog does. Do `<nic>.<vlan>` and the containers recover, or does the watchdog need a hook that restarts them?
 - **(c) NIC name.** The built-in NIC is `eth0` only while the USB adapter is unplugged; every `parent: <nic>.<vlan>` depends on it. Leave the adapter out, or pin the name.
 - **(d) Host → macvlan via the router.** From the host, `curl` a test container's VLAN 31 address. If it doesn't answer, the three macvlan Services need another path (decided then).
-- **(e) Docker stays on disk.** One reboot with Docker started only by MOS: `docker info` shows the data root on the pool.
+- **(e) Docker stays on disk — passed** (2026-11-18): after a reboot with Docker started only by MOS, the data root is `/var/lib/docker` on the pool, unremapped, no `daemon.json`, no pre-start script.
 
 ## Go-live prerequisites
 
