@@ -81,11 +81,20 @@
 			"svc:scrutiny":        ["tag:storage"],
 			"svc:kopia":           ["tag:storage"],
 			"svc:rustfs":          ["tag:storage"],
+			"svc:s3":              ["tag:storage"],
+			// homenas Docker stacks, served by the host's own tailscaled
+			"svc:paperless":       ["tag:storage"],
+			"svc:cannoncommander": ["tag:storage"],
+			"svc:immich":          ["tag:storage"],
+			"svc:atuin":           ["tag:storage"],
+			"svc:hedgedoc":        ["tag:storage"],
+			"svc:filestash":       ["tag:storage"],
+			"svc:rackpeek":        ["tag:storage"],
 			// apps host admin UI
 			"svc:cockpit-sexy":    ["tag:observed"],
-			// media LXC apps
-			"svc:jellyfin":        ["tag:media"],
-			"svc:komga":           ["tag:media"],
+			// media apps: the media LXC now, the homenas media stack after the move (tag:media goes with the LXC)
+			"svc:jellyfin":        ["tag:media", "tag:storage"],
+			"svc:komga":           ["tag:media", "tag:storage"],
 			// infra VM: central Docker management (home)
 			"svc:dockhand":        ["tag:infra"],
 		},
@@ -138,7 +147,8 @@
 		{
 			// admins -> storage host app UIs (same sources as full access to tag:storage)
 			"src": ["autogroup:admin", "group:privusers", "macmini"],
-			"dst": ["svc:archivebox", "svc:archivewarrior", "svc:scrutiny", "svc:kopia", "svc:rustfs"],
+			"dst": ["svc:archivebox", "svc:archivewarrior", "svc:scrutiny", "svc:kopia", "svc:rustfs", "svc:s3",
+			        "svc:paperless", "svc:cannoncommander", "svc:immich", "svc:atuin", "svc:hedgedoc", "svc:filestash", "svc:rackpeek"],
 			"ip":  ["tcp:443"],
 		},
 		{
@@ -262,8 +272,11 @@
 		{
 			// storage host app UIs reachable as services
 			"src":    "${TS_PRIVUSER}",
-			"accept": ["svc:archivebox:443", "svc:archivewarrior:443", "svc:scrutiny:443", "svc:kopia:443", "svc:rustfs:443"],
+			"accept": ["svc:archivebox:443", "svc:archivewarrior:443", "svc:scrutiny:443", "svc:kopia:443", "svc:rustfs:443", "svc:s3:443",
+			           "svc:paperless:443", "svc:cannoncommander:443", "svc:immich:443", "svc:atuin:443", "svc:hedgedoc:443", "svc:filestash:443", "svc:rackpeek:443"],
 		},
+		// homenas app UIs are for admins only: other hosts don't reach them
+		{"src": "tag:observed", "deny": ["svc:s3:443", "svc:paperless:443", "svc:cannoncommander:443", "svc:immich:443", "svc:atuin:443", "svc:hedgedoc:443", "svc:filestash:443", "svc:rackpeek:443"]},
 		{"src": "macmini", "accept": ["svc:archivebox:443", "svc:kopia:443"]},
 		{
 			// media apps as services: privusers yes; other hosts and the lab no
