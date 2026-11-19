@@ -27,12 +27,14 @@
 #   MEDIASORT_SECRETS_FROM=  scp source of mediasort's token/tmdb/llm, e.g. root@<apps-vm>:/srv/docker/mediasort/secrets
 #                            (only needed while they aren't in place yet)
 # Paths (environment, rarely changed): MOS_DOCKER=/var/mergerfs/merger-nvme/disk1/mos-docker (MOS's Docker
-# folder, docker.json); appdata is $MOS_DOCKER/appdata; the rendered .env and compose.yaml go to $H/apps-stack/.
+# folder on the disk itself, outside mergerfs as recommended for Docker data; never the /mnt/merger-* pool
+# mount; as in docker.json); appdata is $MOS_DOCKER/appdata; the rendered .env and compose.yaml go to $H/apps-stack/.
 #   REPO_RAW=https://raw.githubusercontent.com/kaywoz/home0ps/main
 set -euo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 MOS_DOCKER="${MOS_DOCKER:-/var/mergerfs/merger-nvme/disk1/mos-docker}"
+case "$MOS_DOCKER" in /mnt/merger*) echo "MOS_DOCKER is the mergerfs mount ($MOS_DOCKER): use the disk path, e.g. /var/mergerfs/merger-nvme/disk1/mos-docker" >&2; exit 1 ;; esac
 H="$MOS_DOCKER/appdata/home0ps"
 ENV_FILE="${APPS_STACK_ENV:-$H/apps-stack.env}"
 MODE=apply
@@ -40,7 +42,7 @@ case "${1:-}" in
   --dry-run) MODE=dry ;;
   --serve) MODE=serve ;;
   --verify) MODE=verify ;;
-  -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+  -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
   "") ;;
   *) echo "unknown option: $1" >&2; exit 1 ;;
 esac
