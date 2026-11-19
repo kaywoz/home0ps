@@ -19,11 +19,11 @@ Every container on the home0ps hosts, so names stay unique. Scheme: [`NAMING.md`
 | `kr-ccp-socketproxy-0301` | homenas (MOS) | [`config-files/mos/containers.md`](../config-files/mos/containers.md) | 2026-11-08 |
 | `kr-ccp-socketproxy-0401` | infra VM | [`infra/compose.yaml`](infra/compose.yaml) | 2026-11-08 |
 | `kr-ccp-socketproxy-0501` | apps VM | [`apps/compose.yaml`](apps/compose.yaml) | 2026-11-08 |
-| `kr-ccp-logtidedb-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | |
-| `kr-ccp-logtideredis-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | |
-| `kr-ccp-logtideapi-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | |
-| `kr-ccp-logtideworker-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | |
-| `kr-ccp-logtideui-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | |
+| `kr-ccp-logtidedb-0101` | monitoring host (archived 2026-11-19, #207) | [`archive/docker-compose/logtide/compose.yaml`](../archive/docker-compose/logtide/compose.yaml) | |
+| `kr-ccp-logtideredis-0101` | monitoring host (archived 2026-11-19, #207) | [`archive/docker-compose/logtide/compose.yaml`](../archive/docker-compose/logtide/compose.yaml) | |
+| `kr-ccp-logtideapi-0101` | monitoring host (archived 2026-11-19, #207) | [`archive/docker-compose/logtide/compose.yaml`](../archive/docker-compose/logtide/compose.yaml) | |
+| `kr-ccp-logtideworker-0101` | monitoring host (archived 2026-11-19, #207) | [`archive/docker-compose/logtide/compose.yaml`](../archive/docker-compose/logtide/compose.yaml) | |
+| `kr-ccp-logtideui-0101` | monitoring host (archived 2026-11-19, #207) | [`archive/docker-compose/logtide/compose.yaml`](../archive/docker-compose/logtide/compose.yaml) | |
 | `kr-ccp-healthchecks-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | |
 | `kr-ccp-jellyfin-0101` | media LXC | [`media/compose.yaml`](media/compose.yaml) | 2026-11-07 |
 | `kr-ccp-mediasort-0101` | apps VM | [`apps/compose.yaml`](apps/compose.yaml) | 2026-11-10 |
