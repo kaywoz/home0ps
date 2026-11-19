@@ -24,7 +24,7 @@ services:
   # runs on this host, so it calls 127.0.0.1:8089 directly: no Tailscale hop. Bearer-token protected.
   mediasort:
     image: ghcr.io/kaywoz/mediasort:latest   # built in GitHub Actions (README A-Q1)
-    container_name: kr-ccp-mediasort-0201
+    container_name: kr-ccp-mediasort-0101
     restart: unless-stopped
     user: "2104:2104"
     read_only: true

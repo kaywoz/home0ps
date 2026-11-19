@@ -24,7 +24,7 @@
 #     LXCS="kr-cxp-media-0101"            LXCs with a bind entry for $MNT, started after the mount.
 #                                         Set their autostart off: if one starts before the
 #                                         mount, its bind shows the empty directory underneath.
-#     CONTAINERS="kr-ccp-jellyfin-0201:/media kr-ccp-komga-0201:/data"
+#     CONTAINERS="kr-ccp-jellyfin-0101:/media kr-ccp-komga-0101:/data"
 #                                         Docker containers with a bind of $MNT, as name:target.
 #                                         They keep MOS autostart on; one that started before the
 #                                         mount sees an empty target and is restarted here.

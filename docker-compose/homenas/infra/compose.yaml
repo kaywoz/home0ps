@@ -88,11 +88,11 @@ services:
   # Read-only Docker API for Dozzle (monitoring host) and the Beszel agent. One Docker daemon serves all
   # stacks, so one proxy sees every container. Never host networking: the proxy would listen on every
   # interface. `tailscale serve --tcp=2375 tcp://127.0.0.1:2375` on the host; only tag:monitoring may reach
-  # it (existing grant + tests). Same name as today's MOS-template deploy.
+  # it (existing grant + tests). Group 01: the homenas is the first host of the new layout (kaywoz, 2026-11-19).
   socketproxy:
     profiles: [monitoring]             # off until the monitoring host is back (kaywoz, 2026-11-18)
     image: tecnativa/docker-socket-proxy:latest
-    container_name: kr-ccp-socketproxy-0301
+    container_name: kr-ccp-socketproxy-0101
     restart: unless-stopped
     read_only: true
     tmpfs:
@@ -120,12 +120,11 @@ services:
       retries: 3
 
   # Beszel agent: host network (upstream requirement for interface stats), LISTEN on the tailnet IP only,
-  # Docker only through the read-only proxy, pushes to svc:beszel. As deployed today (containers.md), same
-  # name.
+  # Docker only through the read-only proxy, pushes to svc:beszel. Group 01, like every container on this box.
   beszelagent:
     profiles: [monitoring]             # off until the monitoring host is back (kaywoz, 2026-11-18)
     image: henrygd/beszel-agent:latest
-    container_name: kr-ccp-beszelagent-0201
+    container_name: kr-ccp-beszelagent-0101
     restart: unless-stopped
     network_mode: host
     user: "65534:65534"
