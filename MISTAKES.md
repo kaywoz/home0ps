@@ -908,5 +908,5 @@ mistakes, not a diary.
 - **Trigger:** misunderstanding corrected by kaywoz
 - **What happened:** `apps-stack.sh` kept its settings, rendered `.env` and `compose.yaml` under `/boot/config/home0ps/`, copied from `nic-watchdog.sh`. kaywoz asked why they weren't with MOS's Docker data.
 - **Root cause:** I copied a convention without its reason: the watchdog lives on the stick because it must run while the pool or the NIC is in trouble. The stack script needs Docker and the pool anyway.
-- **Fix applied:** everything moved to `<mos-docker>/home0ps/` (kaywoz/home0ps#365).
-- **Rule going forward:** on MOS, files go on the boot stick only when they must work before or without the pool (boot, network recovery). Docker-related files live under MOS's Docker folder.
+- **Fix applied:** everything moved to `<appdata>/home0ps/`, next to the app folders and MOS's `compose_<stack>` folders (kaywoz/home0ps#365).
+- **Rule going forward:** on MOS, files go on the boot stick only when they must work before or without the pool (boot, network recovery). Docker-related files live in MOS's appdata, one folder each.

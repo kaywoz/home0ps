@@ -4,10 +4,11 @@
 #
 # Phase 1 = mediasort, CannonCommander, Atuin, HedgeDoc, Filestash, RackPeek (COMPOSE_PROFILES empty).
 # Run as root on the homenas. Everything lives with MOS's Docker data, on the pool, not on the boot stick:
-# it only works once Docker and the pool are up anyway. H = <mos-docker>/home0ps:
-#   mkdir -p /var/mergerfs/merger-nvme/disk1/mos-docker/home0ps
+# it only works once Docker and the pool are up anyway. It gets its own folder in appdata, next to the app
+# folders and MOS's compose_<stack> folders. H = <appdata>/home0ps:
+#   mkdir -p /var/mergerfs/merger-nvme/disk1/mos-docker/appdata/home0ps
 #   curl -fsSL https://raw.githubusercontent.com/kaywoz/home0ps/main/config-files/mos/apps-stack.sh \
-#     -o /var/mergerfs/merger-nvme/disk1/mos-docker/home0ps/apps-stack.sh
+#     -o /var/mergerfs/merger-nvme/disk1/mos-docker/appdata/home0ps/apps-stack.sh
 #
 #   bash $H/apps-stack.sh --dry-run   show what would change
 #   bash $H/apps-stack.sh             folders, secrets, image checks, the stack's .env
@@ -32,7 +33,7 @@ set -euo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 MOS_DOCKER="${MOS_DOCKER:-/var/mergerfs/merger-nvme/disk1/mos-docker}"
-H="$MOS_DOCKER/home0ps"
+H="$MOS_DOCKER/appdata/home0ps"
 ENV_FILE="${APPS_STACK_ENV:-$H/apps-stack.env}"
 MODE=apply
 case "${1:-}" in
