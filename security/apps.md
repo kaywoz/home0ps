@@ -15,7 +15,7 @@ Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh)
 | Lateral movement from this host | UniFi zone with internet-only egress; switch port VLAN 31 native + 13 tagged only, never management *(planned, #118)* |
 | Containers reaching other VLAN 31 hosts (homenas) | `DOCKER-USER` rule blocking container bridges → VLAN 31 *(planned, #118)* |
 | IoT-facing apps on VLAN 13 | macvlan on the VLAN 13 sub-interface, no host IP on it *(planned, #118)* — keeps the host itself off the IoT network |
-| Over-broad tailnet access | `tag:docker` + `tag:observed` + `tag:ssh` (apps VM, 2026-11-08). Inbound from the tailnet: monitoring host → tcp:45876 (Beszel agent) and tcp:2375 (read-only socket proxy for Dozzle, via `tailscale serve`); infra VM → tcp:2376 (Hawser, Dockhand-home); privusers → tcp:22, 80, 443 (admin baseline grants). Outbound pushes limited to `svc:logtide-api`, `svc:healthchecks`, `svc:beszel` |
+| Over-broad tailnet access | `tag:docker` + `tag:observed` + `tag:ssh` (apps VM, 2026-11-08). Inbound from the tailnet: monitoring host → tcp:45876 (Beszel agent) and tcp:2375 (read-only socket proxy for Dozzle, via `tailscale serve`); infra VM → tcp:2376 (Hawser, Dockhand-home); privusers → tcp:22, 80, 443 (admin baseline grants). Outbound pushes limited to `svc:healthchecks`, `svc:beszel` |
 | User-facing apps exposed | Via Cloudflare Tunnel + Access (outbound-only `cloudflared`, JWT validation on), never published ports *(planned, #118)* |
 | Admin UI exposure | Cockpit on `127.0.0.1:9091` only, published as `svc:cockpit-sexy`; `Origins` pinned, `LoginTo = false`, root disallowed |
 
@@ -52,7 +52,7 @@ Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh)
 
 | Risk | Control |
 |---|---|
-| Log loss / tampering | Persistent, sealed journal; Docker `journald` driver; Fluent Bit (sandboxed, unprivileged) → `svc:logtide-api` over the tailnet with TLS and the shared ingest key (verified, real key set) |
+| Log loss / tampering | Persistent, sealed journal; Docker `journald` driver; logs stay on the host (off-box shipping benched, kaywoz/home0ps#207) |
 | Silent host failure | Beszel agent visible in the hub (push over WebSocket, SSH pull as fallback) |
 | Failed jobs | Heartbeat pings to `svc:healthchecks` allowed for `tag:observed` |
 

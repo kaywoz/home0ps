@@ -72,8 +72,7 @@ Two independent planes:
 |---|---|
 | Log loss / tampering | Persistent journal (capped, 30 days), Forward Secure Sealing, verification key off-host |
 | Blind spots | Docker `journald` log driver: one journal covers host and containers |
-| Evidence loss on compromise | Native, sandboxed Fluent Bit ships the journal off-box to LogTide with disk buffering |
-| Silent sender failure | Log pipeline watchdog (kaywoz/home0ps#116) |
+| Evidence loss on compromise | **Accepted gap** while off-box shipping is benched (kaywoz/home0ps#207): logs stay in each host's journal only. Sealing shows tampering, not deletion of the whole journal. Replacement planned in kaywoz/home0ps#180 |
 | Unnoticed problems | Alerts to Slack (cloud, so delivery doesn't depend on any home0ps host) — kaywoz/home0ps#115 |
 
 ## Recovery
@@ -91,7 +90,7 @@ Two independent planes:
 
 ## Accepted risks (all systems)
 
-- One shared LogTide ingest key: senders can spoof `metadata.host`.
+- No off-box copy of logs while LogTide is benched (kaywoz/home0ps#207): a compromised host can delete its own journal.
 - Images on `:latest`: unvetted upstream changes (compensated by Diun kaywoz/home0ps#101 and Trivy kaywoz/home0ps#102).
 - Some apps only take secrets as env vars (visible via `docker inspect` / the socket proxy).
 - Slack sees alert text: alerts carry host/service/state only. Webhook URLs are bearer secrets.
