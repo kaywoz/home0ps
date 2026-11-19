@@ -9,8 +9,6 @@ locals {
     "cockpit-janky" = "Host admin UI (monitoring host)"
     beszel          = "Monitoring hub"
     dozzle          = "Container log viewer"
-    logtide         = "Log management UI"
-    "logtide-api"   = "Log management API (UI calls + log ingest)"
     healthchecks    = "Job heartbeats (UI + ping endpoint)"
 
     # storage host (tag:storage)
