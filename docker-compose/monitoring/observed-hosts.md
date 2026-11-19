@@ -16,7 +16,7 @@ tailscale status --self --json | grep -m1 '"DNSName"'
 
 ## 1. Tag (Tailscale admin console)
 
-Add `tag:observed` to the host, keeping its role tag. Use the console, not `tailscale set` over your own Tailscale SSH session. The grants already exist: monitoring → tcp:45876 and tcp:2375, host → `svc:beszel` / `svc:healthchecks` / `svc:logtide-api`. No policy change needed.
+Add `tag:observed` to the host, keeping its role tag. Use the console, not `tailscale set` over your own Tailscale SSH session. The grants already exist: monitoring → tcp:45876 and tcp:2375, host → `svc:beszel` / `svc:healthchecks`. No policy change needed.
 
 ## 2. Socket proxy on the host
 
