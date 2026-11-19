@@ -72,8 +72,6 @@
 			"svc:cockpit-janky": ["tag:monitoring"],
 			"svc:beszel":  ["tag:monitoring"],
 			"svc:dozzle":  ["tag:monitoring"],
-			"svc:logtide":     ["tag:monitoring"],
-			"svc:logtide-api": ["tag:monitoring"],
 			"svc:healthchecks": ["tag:monitoring"],
 			// storage host app UIs
 			"svc:archivebox":      ["tag:storage"],
@@ -141,7 +139,7 @@
 		{
 			// admins -> admin UIs by service name (not by node/port)
 			"src": ["autogroup:admin"],
-			"dst": ["svc:gatus", "svc:beszel", "svc:dozzle", "svc:logtide", "svc:logtide-api", "svc:healthchecks", "svc:cockpit-janky", "svc:cockpit-sexy", "svc:dockhand"],
+			"dst": ["svc:gatus", "svc:beszel", "svc:dozzle", "svc:healthchecks", "svc:cockpit-janky", "svc:cockpit-sexy", "svc:dockhand"],
 			"ip":  ["tcp:443"],
 		},
 		{
@@ -155,12 +153,6 @@
 			// privusers' personal devices -> media apps (Apple TV etc. use the LAN, see security/media.md)
 			"src": ["group:privusers"],
 			"dst": ["svc:jellyfin", "svc:komga"],
-			"ip":  ["tcp:443"],
-		},
-		{
-			// log shippers (tailscale devices, remote syslog collectors) -> log ingest
-			"src": ["tag:observed"],
-			"dst": ["svc:logtide-api"],
 			"ip":  ["tcp:443"],
 		},
 		{
@@ -250,9 +242,9 @@
 		},
 		{"src": "tag:monitoring", "accept": ["macmini:45876"], "deny": ["macmini:22"]},
 		{
-			// observed hosts reach log ingest, heartbeats and the Beszel hub only, nothing else on the monitoring host
+			// observed hosts reach heartbeats and the Beszel hub only, nothing else on the monitoring host
 			"src":    "tag:observed",
-			"accept": ["svc:logtide-api:443", "svc:healthchecks:443", "svc:beszel:443"],
+			"accept": ["svc:healthchecks:443", "svc:beszel:443"],
 			"deny":   ["tag:monitoring:22", "tag:monitoring:443", "tag:observed:45876", "tag:observed:2375"],
 		},
 		{
