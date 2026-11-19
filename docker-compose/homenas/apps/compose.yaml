@@ -1,5 +1,12 @@
-# PROPOSAL — not deployed. Apps stack on the replacement homenas (MOS), replacing the apps VM.
-# Design, open questions and migration: docker-compose/homenas/README.md. Nothing here runs until kaywoz OKs it.
+# Apps stack on the replacement homenas (MOS), replacing the apps VM. Design and migration:
+# docker-compose/homenas/README.md.
+#
+# Phase 1 (kaywoz, 2026-11-19): with no profile set, only mediasort, CannonCommander, Atuin, HedgeDoc,
+# Filestash and RackPeek start: plain bridges, no macvlan, fresh data. The rest wait behind profiles,
+# switched on with COMPOSE_PROFILES in the stack's .env:
+# - paperless, immich: real data; after #255 (an offsite copy host root can't delete).
+# - archivers (ArchiveBox, ArchiveTeam Warrior): the VLAN 31 macvlan; after tests (b) and (c) and #322.
+# - immich-ml: off (8 GB box, README A-Q4).
 #
 # Trusted, well-known apps only (CLAUDE.md §8). Baseline (kaywoz, 2026-11-17): Docker as MOS ships it (no
 # userns-remap), this stack owns its networks, admin UIs are served by the host's own tailscaled
@@ -52,6 +59,7 @@ services:
   paperless:
     image: ghcr.io/paperless-ngx/paperless-ngx:latest
     container_name: kr-ccp-paperless-0101
+    profiles: [paperless]
     restart: unless-stopped
     user: "2105:2105"                  # "rootless" mode (docs/setup.md): s6 skips usermod/chown. Never with USERMAP_UID
     read_only: true                    # via S6_READ_ONLY_ROOT; read_only + rootless together untested upstream
@@ -94,6 +102,7 @@ services:
   paperlessredis:
     image: redis:latest
     container_name: kr-ccp-paperlessredis-0101
+    profiles: [paperless]
     restart: unless-stopped
     user: "2106:2106"
     read_only: true
@@ -158,6 +167,7 @@ services:
   immich:
     image: ghcr.io/immich-app/immich-server:release
     container_name: kr-ccp-immich-0101
+    profiles: [immich]
     restart: unless-stopped
     user: "2111:2111"                  # start.sh does no user switching (FAQ: non-root via user:)
     group_add:
@@ -226,6 +236,7 @@ services:
   immichdb:
     image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
     container_name: kr-ccp-immichdb-0101
+    profiles: [immich]
     restart: unless-stopped
     user: "2113:2113"                  # arbitrary uid: upstream postgres entrypoint uses nss_wrapper (to verify)
     read_only: true                    # to verify at build
@@ -256,6 +267,7 @@ services:
   immichredis:
     image: valkey/valkey:latest        # upstream pins valkey:9 by digest; :latest per §8 (README A-Q5)
     container_name: kr-ccp-immichredis-0101
+    profiles: [immich]
     restart: unless-stopped
     user: "2114:2114"
     read_only: true
@@ -281,6 +293,7 @@ services:
   archivebox:
     image: ghcr.io/archivebox/archivebox:latest
     container_name: kr-ccp-archivebox-0101
+    profiles: [archivers]
     restart: unless-stopped
     user: "911:911"                    # the image's own uid: its dirs are owned 911, an arbitrary uid fails (exit 3)
     # Read-only exception (README "Exception register", E1): the entrypoint needs /opt/archivebox writable,
@@ -313,6 +326,7 @@ services:
   archivewarrior:
     image: atdr.meo.ws/archiveteam/warrior-dockerfile:latest
     container_name: kr-ccp-archivewarrior-0101
+    profiles: [archivers]
     restart: unless-stopped
     user: "1000:1000"                  # the image's own uid (/home/warrior owned 1000)
     # Read-only exception (E2): /home/warrior/data holds the baked-in wget-at binaries and must be writable.
@@ -348,7 +362,7 @@ services:
     command: ["start"]
     environment:
       ATUIN_HOST: 0.0.0.0              # defaults to 127.0.0.1
-      ATUIN_OPEN_REGISTRATION: "false"
+      ATUIN_OPEN_REGISTRATION: ${ATUIN_OPEN_REGISTRATION:-false}   # "true" in .env only while creating the first account
       ATUIN_DB_URI: sqlite:///config/atuin.db
     volumes:
       - ${APPDATA}/atuin/config:/config   # server.toml + atuin.db; owned 2121
