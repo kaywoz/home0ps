@@ -27,8 +27,8 @@
 #   MEDIASORT_SECRETS_FROM=  scp source of mediasort's token/tmdb/llm, e.g. root@<apps-vm>:/srv/docker/mediasort/secrets
 #                            (only needed while they aren't in place yet)
 # Paths (environment, rarely changed): MOS_DOCKER=/var/mergerfs/merger-nvme/disk1/mos-docker (MOS's Docker
-# folder on the disk itself, outside mergerfs as recommended for Docker data; never the /mnt/merger-* pool
-# mount; as in docker.json); appdata is $MOS_DOCKER/appdata; the rendered .env and compose.yaml go to $H/apps-stack/.
+# folder on the disk itself: Docker's own files stay outside mergerfs, never the /mnt/merger-* pool mount;
+# service data such as SHARE_DATA goes through mergerfs; as in docker.json); appdata is $MOS_DOCKER/appdata; the rendered .env and compose.yaml go to $H/apps-stack/.
 #   REPO_RAW=https://raw.githubusercontent.com/kaywoz/home0ps/main
 set -euo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
