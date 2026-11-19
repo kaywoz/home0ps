@@ -231,25 +231,43 @@ change explicitly if one no longer fits.
 
 - **Host roles** (real device names never in git, §4): monitoring host
   (Raspberry Pi 5, observation-only: reads everything, changes nothing
-  elsewhere), apps host (Intel N305, trusted well-known apps only), storage
-  host (MOS NAS, storage only, pulls backups). Risky or `privileged`
+  elsewhere), apps host (Intel N305, trusted well-known apps only), homenas
+  (MOS NAS: storage, pulls backups, and the home Docker stacks once
+  kaywoz/home0ps#321 is built; kaywoz, 2026-11-17). Risky or `privileged`
   workloads go to the separate XCP-ng lab, not home0ps.
 - **Two access planes:** admin UIs as Tailscale Services
   (`svc:<app>` on 443); user-facing apps via Cloudflare Tunnel + Access.
   Tailscale is break-glass. No certificates to manage, no DNS API tokens on
   hosts.
-- **Cockpit: one per host** (decided 2026-10-20), each its own Tailscale
+- **One host management portal per host** (decided 2026-10-20, clarified
+  2026-11-19): the host's own native portal (Cockpit, the MOS UI, or a
+  similar portal built into the OS), and it manages only that host.
+  Cockpit, where used, is its own Tailscale
   Service `svc:cockpit-<device>` (§4 Service-name exception) on `127.0.0.1:9091`, `LoginTo = false`,
   `AllowMultiHost` off. No multi-host Cockpit hub: it would hold SSH to every
-  host and share one browser origin across them. The home side has no
-  central admin point; the Mac mini is the home admin workstation.
+  host and share one browser origin across them. The Mac mini is the home
+  admin workstation.
+- **Logical management portals** (Docker UIs, deployers: e.g. Dockhand,
+  Arcane, `h0ps-tern`) may manage other hosts if they keep to the other
+  axioms here: same zone only (never lab ↔ home), never the monitoring host
+  or backup targets, run on a host at least as trusted as the hosts they
+  manage, UI only via their Tailscale Service with own auth (prefer
+  OIDC + MFA), one grant per flow, logged, own security-summary entry.
 - **Exception — Dockhand** *(provisional, part of kaywoz/home0ps#174; may be
   revisited)*: one central Docker UI per zone.
   - **Dockhand-home** runs in the infra VM (VLAN 24, tier 0) and manages **only** its
-    own VM (socket proxy with `POST`), the MOS host's Docker and the apps VM
-    (Hawser) — so it is ≈ root on the MOS host (accepted). **Never the
-    monitoring host** (backup copy 1 stays outside central control) and
-    **never lab agents**.
+    own VM (**full Docker socket** — a write-enabled proxy adds no real
+    protection for a management tool; kaywoz, 2026-11-08), and through
+    Hawser (standard mode, token, tcp:2376 over the tailnet) the apps VM and
+    the media LXC — so it is ≈ root on those hosts (accepted). Hawser runs
+    only on the infra VM, apps VM and media LXC unless kaywoz says otherwise:
+    **not the homenas** (kaywoz, 2026-11-09), **never the monitoring
+    host** (backup copy 1 stays outside central control) and **never lab
+    agents**.
+    **Retires with the homenas Docker migration** (kaywoz, 2026-11-17,
+    kaywoz/home0ps#320): the MOS UI becomes the home Docker UI, and
+    Dockhand-home, its Hawser agents and their grants go with the infra
+    VM, apps VM and media LXC. Don't extend it to new home hosts meanwhile.
   - **Dockhand-lab** runs next to Xen Orchestra in the **lab management
     VM on dedicated lab hardware** (VLAN 21, not on the MOS host) and
     manages lab containers only; lab-facing management never runs on home
@@ -261,9 +279,14 @@ change explicitly if one no longer fits.
   `<site>-<type><platform><env>-<service>-<GGMM>`, e.g. `kr-ccp-gatus-0101`,
   GGMM = group then member. Containers are registered in
   `docker-compose/CONTAINERS.md`; take the next free group there.
+  Tools built for home0ps are named `h0ps-<animal>`, the animal an acronym
+  for what it does (e.g. `h0ps-tern`; NAMING.md).
 - **Host layout:** `/srv/docker/compose.yaml` — one file, all services
   inline, no `include:` — plus one data subfolder per service. Host-level
   config lives in this repo (`config-files/`), not in `/srv/docker`.
+  **Exception — homenas** (MOS, kaywoz 2026-11-17): one compose file per
+  stack (`docker-compose/homenas/<stack>/compose.yaml`), each one MOS
+  stack, because MOS starts, stops and autostarts per stack.
 - **Networks:** one bridge per app, `proxy-<app>`; `internal: true` only when
   the container needs no egress **and** publishes no ports.
 - **Container standard:** non-root `user`, `read_only` + `tmpfs`,
@@ -271,9 +294,21 @@ change explicitly if one no longer fits.
   healthcheck where the image allows, ports on `127.0.0.1` only, secrets as
   files (`600`, owned by the container's remapped host UID), never in git.
 - **Docker socket:** only `tecnativa/docker-socket-proxy` mounts it
-  (`POST=0`); consumers use `DOCKER_HOST=tcp://…:2375`.
+  (`POST=0`); consumers use `DOCKER_HOST=tcp://…:2375`. Exceptions:
+  Dockhand-home on its own VM and the Hawser agents it manages, until
+  they retire (see above).
+- **README acknowledgements** (kaywoz, 2026-11-19): every service home0ps
+  uses gets a line under README "Acknowledgments" crediting the **owner of
+  its upstream repo** (the account or org that owns the source repo, linked),
+  not the image publisher, a fork or a wrapper. Add it in the same change
+  that adds the service.
 - **Images on `:latest`**, no digest/version pinning — decided, don't
   propose it. (OpenTofu providers are different: exact pins, §3.)
+- **rclone always shows progress** (kaywoz, 2026-11-10): every rclone
+  command that copies, moves, syncs, checks or deletes data carries `-P`,
+  dry runs included, in scripts (plus `--stats 2s`) and in commands handed
+  to kaywoz. Pure lookups (`lsf`, `lsjson --stat`, `about`,
+  `backend features`, `config`) are exempt.
 - **Monitoring pulls** from the monitoring host outward over the tailnet,
   one explicit grant per flow; agents listen on tailnet IPs only.
   **Exception — pushes to the monitoring host's Services:** observed hosts
@@ -289,3 +324,15 @@ change explicitly if one no longer fits.
 - **Security summaries:** global [`SECURITY.md`](SECURITY.md) plus
   `security/<role>.md` per host role. Update them in the same change as the
   system they describe.
+
+## 9. Reply style
+
+kaywoz, 2026-11-17. Applies to every reply in chat:
+
+- **Findings first, as short one-liners**, in plain words. No explaining
+  actions unless kaywoz asks. Don't say what you're looking for unless you
+  found it.
+- Then the command/script/code block (host label, §8 conventions).
+- Then **Expect:** a short summary of the expected output and what decides
+  the next step.
+- Then **Why:** a few words on why this next step is needed.

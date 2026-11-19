@@ -1,0 +1,213 @@
+# PROPOSAL — not deployed. Storage stack on the replacement homenas (MOS): the host's own storage
+# services. Design, open questions and migration: docker-compose/homenas/README.md. Nothing here runs until
+# kaywoz OKs it.
+#
+# Same pattern as the other stacks: one bridge per app, ports on 127.0.0.1, `tailscale serve` on the host
+# (tag:storage, which already has svc:kopia and svc:rustfs).
+# - proxy-kopia, proxy-rustfs: plain bridges (not internal, because internal networks can't publish ports).
+#   They need no egress. A container on a plain bridge can reach the MOS host through the bridge gateway:
+#   accepted, every host listener needs a login or is tailnet-only (README S-Q1).
+# - Time Machine: macvlan on VLAN 11 (trusted clients) with a fixed address, so Macs reach SMB without
+#   clashing with MOS's own Samba on 445 (README S-Q2).
+# Docker as MOS ships it (no userns-remap, kaywoz 2026-11-17): appdata and secret files are owned by the uid
+# in `user:`. The stack needs MOS autostart on: `restart:` alone doesn't bring it back.
+#
+# The box's socket proxy and Beszel agent are in the infra stack (shared services, kaywoz 2026-11-17).
+# Scrutiny: collector only (kaywoz, 2026-11-17, replaces the native collector in #103). Not started by `up`
+# (profile `cron`): a MOS UI cron job runs it once a day and it exits. The hub (UI, database) is on the
+# monitoring host.
+services:
+  # Kopia repository server: backups from the other machines (#43). Repository on the pool. TLS with its own
+  # certificate (the repository server's gRPC needs TLS); served as svc:kopia with https+insecure.
+  kopia:
+    image: kopia/kopia:latest
+    container_name: kr-ccp-kopia-0101
+    restart: unless-stopped
+    user: "2301:2301"                  # no USER and no entrypoint script in the image (to verify at build)
+    read_only: true                    # not documented upstream; to verify at build
+    cap_drop: [ALL]                    # no FUSE/SYS_ADMIN: those are only for `kopia mount`
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=256m
+    pids_limit: 300
+    mem_limit: 512m
+    environment:
+      KOPIA_CONFIG_PATH: /app/config/repository.config
+      KOPIA_PERSIST_CREDENTIALS_ON_CONNECT: "true"   # repository password in /app/config/*.kopia-password
+                                                     # (600) instead of KOPIA_PASSWORD in env
+    # UI basic auth from an htpasswd file (a hidden, older flag; `kopia server user add` covers repository
+    # users). No password on the command line or in env: both are readable through the socket proxy.
+    command:
+      - server
+      - start
+      - --address=0.0.0.0:51515
+      - --tls-cert-file=/app/config/tls.crt
+      - --tls-key-file=/app/config/tls.key
+      - --htpasswd-file=/app/config/htpasswd
+    ports:
+      - "127.0.0.1:51515:51515"        # tailscale serve --service=svc:kopia https+insecure://127.0.0.1:51515
+    volumes:
+      - ${APPDATA}/kopia/config:/app/config
+      - ${APPDATA}/kopia/cache:/app/cache
+      - ${APPDATA}/kopia/logs:/app/logs
+      - ${BACKUPS}:/repository
+    networks:
+      - proxy-kopia
+    healthcheck:                       # no unauthenticated endpoint: a 401 from the UI means it's up
+      test: ["CMD-SHELL", "curl -ks -o /dev/null -w '%{http_code}' https://127.0.0.1:51515/ | grep -q 401"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
+  # Time Machine for the Macs (S-Q2). Root with six capabilities (exception E4): its entrypoint creates the
+  # SMB user, writes smb.conf and the avahi service, then runs smbd/nmbd/avahi under s6. Not read_only. On the
+  # VLAN 11 macvlan only, so it can't reach the host's own addresses.
+  timemachine:
+    image: mbentley/timemachine:smb
+    container_name: kr-ccp-timemachine-0101
+    hostname: timemachine              # the name avahi advertises and Finder shows (default: the container ID)
+    restart: unless-stopped
+    cap_drop: [ALL]
+    cap_add:                           # from the entrypoint; each to be confirmed one at a time at build
+      - CHOWN                          # user setup, chown of the share
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID                         # smbd switches to the share user per connection
+      - SETGID
+      - NET_BIND_SERVICE               # 445
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /run/samba                     # as in upstream's compose
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    pids_limit: 200
+    mem_limit: 256m
+    environment:
+      TM_USERNAME: timemachine
+      TM_GROUPNAME: timemachine
+      TM_UID: "2303"                   # owner of the share files (not the process uid)
+      TM_GID: "2303"
+      PASSWORD_FILE: /run/secrets/timemachine_password
+      VOLUME_SIZE_LIMIT: 1T            # caps what Time Machine sees as free space
+      SET_PERMISSIONS: "false"
+    secrets:
+      - timemachine_password
+    volumes:
+      - ${TIMEMACHINE}:/opt/timemachine
+    networks:
+      clients-vlan11:
+        ipv4_address: ${TIMEMACHINE_IP}  # VLAN 13 Macs: UniFi rule to this address, tcp:445 only
+    healthcheck:                       # the image ships none for the smb variant
+      test: ["CMD", "pgrep", "smbd"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
+  # RustFS: local S3 (#39). Keys as files (*_FILE are native); never the default rustfsadmin/rustfsadmin.
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: kr-ccp-rustfs-0101
+    restart: unless-stopped
+    user: "2302:2302"                  # image runs as 10001; the entrypoint never switches user
+    read_only: true                    # not documented upstream; to verify at build
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m
+    pids_limit: 300
+    mem_limit: 512m
+    environment:
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CONSOLE_CORS_ALLOWED_ORIGINS: ${RUSTFS_CONSOLE_ORIGIN}   # the image defaults to "*"
+      RUSTFS_OBS_LOG_DIRECTORY: /logs
+      RUSTFS_ACCESS_KEY_FILE: /run/secrets/rustfs_access_key
+      RUSTFS_SECRET_KEY_FILE: /run/secrets/rustfs_secret_key
+    secrets:
+      - rustfs_access_key
+      - rustfs_secret_key
+    ports:
+      - "127.0.0.1:9000:9000"          # S3 API: tailscale serve --service=svc:s3 (README S-Q3)
+      - "127.0.0.1:9001:9001"          # console: svc:rustfs
+    volumes:
+      - ${S3DATA}:/data
+      - ${APPDATA}/rustfs/logs:/logs
+    networks:
+      - proxy-rustfs
+    healthcheck:                       # as in upstream's compose
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Scrutiny SMART collector (spoke; hub on the monitoring host, #103). Exception E5 (README): NVMe SMART needs
+  # SYS_RAWIO + SYS_ADMIN and the controller devices, so it runs as root. Narrowed as far as the docs allow:
+  # - controller char devices only (/dev/nvmeN), never the namespaces (/dev/nvmeNn1): no direct read/write of
+  #   disk data. Residual: NVMe admin commands (format, sanitize, firmware) through the controller, the same
+  #   power the native collector would have had as host root.
+  # - collector-only image: no UI, no database, no listening port; it only pushes to the hub.
+  # - runs once a day for seconds, not all the time. MOS UI cron (one line, as root):
+  #     0 3 * * *  cd <appdata>/compose_storage && docker-compose --profile cron run --rm scrutinycollector
+  #   (stack folder name as MOS creates it; check at build). MOS autostart's `up -d` skips the profile.
+  # Docs: github.com/AnalogJ/scrutiny docs/INSTALL_HUB_SPOKE.md and README (Docker, hub/spoke).
+  # To verify at build: smartctl works through /dev/nvmeN alone; the binary path and `run` in the image; the
+  # nvmeN numbering is stable across reboots (#310 saw drives renumber after a bus drop).
+  scrutinycollector:
+    image: ghcr.io/analogj/scrutiny:latest-collector
+    container_name: kr-ccp-scrutinycollector-0101
+    profiles: [cron]
+    restart: "no"
+    entrypoint: ["/opt/scrutiny/bin/scrutiny-collector-metrics", "run", "--api-endpoint", "${SCRUTINY_API}"]
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [SYS_RAWIO, SYS_ADMIN]    # SYS_ADMIN: NVMe only (Scrutiny README)
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m
+    pids_limit: 50
+    mem_limit: 128m
+    devices:
+      - /dev/nvme0:/dev/nvme0
+      - /dev/nvme1:/dev/nvme1
+      - /dev/nvme2:/dev/nvme2
+      - /dev/nvme3:/dev/nvme3
+    volumes:
+      - /run/udev:/run/udev:ro         # device metadata (Scrutiny README)
+    networks: [proxy-scrutinycollector]
+
+networks:
+  proxy-kopia:
+    name: proxy-kopia
+    driver: bridge
+  proxy-rustfs:
+    name: proxy-rustfs
+    driver: bridge
+  proxy-scrutinycollector:           # egress only: pushes to svc:scrutiny over the host's tailscaled
+    name: proxy-scrutinycollector
+    driver: bridge
+  clients-vlan11:                    # Time Machine only; owned here, since no other stack uses VLAN 11
+    name: clients-vlan11
+    driver: macvlan
+    driver_opts:
+      parent: ${VLAN11_PARENT}         # e.g. <nic>.11, no IP on the host side
+    ipam:
+      config:
+        - subnet: ${VLAN11_SUBNET}
+          gateway: ${VLAN11_GATEWAY}
+          ip_range: ${VLAN11_RANGE}    # a small block outside the gateway's DHCP pool
+
+secrets:
+  timemachine_password:
+    file: ${APPDATA}/timemachine/password     # 600, root (the entrypoint reads it as root)
+  rustfs_access_key:
+    file: ${APPDATA}/rustfs/secrets/access_key   # 600, owned 2302
+  rustfs_secret_key:
+    file: ${APPDATA}/rustfs/secrets/secret_key   # 600, owned 2302

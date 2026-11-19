@@ -1,8 +1,8 @@
 # Media LXC security design
 
-Unprivileged LXC on the storage host (MOS), **Debian 13**, own NIC on **VLAN 13 (IoT)**. Runs Jellyfin, Komga and Homey as containers ([`docker-compose/media/`](../docker-compose/media/compose.yaml)). Builds on the [global baseline](../SECURITY.md); this file lists only what is specific to this role.
+Unprivileged LXC on the homenas (MOS), **Debian 13**, own NIC on **VLAN 13 (IoT)**. Runs Jellyfin, Komga and Homey as containers ([`docker-compose/media/`](../docker-compose/media/compose.yaml)). Builds on the [global baseline](../SECURITY.md); this file lists only what is specific to this role.
 
-Rebuild: [`config-files/mos/create-lxc.sh`](../config-files/mos/create-lxc.sh) on the storage host, then [`baseline.sh`](../config-files/ubuntu/baseline.sh) and [`docker-host.sh`](../config-files/ubuntu/docker-host.sh) inside — all passed `--verify` (2026-11-03). Build-out: kaywoz/home0ps#174, media mount kaywoz/home0ps#197.
+Rebuild: [`config-files/mos/create-lxc.sh`](../config-files/mos/create-lxc.sh) on the homenas, then [`baseline.sh`](../config-files/ubuntu/baseline.sh) and [`docker-host.sh`](../config-files/ubuntu/docker-host.sh) inside — all passed `--verify` (2026-11-03). Build-out: kaywoz/home0ps#174, media mount kaywoz/home0ps#197.
 
 **Status legend:** controls without a marker are in place and verified; *(planned)* items are tracked in the linked issue; *(untested)* items are configured but not yet confirmed on the host.
 
@@ -11,7 +11,7 @@ Rebuild: [`config-files/mos/create-lxc.sh`](../config-files/mos/create-lxc.sh) o
 | Risk | Control |
 |---|---|
 | IoT devices reaching the LXC | Only Jellyfin **8096/tcp + 7359/udp** on the LXC's VLAN 13 address — an explicit exception to "ports on 127.0.0.1" so Apple TV and other VLAN 13 clients can play and discover (kaywoz, 2026-11-07). No DLNA, no host network for Jellyfin. Homey listens on the LAN by design (see below). No sshd in the LXC (verified: `baseline.sh` "no sshd (container)") |
-| Over-broad tailnet access | `tag:media` + `tag:observed`; Komga and Jellyfin for phones/laptops as `svc:komga` / `svc:jellyfin` *(planned)*; Tailscale SSH: privusers, admin account only, 24h check, never root |
+| Over-broad tailnet access | `tag:media` + `tag:observed`; infra VM → tcp:2376 only (Hawser, Dockhand-home); Komga and Jellyfin for phones/laptops as `svc:komga` / `svc:jellyfin` *(planned)*; Tailscale SSH: privusers, admin account only, 24h check, never root |
 | Docker API for monitoring | Read-only `docker-socket-proxy` (`CONTAINERS`, `INFO`, `EVENTS`; `POST=0`) on `127.0.0.1:2375`, exposed on the tailnet address via `tailscale serve --tcp=2375`; only `tag:monitoring` may reach it (Dozzle remote-host mode, no agent). Read verified (Dozzle shows the host, 2026-11-08); write and LAN refusal *(untested)*. Onboarding: [`observed-hosts.md`](../docker-compose/monitoring/observed-hosts.md) |
 | Homey on host network | Needed for its LAN role (bridges, discovery on VLAN 13). Runs **without `privileged`** (Athom's guide uses it; dropped, kaywoz 2026-11-07), `cap_drop: [ALL]` plus only `SETUID`, `SETGID`, `SYS_CHROOT`, `CHOWN` (D-Bus, avahi, go2rtc switching users / chroot / socket ownership), `/run` as tmpfs. Verified running on a fresh data folder (2026-11-07); data restored from an older install crashed its Matter daemon even with `privileged` |
 
@@ -19,7 +19,7 @@ Rebuild: [`config-files/mos/create-lxc.sh`](../config-files/mos/create-lxc.sh) o
 
 | Risk | Control |
 |---|---|
-| Media library tampering / cloud credential theft | The LXC holds **no** Filen credentials or crypt key: the storage host mounts the library read-only and binds it in read-only (decided 2026-11-07, #197). A compromised app can read the media, nothing more |
+| Media library tampering / cloud credential theft | The LXC holds **no** Filen credentials or crypt key: the homenas mounts the library read-only and binds it in read-only (decided 2026-11-07, #197). A compromised app can read the media, nothing more |
 | Homey account | Homey's own login (cloud account); no secrets in git |
 
 ## Containment
@@ -27,6 +27,7 @@ Rebuild: [`config-files/mos/create-lxc.sh`](../config-files/mos/create-lxc.sh) o
 | Risk | Control |
 |---|---|
 | App compromise → LXC | Container standard: non-root service uids (2001/2002, not the admin account's uid), `read_only` + `tmpfs`, `cap_drop: [ALL]`, `no-new-privileges`, memory/pid limits — all verified running (2026-11-07). Homey runs as the image's own user (root inside the container) with only `SETUID`, `SETGID`, `SYS_CHROOT`, `CHOWN` |
-| LXC compromise → storage host | Unprivileged LXC (root = uid 100000 on the host), device rules allow only tun + the render node, GPU group 44 mapped 1:1; break-glass `lxc-attach` from the host |
+| Central Docker management (Hawser) | `kr-ccp-hawser-0201` lets Dockhand-home on the infra VM manage this Docker in standard mode: **full socket**, so the token holder is ≈ root here (accepted, CLAUDE.md §8). Published on `127.0.0.1:2376` only, exposed via `tailscale serve --tcp=2376`; only `tag:infra` may reach it (policy grant + ACL tests). Token as a file (`/srv/docker/hawser/token`, 600, owned 2102, `TOKEN_FILE`), never an env var: env vars are readable through the read-only socket proxy. uid 2102 (`user:` + docker `group_add`), `read_only`, `/run/hawser` tmpfs, `cap_drop: [ALL]`, `no-new-privileges`, 256 MB / 200 pids. After 10 failed tokens in a minute Hawser blocks the source address for a minute — through `tailscale serve` every caller looks the same, so that also blocks Dockhand briefly. No stacks folder (compose stays in git). Verified 2026-11-09 from the infra VM over the tailnet: `/_hawser/health` healthy, `/version` without token → 401; added in Dockhand with the token. running container checked the same day: `uid=2102`, groups docker (988) + 2102, `ReadonlyRootfs=true`, `CapDrop=[ALL]` |
+| LXC compromise → homenas | Unprivileged LXC (root = uid 100000 on the host), device rules allow only tun + the render node, GPU group 44 mapped 1:1; break-glass `lxc-attach` from the host |
 | GPU access | `/dev/dri/renderD128` only, via `group_add: 44` for Jellyfin |
 | Komga native libraries | `/tmp` tmpfs with `exec` (SQLite JDBC loads its library from there) — the one tmpfs without `noexec` |

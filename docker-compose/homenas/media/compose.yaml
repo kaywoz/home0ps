@@ -1,0 +1,110 @@
+# PROPOSAL — not deployed. Media stack on the replacement homenas (MOS), replacing the media LXC.
+# Design, open questions and migration: docker-compose/homenas/README.md. Nothing here runs until kaywoz OKs it.
+#
+# Baseline (kaywoz, 2026-11-17): Docker as MOS ships it (no userns-remap), this stack owns its networks,
+# admin UIs are served by the host's own tailscaled (tag:storage). Appdata is owned by the uid in `user:`.
+# - media-vlan13: macvlan on the VLAN 13 sub-interface, no host IP on it. Only Jellyfin and Homey, the two
+#   that need layer 2 on VLAN 13 (Apple TV playback and discovery, Homey's device bridging). The host can't
+#   reach a macvlan container directly, so svc:jellyfin is served to Jellyfin's VLAN 13 address through the
+#   router (README "Reaching macvlan containers").
+# - proxy-komga: a plain bridge, Komga's port on 127.0.0.1 for the host's `tailscale serve`, egress via the host.
+# The stack needs MOS autostart on: `restart:` alone doesn't bring it back.
+# Data lives on the pool (${APPDATA}), never on MOS's RAM rootfs. Media comes read-only from the host's
+# rclone mount (config-files/mos/media-mount.sh, #197).
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: kr-ccp-jellyfin-0201
+    restart: unless-stopped
+    user: "2001:2001"
+    group_add:
+      - ${RENDER_GID}                         # host render group (getent group render on MOS)
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128   # Intel QSV / VA-API: render node only
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=256m
+    pids_limit: 500
+    mem_limit: 1536m
+    environment:
+      JELLYFIN_PublishedServerUrl: http://${JELLYFIN_IP}:8096   # what LAN discovery hands out
+    networks:
+      media-vlan13:
+        ipv4_address: ${JELLYFIN_IP}          # fixed: Apple TV and other VLAN 13 clients; svc:jellyfin targets it
+    volumes:
+      - ${APPDATA}/jellyfin/config:/config
+      - ${APPDATA}/jellyfin/cache:/cache
+      - ${MEDIA_MNT}:/media:ro
+    # healthcheck: built into the image
+
+  komga:
+    image: gotson/komga:latest
+    container_name: kr-ccp-komga-0201
+    restart: unless-stopped
+    user: "2002:2002"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=256m,exec                   # exec: the SQLite JDBC driver loads its native library from /tmp
+    pids_limit: 300
+    mem_limit: 768m
+    environment:
+      JAVA_TOOL_OPTIONS: -Xmx512m        # 8 GB box: heap capped below mem_limit
+    ports:
+      - "127.0.0.1:25600:25600"               # tailscale serve --service=svc:komga
+    networks:
+      - proxy-komga                           # plain bridge: egress (metadata) via the host
+    volumes:
+      - ${APPDATA}/komga/config:/config
+      - ${MEDIA_MNT}:/data:ro
+    # no healthcheck: none documented by Komga
+
+  homey:
+    image: ghcr.io/athombv/homey-shs:latest
+    container_name: kr-ccp-homey-0201
+    restart: unless-stopped
+    # In the LXC Homey used network_mode: host to get the LXC's VLAN 13 address. On MOS, host network would
+    # be the homenas's own network, so it gets a fixed macvlan address on VLAN 13 instead (discovery and
+    # mDNS work on that L2 segment; to verify). Runs as the image's own user, root, with only the four
+    # capabilities tested on the media LXC (2026-11-07): exception E3. Without remap that is host root; the
+    # macvlan keeps it off the host's own addresses.
+    read_only: true
+    cap_drop: [ALL]
+    cap_add:
+      - SETUID
+      - SETGID
+      - SYS_CHROOT
+      - CHOWN
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=128m
+      - /run:size=16m
+    pids_limit: 300
+    mem_limit: 512m
+    environment:
+      HOMEY_LOCAL_ADDRESS: ${HOMEY_IP}
+    networks:
+      media-vlan13:
+        ipv4_address: ${HOMEY_IP}
+    volumes:
+      - ${APPDATA}/homey:/homey/user
+
+networks:
+  media-vlan13:
+    name: media-vlan13
+    driver: macvlan
+    driver_opts:
+      parent: ${VLAN13_PARENT}         # e.g. <nic>.13, no IP on the host side
+    ipam:
+      config:
+        - subnet: ${VLAN13_SUBNET}
+          gateway: ${VLAN13_GATEWAY}
+          ip_range: ${VLAN13_RANGE}    # a small block outside the gateway's DHCP pool
+  proxy-komga:
+    name: proxy-komga

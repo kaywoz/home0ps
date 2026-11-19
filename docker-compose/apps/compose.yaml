@@ -4,6 +4,8 @@
 # a read-only socket proxy for Dozzle and the native Beszel agent (systemd service, hardened by
 # config-files/ubuntu/beszel-agent.sh). Docker runs with userns-remap (docker-host.sh): the proxy opts
 # out with userns_mode: host to open docker.sock — same as on the monitoring host and the infra VM.
+# Hawser lets Dockhand-home (infra VM) manage this Docker (CLAUDE.md §8); it opts out the same way.
+# Ollama is the local LLM API for home0ps tooling (#261); mediasort classifies new media (#260).
 services:
   socketproxy:
     image: tecnativa/docker-socket-proxy:latest
@@ -35,7 +37,150 @@ services:
       timeout: 3s
       retries: 3
 
+  # Hawser (standard mode): lets Dockhand-home on the infra VM manage this host's Docker — full socket,
+  # so the token holder is ≈ root here (accepted, CLAUDE.md §8). Published on localhost only;
+  # `tailscale serve --bg --tcp=2376 tcp://localhost:2376` exposes it on the tailnet address, where only
+  # tag:infra may reach it (policy grant + tests). No stacks folder: compose stays in git, Dockhand
+  # is used for power commands, logs and inspection, not stack deploys.
+  # Docs: https://github.com/Finsys/hawser (README: Docker, Configuration, read-only containers).
+  hawser:
+    image: ghcr.io/finsys/hawser:latest
+    container_name: kr-ccp-hawser-0101
+    restart: unless-stopped
+    userns_mode: host                # must open docker.sock under userns-remap
+    user: "2102:2102"                # no entrypoint script: the binary runs as this uid directly
+    group_add:
+      - ${DOCKER_GID}                # host docker group: socket access for uid 2102
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /run/hawser                    # DOCKER_CONFIG + TMPDIR for compose/login (README, read-only)
+    pids_limit: 200
+    mem_limit: 256m
+    environment:
+      TOKEN_FILE: /run/secrets/hawser_token
+      DOCKER_CONFIG: /run/hawser
+      TMPDIR: /run/hawser
+    secrets:
+      - hawser_token
+    ports:
+      - "127.0.0.1:2376:2376"          # tailscale serve --tcp=2376 for Dockhand-home
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - proxy-hawser
+    # healthcheck: built into the image (wget /_hawser/health)
+
+  # Ollama: the home0ps-wide local LLM API (kaywoz/home0ps#261). CPU only. Listens on localhost; local
+  # consumers (e.g. the media classifier, #260) join proxy-ollama and call http://ollama:11434.
+  # No built-in API auth (docs.ollama.com/faq), so it is never published beyond 127.0.0.1; a
+  # Tailscale Service for remote consumers comes with the first one, with one grant each.
+  # Models are pulled by kaywoz: docker exec kr-ccp-ollama-0101 ollama pull <model>
+  # Docs: https://docs.ollama.com/faq (bind, model dir, concurrency, keep-alive), /docker.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: kr-ccp-ollama-0101
+    restart: unless-stopped
+    user: "2103:2103"                # remapped to host uid 102103 (userns-remap); non-root untested
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+      - /home/ollama:uid=2103,gid=2103,mode=0700   # HOME, owned by the container user: per-start key in ~/.ollama (only for ollama.com)
+    pids_limit: 512
+    mem_limit: 8g                    # one ~4B model (2.5-3.5 GB) + context; VM has 16 GB
+    cpus: 3                          # VM has 4 vCPUs (raised from 2, 2026-11-10): 1 left for the rest
+    environment:
+      HOME: /home/ollama
+      OLLAMA_HOST: 0.0.0.0:11434     # inside the container; published on 127.0.0.1 only
+      OLLAMA_MODELS: /models
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_KEEP_ALIVE: 10m         # free RAM between runs
+      OLLAMA_CONTEXT_LENGTH: "4096"
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ./ollama/models:/models      # owned 102103:102103 on the host
+    networks:
+      - proxy-ollama                 # egress needed to pull models
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Media classifier (kaywoz/home0ps#260): decides which library a new download goes to. Gets only
+  # item names from the mover on the homenas (tailnet, `tailscale serve --bg --tcp=8089
+  # tcp://localhost:8089`, only tag:storage may reach it) and answers with a library + folder name.
+  # Never sees files or remote credentials, never moves or deletes. Code and rules in git
+  # (docker-compose/apps/mediasort/), copied to /srv/docker/mediasort/ and built here.
+  # Metadata: TMDB (Bearer read token). LLM: LLM_PROVIDER picks the OpenAI API, the Claude API
+  # or the local ollama service; each cloud key is a secret file. The LLM sees names + TMDB facts, never files.
+  mediasort:
+    build: ./mediasort
+    image: home0ps/mediasort:latest
+    container_name: kr-ccp-mediasort-0101
+    restart: unless-stopped
+    user: "2104:2104"                # remapped to host uid 102104 (userns-remap)
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    pids_limit: 64
+    mem_limit: 256m
+    environment:
+      LLM_PROVIDER: anthropic           # openai | anthropic | ollama (local, #261)
+      OPENAI_MODEL: gpt-6-luna
+      OPENAI_MIN_INTERVAL: "6.5"        # seconds between LLM calls: stays under 10 requests/minute
+      ANTHROPIC_MODEL: claude-haiku-5-5
+      ANTHROPIC_MIN_INTERVAL: "1"       # 1000 requests/minute: only a courtesy gap
+      LLM_KEY_FILE: /run/secrets/llm_key   # API key of the selected provider: only the key, one line
+      OLLAMA_URL: http://ollama:11434   # used when LLM_PROVIDER=ollama
+      OLLAMA_MODEL: qwen3:4b-instruct   # benchmark: kaywoz/home0ps#261
+      OLLAMA_NUM_THREAD: "3"            # = ollama's cpus:
+      TOKEN_FILE: /run/secrets/mediasort_token
+      TMDB_TOKEN_FILE: /run/secrets/tmdb_token
+    secrets:
+      - mediasort_token
+      - tmdb_token
+      - llm_key
+    ports:
+      - "127.0.0.1:8089:8089"        # tailscale serve --tcp=8089 for the mover
+    networks:
+      - proxy-mediasort              # egress to TMDB
+      - proxy-ollama                 # the local LLM API
+    depends_on:
+      - ollama
+    # healthcheck: in the image (GET /health)
+
 networks:
   socketproxy:
     name: socketproxy
     driver: bridge
+  proxy-hawser:
+    name: proxy-hawser
+    driver: bridge
+  proxy-ollama:
+    name: proxy-ollama
+    driver: bridge
+  proxy-mediasort:
+    name: proxy-mediasort
+    driver: bridge
+
+secrets:
+  hawser_token:
+    file: ./hawser/token               # openssl rand -hex 32; 600, owned 2102:2102; never in git
+  mediasort_token:
+    file: ./mediasort/secrets/token    # openssl rand -hex 32; 600, owned 102104; same value on the homenas
+  tmdb_token:
+    file: ./mediasort/secrets/tmdb     # TMDB "API Read Access Token"; 600, owned 102104; never in git
+  llm_key:
+    file: ./mediasort/secrets/llm      # API key of the provider in LLM_PROVIDER (OpenAI or Anthropic);
+                                       # 600, owned 102104; never in git. Must exist (empty is fine for ollama)

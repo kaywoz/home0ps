@@ -667,3 +667,222 @@ mistakes, not a diary.
   (lookups) instead of asking for them to be typed; any edit to a list in
   a config file is a full, idempotent rebuild, not an append.
 
+
+### 2026-11-09 — host steps (compose download)
+
+- **Trigger:** host command failed
+- **What happened:** the infra VM fetch `curl … -o /tmp/compose.yaml && diff …; sudo cp /tmp/compose.yaml /srv/docker/compose.yaml`
+  failed with curl (23): a `/tmp/compose.yaml` left by an earlier step was owned by another user, and
+  `fs.protected_regular` stops even root from opening it. The `;` after `diff` then let `cp` run anyway,
+  which can overwrite the live compose file with that stale copy.
+- **Root cause:** fixed, shared `/tmp` filename reused across steps and users; `;` used where only
+  success should continue (because `diff` exits 1 on any change).
+- **Fix applied:** recovery with a fresh `mktemp` file, a check of the live file, then copy only after
+  a successful download.
+- **Rule going forward:** host download commands use `T=$(mktemp)`, never a fixed `/tmp` name, and
+  every step that writes a live file is chained with `&&` on a successful download (`diff … || true`
+  for the diff, not `;`).
+
+### 2026-11-09 — compose (Dockhand user setup)
+
+- **Trigger:** container crash-looped on first start
+- **What happened:** Dockhand-home was set up with `PUID`/`PGID` and `cap_drop: [ALL]` + `CHOWN`/`SETUID`/`SETGID`.
+  The entrypoint then deletes and recreates its `dockhand` user and group as root; that failed
+  (`addgroup: group 'dockhand' in use`) and `set -e` restarted the container in a loop.
+- **Root cause:** the capability set was chosen from the manual's description, not from the
+  entrypoint script (`docker-entrypoint-node.sh`), which has a separate non-root mode for `user:`.
+- **Fix applied:** `user: "2101:2101"` + `group_add` docker GID, no `PUID`/`PGID`, no added
+  capabilities (kaywoz/home0ps#249).
+- **Rule going forward:** before setting `cap_drop`/`cap_add` or uid variables for an image, read its
+  entrypoint script; prefer an image's own `user:` (non-root) mode over root-then-drop setups.
+
+### 2026-11-09 — compose (Hawser scope)
+
+- **Trigger:** misunderstood request
+- **What happened:** for "do hawser next" I drafted a Hawser agent for the storage host too, with a new
+  mos-templates template (opened as kaywoz/mos-templates#9), because the earlier plan and CLAUDE.md §8
+  listed the MOS host as managed by Dockhand-home. kaywoz: Hawser is not a MOS template, and agents go to
+  the infra VM, apps VM or media LXC only unless he says otherwise.
+- **Root cause:** carried the storage host over from the planning text without confirming the host list
+  when the build started; a new MOS template was created without being asked for.
+- **Fix applied:** mos-templates#9 closed; storage host removed from the Hawser PR, CLAUDE.md §8,
+  `security/infra.md` and `security/storage.md`; the policy grant to the storage host is removed in its
+  own PR.
+- **Rule going forward:** new containers go to the infra VM, apps VM or media LXC; the storage host (MOS)
+  and new MOS templates only when kaywoz names them for that service (CLAUDE.md §8).
+
+### 2026-11-10 — compose (Ollama CPU limit)
+
+- **Trigger:** apply broke something (`docker compose up` refused the service)
+- **What happened:** the Ollama service set `cpus: 3` "of 4" because kaywoz mentioned 4 cores; the apps VM has 2 vCPUs, so Docker rejected the limit ("range of CPUs is from 0.01 to 2.00"). The same check then showed 3 GB RAM against an 8 GB `mem_limit` sized from "16gb" in chat.
+- **Root cause:** took a resource figure from chat as the VM's size instead of checking the host (`nproc`, `free -g`) or the VM definition.
+- **Fix applied:** kaywoz raised the apps VM to 4 vCPUs and 16 GB RAM; `cpus: 3` and `mem_limit: 8g` kept, with the comment stating the VM's real size.
+- **Rule going forward:** before setting `cpus`/`mem_limit`, get the host's actual `nproc` and `free -g` (ask kaywoz to run them if unknown) and size limits below those.
+
+### 2026-11-10 — host (media mount cache in RAM)
+
+- **Trigger:** something broke after deploy (a VM could not start)
+- **What happened:** the media mount's VFS cache was configured on the storage host's RAM rootfs (`/mnt/rclone/...`) instead of the pool; it grew to 30 GB, filled the 32 GB rootfs, and libvirt could no longer write a VM's key file at start.
+- **Root cause:** `media-mount.sh` documented "cache on the pool — never on MOS's RAM rootfs" but didn't enforce it, and the host-local env file was never checked against that rule.
+- **Fix applied:** cache cleared and moved to the pool by kaywoz; `media-mount.sh` now aborts when `CACHE_DIR` or the log directory is on the root filesystem.
+- **Rule going forward:** a script that documents a placement rule for host-local paths enforces it (compare `stat -c %d` with `/`), and host steps for such scripts include a check of the env file's paths.
+
+### 2026-11-10 — host steps (mktemp file modes)
+
+- **Trigger:** apply broke something (the classifier container restart-looped, exit 2)
+- **What happened:** the verified-download one-liner (`mktemp` → `sha256sum -c` → `cp`) installed the classifier's code as mode 600 root, because `mktemp` creates 0600 files and `cp` keeps the mode for new files. The image copied them as-is and the non-root process couldn't read its own script.
+- **Root cause:** the download pattern was written for root-only config files and reused for files a non-root process must read; the Dockerfile didn't set modes on `COPY`.
+- **Fix applied:** Dockerfile `COPY --chmod=644`; on the host `chmod 644` on the code files.
+- **Rule going forward:** host download one-liners for files read by non-root processes end with an explicit `chmod` (e.g. `install -m 644`), and Dockerfiles set `--chmod` on `COPY` when the image runs as a non-root `user`.
+
+### 2026-11-11 — hetzner (SSH key fingerprint formats)
+
+- **Trigger:** wrong assumption — a needless rebuild was proposed
+- **What happened:** SSH to the new honeypot failed. kaywoz compared the key's fingerprint in Hetzner's console with the one in 1Password, and they didn't match. I took that to mean the secret held the wrong key and proposed replacing the key and the server. The rerun showed the key unchanged: it had been right all along. The real cause was that the 1Password agent didn't serve the key's vault.
+- **Root cause:** I asked for a fingerprint comparison without checking that both sides used the same format. Hetzner's console shows MD5, 1Password and `ssh-keygen -l` show SHA256. Before calling the key wrong, I also didn't check which keys the agent offered: the `ssh -v` log only listed other keys.
+- **Fix applied:** no rebuild. The vault was added to `agent.toml`. The host steps now say how to compare fingerprints in one format (`ssh-keygen -l -E md5`) and use an `IdentitiesOnly` host entry.
+- **Rule going forward:** when comparing key fingerprints across tools, state the format and give the command for it. Before blaming the server's key, check in `ssh -v` that the intended key was offered at all.
+
+### 2026-11-11 — hetzner (T-Pot reserved username)
+
+- **Trigger:** script failed on the host
+- **What happened:** the host steps had kaywoz create a non-root admin user named `tpot` for running T-Pot's installer. T-Pot rejects that name, because its installer creates its own `tpot` system user and group (uid/gid 2000, `installer/install/tpot.yml`).
+- **Root cause:** I picked the account name from the product name without reading what the installer creates. I had read only the README.
+- **Fix applied:** kaywoz used a different name. The host steps now take any name except `tpot` as `<admin user>` and keep it out of git (§4).
+- **Rule going forward:** before naming a user, group or path for a third-party installer, grep its install scripts/playbooks for the users, groups and uids it creates.
+
+### 2026-11-11 — hetzner (empty key file from a failed redirect)
+
+- **Trigger:** command failed on the admin Mac
+- **What happened:** I handed over `op item get … > ~/.ssh/tpot.pub && ssh-keygen -lf …`. `op` wasn't installed, but zsh still created the redirect target, so the file was empty. Later `ssh -i ~/.ssh/tpot.pub` matched no agent key and fell back to a password prompt.
+- **Root cause:** a `>` redirect truncates or creates its target before the command runs, so a failed command still leaves a file behind. Chaining with `&&` doesn't prevent that.
+- **Fix applied:** the file was rewritten from the 1Password agent (`ssh-add -L | grep …`) and the fingerprint checked against the agent.
+- **Rule going forward:** commands for kaywoz that write a file from another command's output write to `T=$(mktemp)`, check that it isn't empty (`[ -s "$T" ]`), then `mv` it into place.
+
+### 2026-11-11 — tpot (idempotency check matched a comment)
+
+- **Trigger:** apply broke something (Galah exited with "API key is required")
+- **What happened:** the compose patch for T-Pot ran `grep -q 'LLM_API_KEY: ${GALAH_LLM_API_KEY}' || sed … a\ LLM_API_KEY…`. Upstream already had that line commented out (`# LLM_API_KEY: …`), so the grep matched the comment, the line was never added, and Galah started without a key.
+- **Root cause:** the "already present?" check didn't anchor to uncommented lines. I hadn't read the target file's existing lines before writing the patch.
+- **Fix applied:** the commented line was uncommented on the host. The host steps' patch now anchors every check (`^\s+KEY:`), uncomments an existing commented line before adding one, and ends with a length-only check of the rendered variables.
+- **Rule going forward:** idempotency checks in config patches match only active lines (anchor `^\s*` without `#`). Before patching a third-party file, read its current lines for the keys being added, including commented ones.
+
+### 2026-11-11 — workflow (pushed to a merged PR again)
+
+- **Trigger:** commit missed `main` (repeat of 2026-11-03, "commits pushed to an already-merged PR")
+- **What happened:** a follow-up commit for PR 298 was pushed after kaywoz had merged it. My command ran `gh pr view 298 --json state` but carried on when it printed `MERGED`, so the commit landed only on the dead branch.
+- **Root cause:** the state check printed the state but didn't gate the push. I ran the check without acting on its result.
+- **Fix applied:** the commit was cherry-picked onto a new branch from `main` with a new PR.
+- **Rule going forward:** the state check is a gate in the same command: `[ "$(gh pr view N --json state --jq .state)" = OPEN ] && git push …`. A non-`OPEN` state stops the push.
+
+### 2026-11-16 — compose (stack scope decided alone)
+
+- **Trigger:** misunderstood request
+- **What happened:** the stack proposal (PR 321) was asked to pick apps from the earlier short list. I moved Kopia, Time Machine and the S3 store into "a separate proposal" and parked Immich, without asking, and added Pocket ID and Ollama. kaywoz set the stacks: media (Jellyfin, Komga, Homey), infra (cloudflared), apps (mediasort, paperless-ngx, FileBrowser Quantum, Immich), and a fourth, storage (Kopia, Time Machine, RustFS).
+- **Root cause:** treated "pick from the earlier discussion" as licence to narrow the scope by my own placement rules (a deployer and storage services "don't belong in a stack") instead of putting the cut to kaywoz.
+- **Fix applied:** PR 321 reworked to the four stacks kaywoz named.
+- **Rule going forward:** when a request says to build from an earlier list, every item on it is in scope unless kaywoz drops it; an item I'd leave out or move goes to him as a one-line question before the draft, not as a decision in the draft.
+
+### 2026-11-16 — compose ("risky workload" misread)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** the stack proposal (PR 321) called ArchiveTeam Warrior a "risky workload" under CLAUDE.md §8, because it runs project code it fetches at run time, and asked whether it belongs in the lab. kaywoz: a risky workload means security work (malware, analysis, forensics and similar), not an app that runs third-party code.
+- **Root cause:** read "risky" in §8 by its everyday meaning instead of asking what kaywoz meant by it; the lab placement in an earlier long list was taken as support.
+- **Fix applied:** the Warrior stays in the apps stack; the lab question was dropped from the proposal. Its real gaps (no read-only root, UI without auth by default) are handled as a registered exception with mitigations.
+- **Rule going forward:** "risky workloads go to the lab" (CLAUDE.md §8) means security tooling: malware, analysis, forensics and similar. Don't move ordinary apps to the lab on that rule; flag their specific gaps instead.
+
+### 2026-11-17 — compose (pushed to a merged PR, third time)
+
+- **Trigger:** commit missed `main` (repeat of 2026-11-03 and 2026-11-11)
+- **What happened:** the userns-remap update for the storage stacks was pushed to PR 321's branch after kaywoz had merged it and the branch was deleted. The push recreated the branch, and the merged PR's description was edited to describe a change it doesn't contain.
+- **Root cause:** a long session that had pushed to the same open draft PR several times; the state was assumed, not checked. The 2026-11-11 gate wasn't used.
+- **Fix applied:** the merged PR's description was restored; the commit was cherry-picked onto a new branch from `main` with a new PR; the recreated branch was deleted.
+- **Rule going forward:** unchanged from 2026-11-11, and it applies to every push and every `gh pr edit`, also in long sessions: `[ "$(gh pr view N --json state --jq .state)" = OPEN ] && …`.
+
+### 2026-11-16 — mos (`btrfs device stats` with two paths)
+
+- **Trigger:** command failed on the host
+- **What happened:** a diagnostics block for the candidate storage host ran `btrfs device stats` with two mount paths. It failed with "exactly 1 argument expected", so the error counters weren't shown.
+- **Root cause:** the command's usage wasn't checked; I assumed it takes several paths like `df`.
+- **Fix applied:** loop over `findmnt -t btrfs -n -o TARGET`, one `btrfs device stats` per mount.
+- **Rule going forward:** for any CLI not used before in this repo, check its usage line (`<cmd> --help` or the man page) before handing it over; one path per call unless the usage says otherwise.
+
+### 2026-11-16 — mos (soak script aborted on `smartctl`'s exit code)
+
+- **Trigger:** script bug on the host
+- **What happened:** the soak script (`set -euo pipefail`) aborted early because `smartctl -A` exits non-zero when a drive's error log has entries, even though the read succeeded.
+- **Root cause:** assumed exit 0 means "read OK" for `smartctl`; its exit status is a bitmask that also reports drive state.
+- **Fix applied:** `smartctl … || true` in the reader, plus an `ERR` trap that prints the failing line.
+- **Rule going forward:** in `set -e` scripts, check the exit-code semantics of every monitoring tool (`smartctl`, `nvme`, `ipmitool`, …) and tolerate the non-fatal codes explicitly; add an `ERR` trap that names the line.
+
+### 2026-11-16 — mos (`<placeholder>` read as a redirect)
+
+- **Trigger:** command failed on the host
+- **What happened:** a soak start command contained the placeholder `<old-host-ip>`. It was run unedited, bash read `<` as a redirect, and the soak never started (an empty test folder was left behind).
+- **Root cause:** placeholders written with angle brackets, which are shell syntax.
+- **Fix applied:** folder removed, command re-sent with a placeholder without brackets.
+- **Rule going forward:** placeholders in commands handed to kaywoz never use `<>` (or other shell metacharacters); use plain words such as `OLD_HOST_IP`.
+
+### 2026-11-17 — mos (remap checked before Docker was up)
+
+- **Trigger:** wrong diagnosis
+- **What happened:** the first runtime test of Docker `userns-remap` was reported as failed ("no socket"). The check ran right after `/etc/init.d/docker restart`, but the init script starts `dockerd` in the background, so it wasn't up yet.
+- **Root cause:** assumed the init script returns once the daemon is ready.
+- **Fix applied:** wait loop (`docker info` until it answers, max 60 s) before any check.
+- **Rule going forward:** after starting or restarting a daemon, poll for readiness (socket/API answers) before checking its state; never treat the first failed probe as a result.
+
+### 2026-11-17 — mos (watchdog lock inherited by `dockerd`)
+
+- **Trigger:** script bug on the host
+- **What happened:** `docker-userns.sh` held a `flock` on fd 9 and then restarted Docker. `dockerd` inherited fd 9 and held the lock for its lifetime, so every later run, including `--check`, exited silently.
+- **Root cause:** an open lock fd is inherited by every process the script starts, including long-running daemons.
+- **Fix applied:** the init script is called with `9>&-`; `--check` takes no lock (#325).
+- **Rule going forward:** scripts that hold a lock close the lock fd for every child that may outlive them (`9>&-`), and read-only modes take no lock.
+
+### 2026-11-17 — mos (`docker_options` tested through the wrong path)
+
+- **Trigger:** wrong conclusion
+- **What happened:** I concluded that MOS ignores `docker_options` in `docker.json` and drafted a bug report saying so. The test had restarted Docker with `/etc/init.d/docker` directly, which doesn't read the key; `mos-start` and the UI do pass it at start. The UI also has a field for it, which I said didn't exist.
+- **Root cause:** tested a shortcut path instead of the path the OS uses at boot, and didn't read `mos-start` before concluding.
+- **Fix applied:** read `mos-start`, confirmed with a harmless flag through the UI, corrected the bug report and #310.
+- **Rule going forward:** test a setting through the same path the platform uses (boot script or UI), and read that path's code before saying a setting has no effect.
+
+### 2026-11-17 — mos (remap user restored without its group)
+
+- **Trigger:** apply broke something (Docker didn't start after a reboot)
+- **What happened:** after a Samba-only user was created in the MOS UI, MOS saved its user list, `dockremap` included, to `/boot/config/system/passwd`, but not the group. At the next boot the user came back without its group; `docker-userns.sh` only created the user when it was missing, so it skipped, and `dockerd` refused to start.
+- **Root cause:** the hook treated user and group as one unit and assumed nothing else in MOS touches `/etc/passwd`.
+- **Fix applied:** `groupadd` by hand on the host; the hook now checks user and group separately and `--check` reports a missing group (#341).
+- **Rule going forward:** a hook that recreates RAM `/etc` state checks every piece it depends on (user, group, subuid, subgid, config) on its own, and after any change in the MOS UI that touches users, reboot-test before relying on it.
+
+### 2026-11-17 — homenas (design drifted past need and proportionality)
+
+- **Trigger:** kaywoz had to redirect after hours of troubleshooting
+- **What happened:** the homenas Docker plan stacked daemon-wide userns-remap (boot hook, cron guard, re-owned appdata, five exemptions), per-VLAN macvlan zones, per-zone Tailscale sidecars, and an infra stack owning every network. Each layer was defended on its own; together they produced a chain of MOS-specific failures (RAM `/etc`, a missing group, Docker running on RAM after an out-of-band restart) and test after test, for a home NAS that appliance vendors run with none of it.
+- **Root cause:** each control was judged by whether it reduced some risk, not by whether the risk was worth its cost on a homelab box (CLAUDE.md §8 proportionality), and nobody compared the design with what comparable NAS platforms do by default.
+- **Fix applied:** consolidation of the design against need and proportionality, with a smaller baseline proposed to kaywoz.
+- **Rule going forward:** before adding a control that needs platform workarounds (boot hooks, patched OS state, exemptions), state the concrete threat, what the per-container defaults already cover, and what comparable appliances do; propose it only if the residual risk is clearly worth the upkeep, and ask kaywoz first.
+
+### 2026-11-12 — planning (hardware role swap misread)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** kaywoz asked "what if I keep the CWWK but replace [the monitoring host] with it?". I read "it" as the new F4 SSD and planned the F4 as the new monitoring host. kaywoz meant: the F4 SSD runs MOS as the storage host, the CWWK (today's storage host) becomes the monitoring host, and the Pi 5 retires.
+- **Root cause:** I resolved an ambiguous pronoun to the most recently discussed object, without restating the mapping before a long answer.
+- **Fix applied:** the plan was redone with the correct roles before anything was changed.
+- **Rule going forward:** when a request moves hardware between roles, restate the full mapping (box → role, for every box involved) in one line and get it confirmed before planning around it.
+
+### 2026-11-13 — planning (management portal rule paraphrased as "one Cockpit per host")
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** when listing what CLAUDE.md §8 covers, I wrote "one Cockpit per host". kaywoz's rule is one hardware management portal per host, which can be Cockpit or the MOS UI.
+- **Root cause:** I took the bullet heading ("Cockpit: one per host") as the rule. I didn't read it together with the proportionality line ("one admin UI per host").
+- **Fix applied:** corrected in chat; §8 reworded in kaywoz/home0ps#313 to "one host management portal per host" (the native OS portal: Cockpit, the MOS UI or similar), with logical management portals allowed to span hosts within the other axioms.
+- **Rule going forward:** when summarizing a CLAUDE.md rule, quote its wording, not a heading. If two bullets overlap, state the broader one.
+
+### 2026-11-19 — board (issue closed by number in the wrong repo)
+
+- **Trigger:** wrong assumption
+- **What happened:** during board triage, kaywoz said "won't do" for board item #17 (a theme upgrade in the blog repo). I ran `gh issue close 17` in this repo and closed kaywoz/home0ps#17, an unrelated issue. I reopened it with a comment within minutes.
+- **Root cause:** the board holds items from more than one repo, and I listed them by number only, dropping `content.repository`. `gh issue close N` resolves N against the current repo.
+- **Fix applied:** home0ps#17 reopened; the intended item is closed in its own repo with `-R`.
+- **Rule going forward:** when acting on board items, list them as `owner/repo#N` (from `content.repository`) and pass `-R owner/repo` to every `gh issue` write; before closing, check the issue's title matches the board item's title.

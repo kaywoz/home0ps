@@ -257,7 +257,7 @@ verify_user() {
 
 apply_ssh() {
   step "ssh: keys only, no root, no forwarding"
-  # LXCs get no sshd: access is Tailscale SSH, break-glass is lxc-attach on the storage host
+  # LXCs get no sshd: access is Tailscale SSH, break-glass is lxc-attach on the homenas
   if [ -n "$CONTAINER" ]; then echo "  skipped: container ($CONTAINER), no sshd (Tailscale SSH + lxc-attach)"; return 0; fi
   if ! command -v sshd >/dev/null 2>&1; then echo "  skipped: no SSH server installed"; return 0; fi
   local home keys

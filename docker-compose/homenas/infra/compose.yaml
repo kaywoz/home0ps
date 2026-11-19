@@ -1,0 +1,120 @@
+# PROPOSAL — not deployed. Infra stack on the replacement homenas (MOS), replacing the infra VM.
+# Design, open questions and migration: docker-compose/homenas/README.md. Nothing here runs until kaywoz OKs it.
+#
+# The services that serve other services: cloudflared, the read-only socket proxy and the Beszel agent.
+# The proxy and the agent only feed the monitoring host, which isn't running now (kaywoz, 2026-11-18): both are
+# behind the profile `monitoring`, so `up` (and MOS autostart) start cloudflared only. Enable the profile when
+# the monitoring host is back; their secret files are only needed then.
+# Baseline (kaywoz, 2026-11-17): Docker as MOS ships it (no userns-remap), each stack owns its networks,
+# admin UIs are served by the host's own tailscaled (`tailscale serve`, tag:storage) to 127.0.0.1 ports.
+# No Tailscale sidecars. Appdata and secret files are owned by the uid in `user:`. The stack needs MOS
+# autostart on: `restart:` alone doesn't bring it back.
+services:
+  # cloudflared: the Cloudflare Tunnel for user-facing apps (second access plane, CLAUDE.md §8). Outbound
+  # only. Token as a file. Ingress rules are kept in Cloudflare (remotely managed tunnel). A public app is
+  # reached by cloudflared joining that app's proxy-<app> network (README I-Q2); no app is public yet (I-Q3).
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: kr-ccp-cloudflared-0101
+    restart: unless-stopped
+    user: "2201:2201"                  # image is distroless nonroot, no entrypoint script: any uid works
+    read_only: true                    # no writable path documented; to verify at build
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    mem_limit: 128m
+    # Metrics pinned to loopback: container builds otherwise bind 0.0.0.0:20241.
+    command: ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:20241", "run"]
+    environment:
+      TUNNEL_TOKEN_FILE: /run/secrets/cf_tunnel_token   # cloudflared >= 2025.4.0; never TUNNEL_TOKEN
+    secrets:
+      - cf_tunnel_token
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:20241", "ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - cloudflared                    # plain bridge: egress only, no ports
+
+  # Read-only Docker API for Dozzle (monitoring host) and the Beszel agent. One Docker daemon serves all
+  # stacks, so one proxy sees every container. Never host networking: the proxy would listen on every
+  # interface. `tailscale serve --tcp=2375 tcp://127.0.0.1:2375` on the host; only tag:monitoring may reach
+  # it (existing grant + tests). Same name as today's MOS-template deploy.
+  socketproxy:
+    profiles: [monitoring]             # off until the monitoring host is back (kaywoz, 2026-11-18)
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: kr-ccp-socketproxy-0301
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /run
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    mem_limit: 64m
+    environment:
+      - CONTAINERS=1   # list/inspect/logs/stats
+      - INFO=1
+      - EVENTS=1
+      - POST=0         # read-only API
+    ports:
+      - "127.0.0.1:2375:2375"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro   # :ro restricts nothing; POST=0 does
+    networks:
+      - socketproxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:2375/_ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Beszel agent: host network (upstream requirement for interface stats), LISTEN on the tailnet IP only,
+  # Docker only through the read-only proxy, pushes to svc:beszel. As deployed today (containers.md), same
+  # name.
+  beszelagent:
+    profiles: [monitoring]             # off until the monitoring host is back (kaywoz, 2026-11-18)
+    image: henrygd/beszel-agent:latest
+    container_name: kr-ccp-beszelagent-0201
+    restart: unless-stopped
+    network_mode: host
+    user: "65534:65534"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 50
+    mem_limit: 128m
+    environment:
+      DOCKER_HOST: tcp://127.0.0.1:2375
+      LISTEN: ${BESZEL_LISTEN}         # <tailnet-ip>:45876
+      HUB_URL: https://beszel.${TAILNET}.ts.net
+      KEY_FILE: /run/secrets/beszel_key      # KEY_FILE / TOKEN_FILE supported by the agent
+      TOKEN_FILE: /run/secrets/beszel_token
+    secrets:
+      - beszel_key
+      - beszel_token
+    volumes:
+      - ${APPDATA}/beszel/agent:/var/lib/beszel-agent   # owned 65534
+    healthcheck:                       # upstream's suggestion: fails if the health file is older than 91 s
+      test: ["CMD", "/agent", "health"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
+networks:
+  cloudflared:
+    name: cloudflared
+  socketproxy:
+    name: socketproxy
+
+secrets:
+  cf_tunnel_token:
+    file: ${APPDATA}/cloudflared/token         # from the Cloudflare dashboard; 600, owned 2201
+  beszel_key:
+    file: ${APPDATA}/beszel/secrets/key          # from the hub's "Add system"; 600, owned 65534
+  beszel_token:
+    file: ${APPDATA}/beszel/secrets/token        # 600, owned 65534

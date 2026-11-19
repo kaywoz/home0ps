@@ -1,0 +1,54 @@
+# Builds the media classifier image (kaywoz/home0ps#260) and pushes it to ghcr.io, so the homenas
+# apps stack only pulls it (docker-compose/homenas/README.md, A-Q1). Path-scoped; no secrets beyond
+# GITHUB_TOKEN. Pull requests build without pushing. Weekly rebuild picks up base-image patches.
+name: build mediasort image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docker-compose/apps/mediasort/**"
+      - ".github/workflows/build-mediasort.yml"
+  pull_request:
+    paths:
+      - "docker-compose/apps/mediasort/**"
+      - ".github/workflows/build-mediasort.yml"
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-mediasort-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: docker-compose/apps/mediasort
+          platforms: linux/amd64
+          pull: true
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ghcr.io/kaywoz/mediasort:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/kaywoz/home0ps
+            org.opencontainers.image.description=Media classifier (home0ps#260)
