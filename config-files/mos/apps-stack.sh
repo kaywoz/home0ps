@@ -24,8 +24,8 @@
 # (override with APPS_STACK_ENV=<file>; template: config-files/mos/apps-stack.env.example):
 #   SHARE_USER=              the Samba-only data user CannonCommander runs as (README A-Q2) [required]
 #   SHARE_DATA=/mnt/user/1.data   SHARE_TMP=/mnt/user/tmp   what CannonCommander serves
-#   MEDIASORT_SECRETS_FROM=  scp source of mediasort's token/tmdb/llm, e.g. root@<apps-vm>:/srv/docker/mediasort/secrets
-#                            (only needed while they aren't in place yet)
+#   MOVER_TOKEN=/boot/config/home0ps/media-sort.token   the mover's copy of mediasort's bearer token
+#                            (config-files/mos/media-sort.env.example TOKEN_FILE)
 # Paths (environment, rarely changed): MOS_DOCKER=/var/mergerfs/merger-nvme/disk1/mos-docker (MOS's Docker
 # folder on the disk itself: Docker's own files stay outside mergerfs, never the /mnt/merger-* pool mount;
 # service data such as SHARE_DATA goes through mergerfs; as in docker.json); appdata is $MOS_DOCKER/appdata; the rendered .env and compose.yaml go to $H/apps-stack/.
@@ -52,7 +52,7 @@ esac
 [ -r "$ENV_FILE" ] && . "$ENV_FILE"
 SHARE_USER="${SHARE_USER:-}"
 SHARE_DATA="${SHARE_DATA:-/mnt/user/1.data}"; SHARE_TMP="${SHARE_TMP:-/mnt/user/tmp}"
-MEDIASORT_SECRETS_FROM="${MEDIASORT_SECRETS_FROM:-}"
+MOVER_TOKEN="${MOVER_TOKEN:-/boot/config/home0ps/media-sort.token}"
 A="$MOS_DOCKER/appdata"
 OUT_DIR="$H/apps-stack"
 REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/kaywoz/home0ps/main}"
@@ -91,6 +91,17 @@ check_file() {
   [ "$m" = "$2 600" ] && ok "$1 ($2, 600)" || bad "$1 is '$m', expected '$2 600'"
 }
 
+# prompt_secret <name> <label>: ask for mediasort's secret file <name> once, hidden; kept if present
+prompt_secret() {
+  local f="$A/mediasort/secrets/$1" v
+  if [ -f "$f" ]; then ok "$1 present (kept)"; return; fi
+  if [ "$MODE" = dry ]; then note "would ask for $2"; return; fi
+  read -rs -p "  $2: " v < /dev/tty; echo
+  [ -n "$v" ] || { echo "Empty: $1 not written." >&2; exit 1; }
+  (umask 077; printf '%s' "$v" > "$f"); unset v
+  chown 2104:2104 "$f"; ok "$1 written (600, 2104)"
+}
+
 image_uid() {   # Filestash runs as its image's own user (README A-Q10)
   docker run --rm --entrypoint id machines/filestash:latest 2>/dev/null | sed -n 's/^uid=\([0-9]*\).* gid=\([0-9]*\).*/\1 \2/p'
 }
@@ -124,15 +135,25 @@ prepare() {
   dir "$A/filestash" "$fs_uid" "$fs_gid"; dir "$A/filestash/state" "$fs_uid" "$fs_gid"
 
   step "mediasort secrets (token, tmdb, llm)"
-  local f missing=""
-  for f in token tmdb llm; do [ -f "$A/mediasort/secrets/$f" ] || missing="$missing $f"; done
-  if [ -n "$missing" ]; then
-    [ -n "$MEDIASORT_SECRETS_FROM" ] || { echo "Missing:$missing. Set MEDIASORT_SECRETS_FROM in $ENV_FILE or copy them to $A/mediasort/secrets/." >&2; exit 1; }
-    note "copy$missing from $MEDIASORT_SECRETS_FROM"
-    for f in $missing; do run scp -q "$MEDIASORT_SECRETS_FROM/$f" "$A/mediasort/secrets/$f"; done
-  else ok "present (kept)"; fi
-  run chown 2104:2104 "$A"/mediasort/secrets/token "$A"/mediasort/secrets/tmdb "$A"/mediasort/secrets/llm 2>/dev/null || true
-  run chmod 600 "$A"/mediasort/secrets/token "$A"/mediasort/secrets/tmdb "$A"/mediasort/secrets/llm 2>/dev/null || true
+  local ms="$A/mediasort/secrets"
+  # token: the bearer key the mover sends. Reuse the mover's copy if this host has one, else generate a
+  # new one and write both copies, so they match.
+  if [ -f "$ms/token" ]; then ok "token present (kept)"
+  elif [ -s "$MOVER_TOKEN" ]; then
+    note "token: copy the mover's ($MOVER_TOKEN)"
+    run install -m 600 -o 2104 -g 2104 "$MOVER_TOKEN" "$ms/token"
+  else
+    note "token: generate, also write the mover's copy ($MOVER_TOKEN)"
+    if [ "$MODE" != dry ]; then
+      install -d -m 700 "$(dirname "$MOVER_TOKEN")"
+      (umask 077; openssl rand -hex 32 | tr -d '\n' > "$ms/token")
+      install -m 600 "$ms/token" "$MOVER_TOKEN"
+      chown 2104:2104 "$ms/token"
+    fi
+  fi
+  # tmdb and llm: entered here, never echoed (the apps VM that held them is gone)
+  prompt_secret tmdb "TMDB API Read Access Token (themoviedb.org: account settings -> API)"
+  prompt_secret llm  "LLM provider API key (Anthropic by default; a new key with a spend limit)"
 
   step "HedgeDoc session secret"
   if [ -f "$A/hedgedoc/secrets/session_secret" ]; then ok "present (kept)"
