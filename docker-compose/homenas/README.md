@@ -2,7 +2,7 @@
 
 > **Status: proposal — nothing is deployed or built.** kaywoz OKs (or changes) this before anything runs. The four compose files next to this README are drafts that validate (`docker compose config --quiet`), not deploy instructions.
 >
-> **Phase 1 approved (kaywoz, 2026-11-19):** the apps stack's bridge-only apps (mediasort, CannonCommander, Atuin, HedgeDoc, Filestash, RackPeek) are built first; paperless, Immich and the archivers wait behind compose profiles. Host steps: [`apps/BUILD.md`](apps/BUILD.md).
+> **Phase 1 approved (kaywoz, 2026-11-19):** the apps stack's bridge-only apps (mediasort, CannonCommander, Atuin, HedgeDoc, Filestash, RackPeek) are built first; paperless, Immich and the archivers wait behind compose profiles. Host steps: [`config-files/mos/apps-stack.sh`](../../config-files/mos/apps-stack.sh).
 >
 > **Decided 2026-11-17 (kaywoz):** Docker runs directly on MOS and **all** stacks go there: no LXC and no VM stays. The #310 tests are done; verdict "viable, with conditions". Later the same day the design was cut back to need and proportionality ([Baseline](#baseline)).
 
@@ -142,7 +142,7 @@ What each dropped layer would have bought, and why it went:
 
 ## Stack 3 — apps, replaces the apps VM
 
-**Phase 1** (kaywoz, 2026-11-19): with `COMPOSE_PROFILES` empty, only mediasort, CannonCommander, Atuin, HedgeDoc, Filestash and RackPeek start. Profiles: `paperless` and `immich` after #255, `archivers` after tests (b), (c) and #322, `immich-ml` off. Build steps: [`apps/BUILD.md`](apps/BUILD.md).
+**Phase 1** (kaywoz, 2026-11-19): with `COMPOSE_PROFILES` empty, only mediasort, CannonCommander, Atuin, HedgeDoc, Filestash and RackPeek start. Profiles: `paperless` and `immich` after #255, `archivers` after tests (b), (c) and #322, `immich-ml` off. Host steps: [`config-files/mos/apps-stack.sh`](../../config-files/mos/apps-stack.sh) (`--dry-run`, then apply, `--serve`, `--verify`).
 
 | App | Container | Network / port | Served as |
 |---|---|---|---|
