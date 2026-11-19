@@ -1,8 +1,8 @@
 # Media LXC security design
 
-Unprivileged LXC on the storage host (MOS), **Debian 13**, own NIC on **VLAN 13 (IoT)**. Runs Jellyfin, Komga and Homey as containers ([`docker-compose/media/`](../docker-compose/media/compose.yaml)). Builds on the [global baseline](../SECURITY.md); this file lists only what is specific to this role.
+Unprivileged LXC on the homenas (MOS), **Debian 13**, own NIC on **VLAN 13 (IoT)**. Runs Jellyfin, Komga and Homey as containers ([`docker-compose/media/`](../docker-compose/media/compose.yaml)). Builds on the [global baseline](../SECURITY.md); this file lists only what is specific to this role.
 
-Rebuild: [`config-files/mos/create-lxc.sh`](../config-files/mos/create-lxc.sh) on the storage host, then [`baseline.sh`](../config-files/ubuntu/baseline.sh) and [`docker-host.sh`](../config-files/ubuntu/docker-host.sh) inside — all passed `--verify` (2026-11-03). Build-out: kaywoz/home0ps#174, media mount kaywoz/home0ps#197.
+Rebuild: [`config-files/mos/create-lxc.sh`](../config-files/mos/create-lxc.sh) on the homenas, then [`baseline.sh`](../config-files/ubuntu/baseline.sh) and [`docker-host.sh`](../config-files/ubuntu/docker-host.sh) inside — all passed `--verify` (2026-11-03). Build-out: kaywoz/home0ps#174, media mount kaywoz/home0ps#197.
 
 **Status legend:** controls without a marker are in place and verified; *(planned)* items are tracked in the linked issue; *(untested)* items are configured but not yet confirmed on the host.
 
@@ -19,7 +19,7 @@ Rebuild: [`config-files/mos/create-lxc.sh`](../config-files/mos/create-lxc.sh) o
 
 | Risk | Control |
 |---|---|
-| Media library tampering / cloud credential theft | The LXC holds **no** Filen credentials or crypt key: the storage host mounts the library read-only and binds it in read-only (decided 2026-11-07, #197). A compromised app can read the media, nothing more |
+| Media library tampering / cloud credential theft | The LXC holds **no** Filen credentials or crypt key: the homenas mounts the library read-only and binds it in read-only (decided 2026-11-07, #197). A compromised app can read the media, nothing more |
 | Homey account | Homey's own login (cloud account); no secrets in git |
 
 ## Containment
@@ -28,6 +28,6 @@ Rebuild: [`config-files/mos/create-lxc.sh`](../config-files/mos/create-lxc.sh) o
 |---|---|
 | App compromise → LXC | Container standard: non-root service uids (2001/2002, not the admin account's uid), `read_only` + `tmpfs`, `cap_drop: [ALL]`, `no-new-privileges`, memory/pid limits — all verified running (2026-11-07). Homey runs as the image's own user (root inside the container) with only `SETUID`, `SETGID`, `SYS_CHROOT`, `CHOWN` |
 | Central Docker management (Hawser) | `kr-ccp-hawser-0201` lets Dockhand-home on the infra VM manage this Docker in standard mode: **full socket**, so the token holder is ≈ root here (accepted, CLAUDE.md §8). Published on `127.0.0.1:2376` only, exposed via `tailscale serve --tcp=2376`; only `tag:infra` may reach it (policy grant + ACL tests). Token as a file (`/srv/docker/hawser/token`, 600, owned 2102, `TOKEN_FILE`), never an env var: env vars are readable through the read-only socket proxy. uid 2102 (`user:` + docker `group_add`), `read_only`, `/run/hawser` tmpfs, `cap_drop: [ALL]`, `no-new-privileges`, 256 MB / 200 pids. After 10 failed tokens in a minute Hawser blocks the source address for a minute — through `tailscale serve` every caller looks the same, so that also blocks Dockhand briefly. No stacks folder (compose stays in git). Verified 2026-11-09 from the infra VM over the tailnet: `/_hawser/health` healthy, `/version` without token → 401; added in Dockhand with the token. running container checked the same day: `uid=2102`, groups docker (988) + 2102, `ReadonlyRootfs=true`, `CapDrop=[ALL]` |
-| LXC compromise → storage host | Unprivileged LXC (root = uid 100000 on the host), device rules allow only tun + the render node, GPU group 44 mapped 1:1; break-glass `lxc-attach` from the host |
+| LXC compromise → homenas | Unprivileged LXC (root = uid 100000 on the host), device rules allow only tun + the render node, GPU group 44 mapped 1:1; break-glass `lxc-attach` from the host |
 | GPU access | `/dev/dri/renderD128` only, via `group_add: 44` for Jellyfin |
 | Komga native libraries | `/tmp` tmpfs with `exec` (SQLite JDBC loads its library from there) — the one tmpfs without `noexec` |

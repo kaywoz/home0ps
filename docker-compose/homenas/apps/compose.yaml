@@ -1,0 +1,507 @@
+# PROPOSAL — not deployed. Apps stack on the replacement homenas (MOS), replacing the apps VM.
+# Design, open questions and migration: docker-compose/homenas/README.md. Nothing here runs until kaywoz OKs it.
+#
+# Trusted, well-known apps only (CLAUDE.md §8). Baseline (kaywoz, 2026-11-17): Docker as MOS ships it (no
+# userns-remap), this stack owns its networks, admin UIs are served by the host's own tailscaled
+# (`tailscale serve --service=svc:<app>`, tag:storage) to 127.0.0.1 ports. Appdata and secret files are
+# owned by the uid in `user:`.
+# - proxy-<app>: one plain bridge per app with a UI; its port on 127.0.0.1; egress via the host.
+# - <app>-backend: internal bridges, app + its database/Redis only.
+# - apps-vlan31: macvlan on the VLAN 31 sub-interface, no host IP on it: the two archivers only (A-Q12, G8).
+#   They fetch arbitrary URLs, so they leave through VLAN 31 under internet-only UniFi rules and can't reach
+#   the host directly. Their UIs are served to their VLAN 31 addresses through the router (README
+#   "Reaching macvlan containers").
+# The stack needs MOS autostart on: `restart:` alone doesn't bring it back.
+services:
+  # Media classifier (#260), moved from the apps VM unchanged. Egress to TMDB and the LLM provider. The mover
+  # runs on this host, so it calls 127.0.0.1:8089 directly: no Tailscale hop. Bearer-token protected.
+  mediasort:
+    image: ghcr.io/kaywoz/mediasort:latest   # built in GitHub Actions (README A-Q1)
+    container_name: kr-ccp-mediasort-0201
+    restart: unless-stopped
+    user: "2104:2104"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    pids_limit: 64
+    mem_limit: 128m
+    environment:
+      LLM_PROVIDER: anthropic           # openai | anthropic (no local LLM in this stack: Ollama dropped)
+      OPENAI_MODEL: gpt-6-luna
+      OPENAI_MIN_INTERVAL: "6.5"
+      ANTHROPIC_MODEL: claude-haiku-5-5
+      ANTHROPIC_MIN_INTERVAL: "1"
+      LLM_KEY_FILE: /run/secrets/llm_key
+      TOKEN_FILE: /run/secrets/mediasort_token
+      TMDB_TOKEN_FILE: /run/secrets/tmdb_token
+    secrets:
+      - mediasort_token
+      - tmdb_token
+      - llm_key
+    ports:
+      - "127.0.0.1:8089:8089"          # the mover (host cron): CLASSIFIER_URL=http://127.0.0.1:8089
+    networks:
+      - proxy-mediasort
+    # healthcheck: in the image (GET /health)
+
+  # paperless-ngx: scan, OCR and archive documents. SQLite + Redis (no Postgres); no Tika/Gotenberg
+  # (Office files and mail parsing parked).
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    container_name: kr-ccp-paperless-0101
+    restart: unless-stopped
+    user: "2105:2105"                  # "rootless" mode (docs/setup.md): s6 skips usermod/chown. Never with USERMAP_UID
+    read_only: true                    # via S6_READ_ONLY_ROOT; read_only + rootless together untested upstream
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /run:size=32m                  # s6 copies its scripts here; also holds the *_FILE env
+      - /tmp:size=1g                   # PAPERLESS_SCRATCH_DIR (OCR working files)
+      - /var/cache/fontconfig:size=16m
+    pids_limit: 300
+    mem_limit: 1g
+    environment:
+      S6_READ_ONLY_ROOT: "1"
+      PAPERLESS_URL: ${PAPERLESS_URL}
+      PAPERLESS_SECRET_KEY_FILE: /run/secrets/paperless_secret_key
+      PAPERLESS_REDIS_FILE: /run/secrets/paperless_redis_url   # redis://:<password>@paperlessredis:6379
+      PAPERLESS_OCR_LANGUAGE: eng      # extra languages can't be installed at start in rootless mode
+      PAPERLESS_TIKA_ENABLED: "false"
+      PAPERLESS_TASK_WORKERS: "1"      # 8 GB box: one OCR job at a time
+      PAPERLESS_THREADS_PER_WORKER: "1"
+      PAPERLESS_WEBSERVER_WORKERS: "1"
+    secrets:
+      - paperless_secret_key
+      - paperless_redis_url
+    volumes:
+      - ${APPDATA}/paperless/data:/usr/src/paperless/data      # SQLite db, index
+      - ${APPDATA}/paperless/media:/usr/src/paperless/media    # the documents
+      - ${APPDATA}/paperless/consume:/usr/src/paperless/consume
+      - ${APPDATA}/paperless/export:/usr/src/paperless/export
+    ports:
+      - "127.0.0.1:8000:8000"          # svc:paperless
+    networks:
+      - proxy-paperless
+      - paperless-backend              # internal: paperless + Redis
+    depends_on:
+      - paperlessredis
+    # healthcheck: built into the image (curl http://localhost:8000)
+
+  paperlessredis:
+    image: redis:latest
+    container_name: kr-ccp-paperlessredis-0101
+    restart: unless-stopped
+    user: "2106:2106"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # Password (requirepass) from a config file: Redis has no *_FILE support. Only paperless shares its
+    # network; the password is defence in depth.
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    pids_limit: 64
+    mem_limit: 128m
+    volumes:
+      - ${APPDATA}/paperless/redis:/data
+      - ${APPDATA}/paperless/secrets/redis.conf:/usr/local/etc/redis/redis.conf:ro   # requirepass <pw>; save 60 1
+    networks:
+      - paperless-backend
+    healthcheck:                       # reads the password from the file at run time: never in env or inspect
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$(sed -n 's/^requirepass //p' /usr/local/etc/redis/redis.conf)\" ping | grep -q PONG"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # CannonCommander (MOS Hub app, a fork of FileBrowser Quantum): two-panel file manager in the browser.
+  # The image's entrypoint needs root (chowns /remotes, edits /etc/passwd, drops to PUID with setpriv), so
+  # it is bypassed: tini starts the server directly as the data user. config.yaml is placed by hand at deploy
+  # (the entrypoint would have copied the default) and holds the admin password, so the instance never
+  # starts without a sign-in (a fresh install is open until a password is set) and no password reaches
+  # the log. No /dev/fuse, no SYS_ADMIN, no DAC_* caps: rclone remotes and the Unraid extras stay off.
+  cannoncommander:
+    image: junkerderprovinz/cannoncommander:latest
+    container_name: kr-ccp-cannoncommander-0101
+    restart: unless-stopped
+    user: "${SHARE_UID}:${SHARE_GID}"  # the Samba-only data user that owns 1.data and tmp (README A-Q2)
+    entrypoint: ["/sbin/tini", "--", "/app/cannoncommander"]   # to verify at build: README A-Q2
+    read_only: true                    # to verify at build
+    cap_drop: [ALL]                    # config.yaml sets http.port 8080, so no NET_BIND_SERVICE for port 80
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m
+    pids_limit: 200
+    mem_limit: 256m
+    environment:
+      CC_CONFIG: /config/config.yaml                       # image default, set for clarity
+      CC_DATABASE_PATH: /config/cannoncommander.sqlite     # image default
+    volumes:
+      - ${APPDATA}/cannoncommander:/config   # config.yaml (600, admin password), database, cache/; owned by the data user
+      - ${SHARE_DATA}:/mnt/user/1.data       # what it serves (source /mnt/user in config.yaml); never the pool root
+      - ${SHARE_TMP}:/mnt/user/tmp
+    ports:
+      - "127.0.0.1:8080:8080"          # svc:cannoncommander
+    networks:
+      - proxy-cannoncommander
+    healthcheck:                       # the image's own check is hard-coded to port 80
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Immich: photos. Four containers as in the upstream release compose. Server and ML use the moving
+  # `release` tag (Immich publishes no `latest`). Only the server publishes a port.
+  immich:
+    image: ghcr.io/immich-app/immich-server:release
+    container_name: kr-ccp-immich-0101
+    restart: unless-stopped
+    user: "2111:2111"                  # start.sh does no user switching (FAQ: non-root via user:)
+    group_add:
+      - ${RENDER_GID}                  # Quick Sync transcoding
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+    read_only: true                    # not documented upstream; to verify at build
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=1g
+    pids_limit: 500
+    mem_limit: 1g
+    environment:
+      DB_HOSTNAME: immichdb
+      DB_USERNAME: immich
+      DB_DATABASE_NAME: immich
+      DB_PASSWORD_FILE: /run/secrets/immich_db_password   # start.sh exports it into the process env
+      REDIS_HOSTNAME: immichredis
+      REDIS_PASSWORD_FILE: /run/secrets/immich_redis_password
+      IMMICH_MACHINE_LEARNING_URL: http://immichml:3003
+    secrets:
+      - immich_db_password
+      - immich_redis_password
+    volumes:
+      - ${PHOTOS}:/data                # UPLOAD_LOCATION: originals, thumbs, encoded video; owned 2111
+      - ${PHOTOS_LIBRARY}:/external:ro # existing photos as an external library (README A-Q3)
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "127.0.0.1:2283:2283"          # svc:immich
+    networks:
+      - proxy-immich
+      - immich-backend                 # internal: server + db + redis + ML
+    depends_on:
+      - immichdb
+      - immichredis
+    # healthcheck: built into the image (immich-healthcheck)
+
+  # Machine learning (smart search, faces). OFF by default (profile `immich-ml`): the box has 8 GB, and
+  # Immich needs 6 GB with ML, 4 GB without. Alternatives: ML on another machine (README A-Q4). With ML
+  # off, turn it off in Immich's admin settings too. Models download on first use, through proxy-immichml.
+  immichml:
+    image: ghcr.io/immich-app/immich-machine-learning:release
+    container_name: kr-ccp-immichml-0101
+    profiles: [immich-ml]
+    restart: unless-stopped
+    user: "2112:2112"
+    read_only: true                    # not documented upstream; to verify at build
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=256m
+    pids_limit: 300
+    mem_limit: 1536m
+    volumes:
+      - ${APPDATA}/immich/model-cache:/cache   # HF_HOME + JIT caches; bind mount (named volumes break non-root)
+    networks:
+      - immich-backend                 # internal: its API (3003) has no auth; no published port
+      - proxy-immichml                 # plain bridge: egress for the model download
+    # healthcheck: built into the image (healthcheck.py)
+
+  # Database: Immich's own Postgres + VectorChord image. It has no `latest` or moving tag; upstream ties the
+  # extension version to each Immich release, so this tag follows the release compose (README A-Q5).
+  immichdb:
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+    container_name: kr-ccp-immichdb-0101
+    restart: unless-stopped
+    user: "2113:2113"                  # arbitrary uid: upstream postgres entrypoint uses nss_wrapper (to verify)
+    read_only: true                    # to verify at build
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /etc/postgresql:size=8m,uid=2113,gid=2113   # entrypoint copies and edits postgresql.conf here
+      - /var/run/postgresql:size=8m,uid=2113,gid=2113
+      - /tmp:size=64m
+    shm_size: 128mb
+    pids_limit: 300
+    mem_limit: 512m                      # docs: at least 2 GB when limits are set
+    environment:
+      POSTGRES_USER: immich
+      POSTGRES_DB: immich
+      POSTGRES_PASSWORD_FILE: /run/secrets/immich_db_password_pg
+      POSTGRES_INITDB_ARGS: --data-checksums
+      DB_STORAGE_TYPE: SSD
+    secrets:
+      - immich_db_password_pg
+    volumes:
+      - ${APPDATA}/immich/postgres:/var/lib/postgresql/data   # local pool only, never a network share
+    networks:
+      - immich-backend
+    # healthcheck: built into the image (pg_isready + checksum failures)
+
+  immichredis:
+    image: valkey/valkey:latest        # upstream pins valkey:9 by digest; :latest per §8 (README A-Q5)
+    container_name: kr-ccp-immichredis-0101
+    restart: unless-stopped
+    user: "2114:2114"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    command: ["valkey-server", "/usr/local/etc/valkey/valkey.conf"]
+    pids_limit: 64
+    mem_limit: 128m
+    volumes:
+      - ${APPDATA}/immich/redis:/data
+      - ${APPDATA}/immich/secrets/valkey.conf:/usr/local/etc/valkey/valkey.conf:ro   # requirepass <pw>
+    networks:
+      - immich-backend
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli --no-auth-warning -a \"$$(sed -n 's/^requirepass //p' /usr/local/etc/valkey/valkey.conf)\" ping | grep -q PONG"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ArchiveBox: archives web pages. Fetches anything it's given, so it sits on apps-vlan31 only: its UI (5797)
+  # is open on VLAN 31 (own login; public index/snapshots/add view off) and svc:archivebox targets it there.
+  archivebox:
+    image: ghcr.io/archivebox/archivebox:latest
+    container_name: kr-ccp-archivebox-0101
+    restart: unless-stopped
+    user: "911:911"                    # the image's own uid: its dirs are owned 911, an arbitrary uid fails (exit 3)
+    # Read-only exception (README "Exception register", E1): the entrypoint needs /opt/archivebox writable,
+    # and it holds the browser and plugin binaries, so a tmpfs won't do.
+    cap_drop: [ALL]                    # Chromium runs with --no-sandbox (image sets CHROME_SANDBOX=false)
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=1g
+    shm_size: 1gb                      # as upstream's compose
+    pids_limit: 2048                   # as upstream's compose (Chromium)
+    mem_limit: 1g
+    environment:
+      PUBLIC_INDEX: "False"            # the image defaults to True
+      PUBLIC_SNAPSHOTS: "False"
+      PUBLIC_ADD_VIEW: "False"
+      TIMEOUT: "60"
+    # Admin account: once, `docker compose run --rm archivebox archivebox manage createsuperuser`
+    # (no *_FILE support; ADMIN_PASSWORD in env would be readable through the socket proxy).
+    volumes:
+      - ${APPDATA}/archivebox/data:/data   # owned 911
+    networks:
+      apps-vlan31:
+        ipv4_address: ${ARCHIVEBOX_IP}       # fixed: UniFi rules per address, svc:archivebox target
+    # healthcheck: built into the image (/health/ on 5797)
+
+  # ArchiveTeam Warrior: runs ArchiveTeam's project pipelines (pulled from GitHub at run time). Its UI has
+  # no auth unless http_password is set in projects/config.json (pre-made in the volume, 600; env vars
+  # would be readable via the proxy). Read-only exception: README "Exception register" (E2).
+  archivewarrior:
+    image: atdr.meo.ws/archiveteam/warrior-dockerfile:latest
+    container_name: kr-ccp-archivewarrior-0101
+    restart: unless-stopped
+    user: "1000:1000"                  # the image's own uid (/home/warrior owned 1000)
+    # Read-only exception (E2): /home/warrior/data holds the baked-in wget-at binaries and must be writable.
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true         # also blocks the image's passwordless sudo
+    tmpfs:
+      - /tmp:size=256m
+    pids_limit: 500
+    mem_limit: 384m
+    volumes:
+      - ${APPDATA}/archivewarrior/projects:/home/warrior/projects   # config.json, project checkouts, item data
+    networks:
+      apps-vlan31:
+        ipv4_address: ${WARRIOR_IP}   # fixed: UniFi rules per address, svc:archivewarrior target. Egress: warriorhq, GitHub, trackers, upload targets, archived sites
+    # healthcheck: built into the image (wget-at on 8001)
+
+  # Atuin: shell history sync server, SQLite backend (server support since 18.7/18.8): one container, no DB.
+  # Clients reach it as svc:atuin. Registration closed after the first account (true once, then false).
+  atuin:
+    image: ghcr.io/atuinsh/atuin:latest   # upstream's latest lags releases (README A-Q8)
+    container_name: kr-ccp-atuin-0101
+    restart: unless-stopped
+    user: "2121:2121"                  # no entrypoint script: any uid with a writable /config
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m
+    pids_limit: 100
+    mem_limit: 128m
+    command: ["start"]
+    environment:
+      ATUIN_HOST: 0.0.0.0              # defaults to 127.0.0.1
+      ATUIN_OPEN_REGISTRATION: "false"
+      ATUIN_DB_URI: sqlite:///config/atuin.db
+    volumes:
+      - ${APPDATA}/atuin/config:/config   # server.toml + atuin.db; owned 2121
+    ports:
+      - "127.0.0.1:8888:8888"          # svc:atuin
+    networks:
+      - proxy-atuin
+    # healthcheck: built into the image (/healthz)
+
+  # HedgeDoc 1.x: collaborative Markdown editor (the open-source line that started as HackMD), replacing
+  # Dillinger. SQLite, local accounts only (no self-registration, no anonymous notes). Served as svc:hedgedoc.
+  # `latest` is 1.12.0; upstream withdrew 1.12.1/1.12.2, and its docs example still shows 1.12.2: don't copy it.
+  hedgedoc:
+    image: quay.io/hedgedoc/hedgedoc:latest
+    container_name: kr-ccp-hedgedoc-0101
+    restart: unless-stopped
+    user: "2123:2123"                  # entrypoint uses gosu only when started as root; uploads pre-owned
+    read_only: true                    # to verify at build (writable: uploads, db, /tmp)
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m                  # tmpPath defaults to os.tmpdir()
+    pids_limit: 200
+    mem_limit: 256m
+    environment:
+      CMD_DOMAIN: hedgedoc.${TAILNET}.ts.net   # behind tailscale serve (TLS terminated there)
+      CMD_PROTOCOL_USESSL: "true"
+      CMD_URL_ADDPORT: "false"
+      CMD_ALLOW_ANONYMOUS: "false"
+      CMD_ALLOW_EMAIL_REGISTER: "false"        # users via bin/manage_users
+      CMD_DEFAULT_PERMISSION: limited
+      CMD_DB_URL: sqlite:///hedgedoc/db/hedgedoc.sqlite   # a subfolder, not the install root (docs)
+    secrets:                           # HedgeDoc reads Docker secrets by name from /run/secrets/
+      - source: hedgedoc_session_secret
+        target: sessionsecret          # without it every restart logs everyone out
+    volumes:
+      - ${APPDATA}/hedgedoc/db:/hedgedoc/db
+      - ${APPDATA}/hedgedoc/uploads:/hedgedoc/public/uploads   # owned 2123, mode 700
+    ports:
+      - "127.0.0.1:3000:3000"          # svc:hedgedoc
+    networks:
+      - proxy-hedgedoc
+    # healthcheck: built into the image (node healthcheck.mjs -> /_health)
+
+  # Filestash: file manager with storage backends. Until an admin password is set, /admin/setup is open:
+  # set it right after the first start (only reachable through svc:filestash).
+  filestash:
+    image: machines/filestash:latest
+    container_name: kr-ccp-filestash-0101
+    restart: unless-stopped
+    # runs as the image's own user `filestash` (uid unverified, likely 1000): the binary is mode 730, so an
+    # arbitrary uid can't execute it. No `user:` override.
+    read_only: true                    # to verify at build
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /app/data/cache:size=512m
+      - /tmp:size=256m
+    pids_limit: 200
+    mem_limit: 256m
+    volumes:
+      - ${APPDATA}/filestash/state:/app/data/state   # config.json (admin bcrypt hash), db, logs
+    ports:
+      - "127.0.0.1:8334:8334"          # svc:filestash
+    networks:
+      - proxy-filestash
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8334/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # RackPeek: homelab inventory. Its web UI has no authentication: Tailscale only (svc:rackpeek, admins).
+  rackpeek:
+    image: aptacode/rackpeek:latest
+    container_name: kr-ccp-rackpeek-0101
+    restart: unless-stopped
+    user: "1654:1654"                  # the image's own uid; its dirs are owned 1654
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /app/tmp:size=64m,uid=1654,gid=1654   # TMPDIR
+    pids_limit: 200
+    mem_limit: 256m
+    volumes:
+      - ${APPDATA}/rackpeek/config:/app/config   # config.yaml, data-protection keys
+    ports:
+      - "127.0.0.1:8081:8080"          # svc:rackpeek; container port to verify at build
+    networks:
+      - proxy-rackpeek
+    # healthcheck: built into the image (/health)
+
+networks:
+  # One plain bridge per app (port on 127.0.0.1, egress via the host).
+  proxy-mediasort:
+    name: proxy-mediasort
+  proxy-paperless:
+    name: proxy-paperless
+  proxy-cannoncommander:
+    name: proxy-cannoncommander
+  proxy-immich:
+    name: proxy-immich
+  proxy-immichml:
+    name: proxy-immichml
+  proxy-atuin:
+    name: proxy-atuin
+  proxy-hedgedoc:
+    name: proxy-hedgedoc
+  proxy-filestash:
+    name: proxy-filestash
+  proxy-rackpeek:
+    name: proxy-rackpeek
+  # Databases and Redis: internal, no egress, no ports.
+  paperless-backend:
+    name: paperless-backend
+    driver: bridge
+    internal: true
+  immich-backend:
+    name: immich-backend
+    driver: bridge
+    internal: true
+  # The archivers only (README A-Q12).
+  apps-vlan31:
+    name: apps-vlan31
+    driver: macvlan
+    driver_opts:
+      parent: ${VLAN31_PARENT}         # e.g. <nic>.31, no IP on the host side
+    ipam:
+      config:
+        - subnet: ${VLAN31_SUBNET}
+          gateway: ${VLAN31_GATEWAY}
+          ip_range: ${VLAN31_RANGE}    # a small block outside the gateway's DHCP pool
+
+secrets:
+  mediasort_token:
+    file: ${APPDATA}/mediasort/secrets/token         # 600, owned 2104; same value in the mover's token file
+  tmdb_token:
+    file: ${APPDATA}/mediasort/secrets/tmdb          # 600, owned 2104
+  llm_key:
+    file: ${APPDATA}/mediasort/secrets/llm           # 600, owned 2104; the selected provider's API key
+  paperless_secret_key:
+    file: ${APPDATA}/paperless/secrets/secret_key    # openssl rand -hex 32, no trailing newline; 600, owned 2105
+  paperless_redis_url:
+    file: ${APPDATA}/paperless/secrets/redis_url     # redis://:<password>@paperlessredis:6379; 600, owned 2105
+  immich_db_password:
+    file: ${APPDATA}/immich/secrets/db_password      # letters and digits only (Immich docs); 600, owned 2111
+  immich_db_password_pg:
+    file: ${APPDATA}/immich/secrets/db_password_pg   # same value, second copy: 600, owned 2113 (the db's uid)
+  immich_redis_password:
+    file: ${APPDATA}/immich/secrets/redis_password   # same value as requirepass in valkey.conf; 600, owned 2111
+  hedgedoc_session_secret:
+    file: ${APPDATA}/hedgedoc/secrets/session_secret   # openssl rand -hex 32; 600, owned 2123
