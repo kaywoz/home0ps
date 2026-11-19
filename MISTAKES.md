@@ -910,3 +910,11 @@ mistakes, not a diary.
 - **Root cause:** I copied a convention without its reason: the watchdog lives on the stick because it must run while the pool or the NIC is in trouble. The stack script needs Docker and the pool anyway.
 - **Fix applied:** everything moved to `<appdata>/home0ps/`, next to the app folders and MOS's `compose_<stack>` folders (kaywoz/home0ps#365).
 - **Rule going forward:** on MOS, files go on the boot stick only when they must work before or without the pool (boot, network recovery). Docker-related files live in MOS's appdata, one folder each.
+
+### 2026-11-19 — mos (Arcane admin password accepted by the script, rejected by Arcane)
+
+- **Trigger:** host step failed
+- **What happened:** `infra-stack.sh` only checked the first Arcane admin password for 12+ characters. Arcane's policy also wants an uppercase letter, a lowercase letter, a number and a symbol. Arcane rejected the file, created no admin at all, and every login failed with "invalid username or password".
+- **Root cause:** I read which settings take a file (`config.go`) but not what Arcane does with the value (`CreateDefaultAdmin` validates it against its password policy and, on failure, logs a warning and creates no user).
+- **Fix applied:** a new password file and a restart created the admin; the script now checks Arcane's full policy before writing the file.
+- **Rule going forward:** when a script hands a secret to an app, check the app's own validation of that value (policy, length, format) in its code or docs and enforce the same rule in the script, so it fails at the prompt, not silently in the app.
