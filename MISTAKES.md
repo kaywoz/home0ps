@@ -878,3 +878,11 @@ mistakes, not a diary.
 - **Root cause:** I took the bullet heading ("Cockpit: one per host") as the rule. I didn't read it together with the proportionality line ("one admin UI per host").
 - **Fix applied:** corrected in chat; §8 reworded in kaywoz/home0ps#313 to "one host management portal per host" (the native OS portal: Cockpit, the MOS UI or similar), with logical management portals allowed to span hosts within the other axioms.
 - **Rule going forward:** when summarizing a CLAUDE.md rule, quote its wording, not a heading. If two bullets overlap, state the broader one.
+
+### 2026-11-19 — board (issue closed by number in the wrong repo)
+
+- **Trigger:** wrong assumption
+- **What happened:** during board triage, kaywoz said "won't do" for board item #17 (a theme upgrade in the blog repo). I ran `gh issue close 17` in this repo and closed kaywoz/home0ps#17, an unrelated issue. I reopened it with a comment within minutes.
+- **Root cause:** the board holds items from more than one repo, and I listed them by number only, dropping `content.repository`. `gh issue close N` resolves N against the current repo.
+- **Fix applied:** home0ps#17 reopened; the intended item is closed in its own repo with `-R`.
+- **Rule going forward:** when acting on board items, list them as `owner/repo#N` (from `content.repository`) and pass `-R owner/repo` to every `gh issue` write; before closing, check the issue's title matches the board item's title.
