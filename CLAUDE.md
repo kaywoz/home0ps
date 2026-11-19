@@ -312,13 +312,14 @@ change explicitly if one no longer fits.
 - **Monitoring pulls** from the monitoring host outward over the tailnet,
   one explicit grant per flow; agents listen on tailnet IPs only.
   **Exception — pushes to the monitoring host's Services:** observed hosts
-  (`tag:observed`) may open connections to `svc:logtide-api` (logs),
-  `svc:healthchecks` (pings) and `svc:beszel` (Beszel agent WebSocket),
+  (`tag:observed`) may open connections to `svc:healthchecks` (pings)
+  and `svc:beszel` (Beszel agent WebSocket),
   nothing else on the monitoring host. Each push flow is its own grant
   with an ACL test.
-- **Logs:** journald everywhere (Docker `journald` driver) → native,
-  sandboxed Fluent Bit → LogTide (`config-files/log-shipping/`). One shared
-  ingest key; attribution via `metadata.host`.
+- **Logs:** journald everywhere (Docker `journald` driver), persistent and
+  sealed, kept on each host (`config-files/logging/`). Off-box shipping
+  (Fluent Bit → LogTide) is benched (kaywoz, 2026-11-02, kaywoz/home0ps#207;
+  config in `archive/`); kaywoz/home0ps#180 is the planned replacement.
 - **Alerting → Slack** (cloud, so delivery doesn't depend on the monitoring
   host). No ntfy, no Discord.
 - **Security summaries:** global [`SECURITY.md`](SECURITY.md) plus
