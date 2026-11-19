@@ -862,3 +862,19 @@ mistakes, not a diary.
 - **Root cause:** each control was judged by whether it reduced some risk, not by whether the risk was worth its cost on a homelab box (CLAUDE.md §8 proportionality), and nobody compared the design with what comparable NAS platforms do by default.
 - **Fix applied:** consolidation of the design against need and proportionality, with a smaller baseline proposed to kaywoz.
 - **Rule going forward:** before adding a control that needs platform workarounds (boot hooks, patched OS state, exemptions), state the concrete threat, what the per-container defaults already cover, and what comparable appliances do; propose it only if the residual risk is clearly worth the upkeep, and ask kaywoz first.
+
+### 2026-11-12 — planning (hardware role swap misread)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** kaywoz asked "what if I keep the CWWK but replace [the monitoring host] with it?". I read "it" as the new F4 SSD and planned the F4 as the new monitoring host. kaywoz meant: the F4 SSD runs MOS as the storage host, the CWWK (today's storage host) becomes the monitoring host, and the Pi 5 retires.
+- **Root cause:** I resolved an ambiguous pronoun to the most recently discussed object, without restating the mapping before a long answer.
+- **Fix applied:** the plan was redone with the correct roles before anything was changed.
+- **Rule going forward:** when a request moves hardware between roles, restate the full mapping (box → role, for every box involved) in one line and get it confirmed before planning around it.
+
+### 2026-11-13 — planning (management portal rule paraphrased as "one Cockpit per host")
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** when listing what CLAUDE.md §8 covers, I wrote "one Cockpit per host". kaywoz's rule is one hardware management portal per host, which can be Cockpit or the MOS UI.
+- **Root cause:** I took the bullet heading ("Cockpit: one per host") as the rule. I didn't read it together with the proportionality line ("one admin UI per host").
+- **Fix applied:** corrected in chat; §8 reworded in kaywoz/home0ps#313 to "one host management portal per host" (the native OS portal: Cockpit, the MOS UI or similar), with logical management portals allowed to span hosts within the other axioms.
+- **Rule going forward:** when summarizing a CLAUDE.md rule, quote its wording, not a heading. If two bullets overlap, state the broader one.
