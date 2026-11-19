@@ -27,6 +27,7 @@ locals {
     hedgedoc        = "Markdown editor"
     filestash       = "File manager (storage backends)"
     rackpeek        = "Homelab inventory"
+    arcane          = "Docker management and git-sync deploys (homenas)"
 
     # apps host (tag:observed)
     "cockpit-sexy" = "Host admin UI (apps host)"
