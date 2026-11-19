@@ -100,10 +100,17 @@ prepare() {
   elif [ "$MODE" = dry ]; then note "would ask for the first admin password and write $SEC/admin_password"
   else
     local pw pw2
-    read -rs -p "  Arcane first admin password (12+ characters): " pw < /dev/tty; echo
+    read -rs -p "  Arcane first admin password (12+ characters, upper, lower, digit, symbol): " pw < /dev/tty; echo
     read -rs -p "  again: " pw2 < /dev/tty; echo
     [ "$pw" = "$pw2" ] || { echo "Passwords differ." >&2; exit 1; }
+    # Arcane's own policy: without it, Arcane creates no admin at all and every login fails
+    # ("password must be at least 12 characters and include an uppercase letter, a lowercase letter,
+    # a number, and a symbol", backend/internal/user/service.go CreateDefaultAdmin)
     [ "${#pw}" -ge 12 ] || { echo "Shorter than 12 characters." >&2; exit 1; }
+    case "$pw" in *[[:upper:]]*) ;; *) echo "No uppercase letter (Arcane's policy)." >&2; exit 1 ;; esac
+    case "$pw" in *[[:lower:]]*) ;; *) echo "No lowercase letter (Arcane's policy)." >&2; exit 1 ;; esac
+    case "$pw" in *[[:digit:]]*) ;; *) echo "No number (Arcane's policy)." >&2; exit 1 ;; esac
+    case "$pw" in *[![:alnum:]]*) ;; *) echo "No symbol (Arcane's policy)." >&2; exit 1 ;; esac
     (umask 077; printf '%s' "$pw" > "$SEC/admin_password"); unset pw pw2
     chown "$ARC_UID:$ARC_UID" "$SEC/admin_password"; ok "written (600, $ARC_UID)"
   fi
