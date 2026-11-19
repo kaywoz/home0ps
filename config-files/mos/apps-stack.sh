@@ -24,7 +24,7 @@
 # (override with APPS_STACK_ENV=<file>; template: config-files/mos/apps-stack.env.example):
 #   SHARE_USER=              the Samba-only data user CannonCommander runs as (README A-Q2) [required]
 #   SHARE_DATA=/mnt/user/1.data   SHARE_TMP=/mnt/user/tmp   what CannonCommander serves
-#   MOVER_TOKEN=/boot/config/home0ps/media-sort.token   the mover's copy of mediasort's bearer token
+#   MOVER_TOKEN=$H/media-sort.token   the mover's copy of mediasort's bearer token
 #                            (config-files/mos/media-sort.env.example TOKEN_FILE)
 # Paths (environment, rarely changed): MOS_DOCKER=/var/mergerfs/merger-nvme/disk1/mos-docker (MOS's Docker
 # folder on the disk itself: Docker's own files stay outside mergerfs, never the /mnt/merger-* pool mount;
@@ -52,7 +52,7 @@ esac
 [ -r "$ENV_FILE" ] && . "$ENV_FILE"
 SHARE_USER="${SHARE_USER:-}"
 SHARE_DATA="${SHARE_DATA:-/mnt/user/1.data}"; SHARE_TMP="${SHARE_TMP:-/mnt/user/tmp}"
-MOVER_TOKEN="${MOVER_TOKEN:-/boot/config/home0ps/media-sort.token}"
+MOVER_TOKEN="${MOVER_TOKEN:-$H/media-sort.token}"
 A="$MOS_DOCKER/appdata"
 OUT_DIR="$H/apps-stack"
 REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/kaywoz/home0ps/main}"
