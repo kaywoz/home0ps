@@ -239,11 +239,20 @@ change explicitly if one no longer fits.
   (`svc:<app>` on 443); user-facing apps via Cloudflare Tunnel + Access.
   Tailscale is break-glass. No certificates to manage, no DNS API tokens on
   hosts.
-- **Cockpit: one per host** (decided 2026-10-20), each its own Tailscale
+- **One host management portal per host** (decided 2026-10-20, clarified
+  2026-11-19): the host's own native portal (Cockpit, the MOS UI, or a
+  similar portal built into the OS), and it manages only that host.
+  Cockpit, where used, is its own Tailscale
   Service `svc:cockpit-<device>` (§4 Service-name exception) on `127.0.0.1:9091`, `LoginTo = false`,
   `AllowMultiHost` off. No multi-host Cockpit hub: it would hold SSH to every
-  host and share one browser origin across them. The home side has no
-  central admin point; the Mac mini is the home admin workstation.
+  host and share one browser origin across them. The Mac mini is the home
+  admin workstation.
+- **Logical management portals** (Docker UIs, deployers: e.g. Dockhand,
+  Arcane, `h0ps-tern`) may manage other hosts if they keep to the other
+  axioms here: same zone only (never lab ↔ home), never the monitoring host
+  or backup targets, run on a host at least as trusted as the hosts they
+  manage, UI only via their Tailscale Service with own auth (prefer
+  OIDC + MFA), one grant per flow, logged, own security-summary entry.
 - **Exception — Dockhand** *(provisional, part of kaywoz/home0ps#174; may be
   revisited)*: one central Docker UI per zone.
   - **Dockhand-home** runs in the infra VM (VLAN 24, tier 0) and manages **only** its
