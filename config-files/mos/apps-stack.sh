@@ -3,39 +3,46 @@
 # (docker-compose/homenas/apps/, kaywoz/home0ps#320).
 #
 # Phase 1 = mediasort, CannonCommander, Atuin, HedgeDoc, Filestash, RackPeek (COMPOSE_PROFILES empty).
-# Run as root on the homenas. Via bash, because /boot on MOS doesn't allow executing files directly:
+# Run as root on the homenas. Everything lives with MOS's Docker data, on the pool, not on the boot stick:
+# it only works once Docker and the pool are up anyway. It gets its own folder in appdata, next to the app
+# folders and MOS's compose_<stack> folders. H = <appdata>/home0ps:
+#   mkdir -p /var/mergerfs/merger-nvme/disk1/mos-docker/appdata/home0ps
 #   curl -fsSL https://raw.githubusercontent.com/kaywoz/home0ps/main/config-files/mos/apps-stack.sh \
-#     -o /boot/config/home0ps/apps-stack.sh
+#     -o /var/mergerfs/merger-nvme/disk1/mos-docker/appdata/home0ps/apps-stack.sh
 #
-#   bash /boot/config/home0ps/apps-stack.sh --dry-run   show what would change
-#   bash /boot/config/home0ps/apps-stack.sh             folders, secrets, image checks, the stack's .env
-#                                                       and compose.yaml to paste into the MOS UI
-#   bash /boot/config/home0ps/apps-stack.sh --serve     the Tailscale Services (after the stack runs)
-#   bash /boot/config/home0ps/apps-stack.sh --verify    check everything, change nothing; exit 1 on a failure
+#   bash $H/apps-stack.sh --dry-run   show what would change
+#   bash $H/apps-stack.sh             folders, secrets, image checks, the stack's .env
+#                                     and compose.yaml to paste into the MOS UI
+#   bash $H/apps-stack.sh --serve     the Tailscale Services (after the stack runs)
+#   bash $H/apps-stack.sh --verify    check everything, change nothing; exit 1 on a failure
 #
 # Re-runnable: existing secrets and configs are kept, never overwritten. Nothing prints a secret.
 # The MOS UI steps (create the stack, autostart, start) and the first logins stay manual; the default
 # mode prints them at the end.
 #
-# Settings file (host-local, not in git): /boot/config/home0ps/apps-stack.env
+# Settings file (host-local, not in git): $H/apps-stack.env
 # (override with APPS_STACK_ENV=<file>; template: config-files/mos/apps-stack.env.example):
 #   SHARE_USER=              the Samba-only data user CannonCommander runs as (README A-Q2) [required]
 #   SHARE_DATA=/mnt/user/1.data   SHARE_TMP=/mnt/user/tmp   what CannonCommander serves
 #   MEDIASORT_SECRETS_FROM=  scp source of mediasort's token/tmdb/llm, e.g. root@<apps-vm>:/srv/docker/mediasort/secrets
 #                            (only needed while they aren't in place yet)
-#   APPDATA=/var/mergerfs/merger-nvme/disk1/mos-docker/appdata   MOS's appdata folder
-#   OUT_DIR=/boot/config/home0ps/apps-stack   where the rendered .env and compose.yaml go
+# Paths (environment, rarely changed): MOS_DOCKER=/var/mergerfs/merger-nvme/disk1/mos-docker (MOS's Docker
+# folder on the disk itself: Docker's own files stay outside mergerfs, never the /mnt/merger-* pool mount;
+# service data such as SHARE_DATA goes through mergerfs; as in docker.json); appdata is $MOS_DOCKER/appdata; the rendered .env and compose.yaml go to $H/apps-stack/.
 #   REPO_RAW=https://raw.githubusercontent.com/kaywoz/home0ps/main
 set -euo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-ENV_FILE="${APPS_STACK_ENV:-/boot/config/home0ps/apps-stack.env}"
+MOS_DOCKER="${MOS_DOCKER:-/var/mergerfs/merger-nvme/disk1/mos-docker}"
+case "$MOS_DOCKER" in /mnt/merger*) echo "MOS_DOCKER is the mergerfs mount ($MOS_DOCKER): use the disk path, e.g. /var/mergerfs/merger-nvme/disk1/mos-docker" >&2; exit 1 ;; esac
+H="$MOS_DOCKER/appdata/home0ps"
+ENV_FILE="${APPS_STACK_ENV:-$H/apps-stack.env}"
 MODE=apply
 case "${1:-}" in
   --dry-run) MODE=dry ;;
   --serve) MODE=serve ;;
   --verify) MODE=verify ;;
-  -h|--help) sed -n '2,31p' "$0"; exit 0 ;;
+  -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
   "") ;;
   *) echo "unknown option: $1" >&2; exit 1 ;;
 esac
@@ -46,8 +53,8 @@ esac
 SHARE_USER="${SHARE_USER:-}"
 SHARE_DATA="${SHARE_DATA:-/mnt/user/1.data}"; SHARE_TMP="${SHARE_TMP:-/mnt/user/tmp}"
 MEDIASORT_SECRETS_FROM="${MEDIASORT_SECRETS_FROM:-}"
-A="${APPDATA:-/var/mergerfs/merger-nvme/disk1/mos-docker/appdata}"
-OUT_DIR="${OUT_DIR:-/boot/config/home0ps/apps-stack}"
+A="$MOS_DOCKER/appdata"
+OUT_DIR="$H/apps-stack"
 REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/kaywoz/home0ps/main}"
 
 # Phase-1 Services: name port (127.0.0.1). mediasort has none: the mover calls 127.0.0.1:8089.
