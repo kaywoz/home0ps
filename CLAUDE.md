@@ -284,6 +284,9 @@ change explicitly if one no longer fits.
 - **Host layout:** `/srv/docker/compose.yaml` — one file, all services
   inline, no `include:` — plus one data subfolder per service. Host-level
   config lives in this repo (`config-files/`), not in `/srv/docker`.
+  **Host steps ship as a script** (kaywoz, 2026-11-19): re-runnable, in
+  `config-files/<platform>/`, with `--dry-run` and `--verify`. A doc lists
+  only what can't be scripted (UI clicks, first logins).
   **Exception — homenas** (MOS, kaywoz 2026-11-17): one compose file per
   stack (`docker-compose/homenas/<stack>/compose.yaml`), each one MOS
   stack, because MOS starts, stops and autostarts per stack.

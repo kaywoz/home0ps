@@ -894,3 +894,11 @@ mistakes, not a diary.
 - **Root cause:** I read "owner of a repo" as the GitHub account field, not as the people who make the project.
 - **Fix applied:** kaywoz/home0ps#362 now lists only creators, main maintainers or volunteer communities, and CLAUDE.md §8's rule says so.
 - **Rule going forward:** when a rule names an owner or author, credit the people behind the work. If an owner is a company, foundation or closed-source vendor, leave it out, or ask.
+
+### 2026-11-19 — compose (host steps written as a doc instead of a script)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** for phase 1 of the homenas apps stack I wrote `BUILD.md`, a page of commands to copy one by one. Earlier host work (the infra VM, the MOS NIC watchdog, the Docker host layer) was delivered as scripts with `--dry-run` and `--verify`. kaywoz asked why it wasn't done the same way.
+- **Root cause:** I followed the README's "deploy procedure" style instead of checking how host steps had been handed over before.
+- **Fix applied:** `config-files/mos/apps-stack.sh` replaces `BUILD.md`: it creates folders and secrets, checks the unverified image facts, renders the stack's `.env`, serves the Services and verifies the result. Only the MOS UI steps and the first-start logins stay manual.
+- **Rule going forward:** host steps are a re-runnable script in `config-files/<platform>/` with `--dry-run` and `--verify` (now in CLAUDE.md §8 "Host layout"). A doc lists only what can't be scripted (UI clicks, first logins).
