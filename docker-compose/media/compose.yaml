@@ -3,7 +3,7 @@
 # Docker in an unprivileged LXC: no userns-remap (the LXC already maps root to an unprivileged
 # host uid), so container uids are LXC uids: data folders are owned by the uid in `user:`.
 # Service uids 2001/2002 are deliberately not the admin account's uid.
-# Media comes read-only from the storage host's rclone mount, bound into the LXC at /mnt/media.
+# Media comes read-only from the homenas's rclone mount, bound into the LXC at /mnt/media.
 services:
   jellyfin:
     image: jellyfin/jellyfin:latest

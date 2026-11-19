@@ -774,3 +774,91 @@ mistakes, not a diary.
 - **Root cause:** the state check printed the state but didn't gate the push. I ran the check without acting on its result.
 - **Fix applied:** the commit was cherry-picked onto a new branch from `main` with a new PR.
 - **Rule going forward:** the state check is a gate in the same command: `[ "$(gh pr view N --json state --jq .state)" = OPEN ] && git push …`. A non-`OPEN` state stops the push.
+
+### 2026-11-16 — compose (stack scope decided alone)
+
+- **Trigger:** misunderstood request
+- **What happened:** the stack proposal (PR 321) was asked to pick apps from the earlier short list. I moved Kopia, Time Machine and the S3 store into "a separate proposal" and parked Immich, without asking, and added Pocket ID and Ollama. kaywoz set the stacks: media (Jellyfin, Komga, Homey), infra (cloudflared), apps (mediasort, paperless-ngx, FileBrowser Quantum, Immich), and a fourth, storage (Kopia, Time Machine, RustFS).
+- **Root cause:** treated "pick from the earlier discussion" as licence to narrow the scope by my own placement rules (a deployer and storage services "don't belong in a stack") instead of putting the cut to kaywoz.
+- **Fix applied:** PR 321 reworked to the four stacks kaywoz named.
+- **Rule going forward:** when a request says to build from an earlier list, every item on it is in scope unless kaywoz drops it; an item I'd leave out or move goes to him as a one-line question before the draft, not as a decision in the draft.
+
+### 2026-11-16 — compose ("risky workload" misread)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** the stack proposal (PR 321) called ArchiveTeam Warrior a "risky workload" under CLAUDE.md §8, because it runs project code it fetches at run time, and asked whether it belongs in the lab. kaywoz: a risky workload means security work (malware, analysis, forensics and similar), not an app that runs third-party code.
+- **Root cause:** read "risky" in §8 by its everyday meaning instead of asking what kaywoz meant by it; the lab placement in an earlier long list was taken as support.
+- **Fix applied:** the Warrior stays in the apps stack; the lab question was dropped from the proposal. Its real gaps (no read-only root, UI without auth by default) are handled as a registered exception with mitigations.
+- **Rule going forward:** "risky workloads go to the lab" (CLAUDE.md §8) means security tooling: malware, analysis, forensics and similar. Don't move ordinary apps to the lab on that rule; flag their specific gaps instead.
+
+### 2026-11-17 — compose (pushed to a merged PR, third time)
+
+- **Trigger:** commit missed `main` (repeat of 2026-11-03 and 2026-11-11)
+- **What happened:** the userns-remap update for the storage stacks was pushed to PR 321's branch after kaywoz had merged it and the branch was deleted. The push recreated the branch, and the merged PR's description was edited to describe a change it doesn't contain.
+- **Root cause:** a long session that had pushed to the same open draft PR several times; the state was assumed, not checked. The 2026-11-11 gate wasn't used.
+- **Fix applied:** the merged PR's description was restored; the commit was cherry-picked onto a new branch from `main` with a new PR; the recreated branch was deleted.
+- **Rule going forward:** unchanged from 2026-11-11, and it applies to every push and every `gh pr edit`, also in long sessions: `[ "$(gh pr view N --json state --jq .state)" = OPEN ] && …`.
+
+### 2026-11-16 — mos (`btrfs device stats` with two paths)
+
+- **Trigger:** command failed on the host
+- **What happened:** a diagnostics block for the candidate storage host ran `btrfs device stats` with two mount paths. It failed with "exactly 1 argument expected", so the error counters weren't shown.
+- **Root cause:** the command's usage wasn't checked; I assumed it takes several paths like `df`.
+- **Fix applied:** loop over `findmnt -t btrfs -n -o TARGET`, one `btrfs device stats` per mount.
+- **Rule going forward:** for any CLI not used before in this repo, check its usage line (`<cmd> --help` or the man page) before handing it over; one path per call unless the usage says otherwise.
+
+### 2026-11-16 — mos (soak script aborted on `smartctl`'s exit code)
+
+- **Trigger:** script bug on the host
+- **What happened:** the soak script (`set -euo pipefail`) aborted early because `smartctl -A` exits non-zero when a drive's error log has entries, even though the read succeeded.
+- **Root cause:** assumed exit 0 means "read OK" for `smartctl`; its exit status is a bitmask that also reports drive state.
+- **Fix applied:** `smartctl … || true` in the reader, plus an `ERR` trap that prints the failing line.
+- **Rule going forward:** in `set -e` scripts, check the exit-code semantics of every monitoring tool (`smartctl`, `nvme`, `ipmitool`, …) and tolerate the non-fatal codes explicitly; add an `ERR` trap that names the line.
+
+### 2026-11-16 — mos (`<placeholder>` read as a redirect)
+
+- **Trigger:** command failed on the host
+- **What happened:** a soak start command contained the placeholder `<old-host-ip>`. It was run unedited, bash read `<` as a redirect, and the soak never started (an empty test folder was left behind).
+- **Root cause:** placeholders written with angle brackets, which are shell syntax.
+- **Fix applied:** folder removed, command re-sent with a placeholder without brackets.
+- **Rule going forward:** placeholders in commands handed to kaywoz never use `<>` (or other shell metacharacters); use plain words such as `OLD_HOST_IP`.
+
+### 2026-11-17 — mos (remap checked before Docker was up)
+
+- **Trigger:** wrong diagnosis
+- **What happened:** the first runtime test of Docker `userns-remap` was reported as failed ("no socket"). The check ran right after `/etc/init.d/docker restart`, but the init script starts `dockerd` in the background, so it wasn't up yet.
+- **Root cause:** assumed the init script returns once the daemon is ready.
+- **Fix applied:** wait loop (`docker info` until it answers, max 60 s) before any check.
+- **Rule going forward:** after starting or restarting a daemon, poll for readiness (socket/API answers) before checking its state; never treat the first failed probe as a result.
+
+### 2026-11-17 — mos (watchdog lock inherited by `dockerd`)
+
+- **Trigger:** script bug on the host
+- **What happened:** `docker-userns.sh` held a `flock` on fd 9 and then restarted Docker. `dockerd` inherited fd 9 and held the lock for its lifetime, so every later run, including `--check`, exited silently.
+- **Root cause:** an open lock fd is inherited by every process the script starts, including long-running daemons.
+- **Fix applied:** the init script is called with `9>&-`; `--check` takes no lock (#325).
+- **Rule going forward:** scripts that hold a lock close the lock fd for every child that may outlive them (`9>&-`), and read-only modes take no lock.
+
+### 2026-11-17 — mos (`docker_options` tested through the wrong path)
+
+- **Trigger:** wrong conclusion
+- **What happened:** I concluded that MOS ignores `docker_options` in `docker.json` and drafted a bug report saying so. The test had restarted Docker with `/etc/init.d/docker` directly, which doesn't read the key; `mos-start` and the UI do pass it at start. The UI also has a field for it, which I said didn't exist.
+- **Root cause:** tested a shortcut path instead of the path the OS uses at boot, and didn't read `mos-start` before concluding.
+- **Fix applied:** read `mos-start`, confirmed with a harmless flag through the UI, corrected the bug report and #310.
+- **Rule going forward:** test a setting through the same path the platform uses (boot script or UI), and read that path's code before saying a setting has no effect.
+
+### 2026-11-17 — mos (remap user restored without its group)
+
+- **Trigger:** apply broke something (Docker didn't start after a reboot)
+- **What happened:** after a Samba-only user was created in the MOS UI, MOS saved its user list, `dockremap` included, to `/boot/config/system/passwd`, but not the group. At the next boot the user came back without its group; `docker-userns.sh` only created the user when it was missing, so it skipped, and `dockerd` refused to start.
+- **Root cause:** the hook treated user and group as one unit and assumed nothing else in MOS touches `/etc/passwd`.
+- **Fix applied:** `groupadd` by hand on the host; the hook now checks user and group separately and `--check` reports a missing group (#341).
+- **Rule going forward:** a hook that recreates RAM `/etc` state checks every piece it depends on (user, group, subuid, subgid, config) on its own, and after any change in the MOS UI that touches users, reboot-test before relying on it.
+
+### 2026-11-17 — homenas (design drifted past need and proportionality)
+
+- **Trigger:** kaywoz had to redirect after hours of troubleshooting
+- **What happened:** the homenas Docker plan stacked daemon-wide userns-remap (boot hook, cron guard, re-owned appdata, five exemptions), per-VLAN macvlan zones, per-zone Tailscale sidecars, and an infra stack owning every network. Each layer was defended on its own; together they produced a chain of MOS-specific failures (RAM `/etc`, a missing group, Docker running on RAM after an out-of-band restart) and test after test, for a home NAS that appliance vendors run with none of it.
+- **Root cause:** each control was judged by whether it reduced some risk, not by whether the risk was worth its cost on a homelab box (CLAUDE.md §8 proportionality), and nobody compared the design with what comparable NAS platforms do by default.
+- **Fix applied:** consolidation of the design against need and proportionality, with a smaller baseline proposed to kaywoz.
+- **Rule going forward:** before adding a control that needs platform workarounds (boot hooks, patched OS state, exemptions), state the concrete threat, what the per-container defaults already cover, and what comparable appliances do; propose it only if the residual risk is clearly worth the upkeep, and ask kaywoz first.

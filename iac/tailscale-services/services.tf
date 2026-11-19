@@ -19,6 +19,16 @@ locals {
     scrutiny       = "Disk SMART health"
     kopia          = "Backup server UI"
     rustfs         = "S3 storage console"
+    s3             = "S3 API (RustFS)"
+
+    # homenas Docker stacks, served by the host (tag:storage)
+    paperless       = "Document archive"
+    cannoncommander = "File manager"
+    immich          = "Photos"
+    atuin           = "Shell history sync"
+    hedgedoc        = "Markdown editor"
+    filestash       = "File manager (storage backends)"
+    rackpeek        = "Homelab inventory"
 
     # apps host (tag:observed)
     "cockpit-sexy" = "Host admin UI (apps host)"
