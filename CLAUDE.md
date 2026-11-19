@@ -265,14 +265,20 @@ change explicitly if one no longer fits.
     host** (backup copy 1 stays outside central control) and **never lab
     agents**.
     **Retires with the homenas Docker migration** (kaywoz, 2026-11-17,
-    kaywoz/home0ps#320): the MOS UI becomes the home Docker UI, and
-    Dockhand-home, its Hawser agents and their grants go with the infra
-    VM, apps VM and media LXC. Don't extend it to new home hosts meanwhile.
+    kaywoz/home0ps#320): Dockhand-home, its Hawser agents and their grants
+    go with the infra VM, apps VM and media LXC. Don't extend it to new
+    home hosts meanwhile.
+  - **Arcane on the homenas** (kaywoz, 2026-11-19, kaywoz/home0ps#352)
+    replaces it there: the homenas's Docker UI and git-sync deployer, in
+    the infra stack, with the **full local socket** (≈ root on the box,
+    accepted). It manages **only the homenas**: no Arcane agents on other
+    hosts. Git sync is pull-only from `main`, no webhook. The MOS UI stays
+    the hardware portal and runs the infra stack itself.
   - **Dockhand-lab** runs next to Xen Orchestra in the **lab management
     VM on dedicated lab hardware** (VLAN 21, not on the MOS host) and
     manages lab containers only; lab-facing management never runs on home
     hardware.
-  - Both are tier 0 for their zone: UI only via their Tailscale Services,
+  - All are tier 0 for their zone: UI only via their Tailscale Services,
     own auth (prefer OIDC + MFA), logged, own security-summary entry.
 - **Names:** [`NAMING.md`](NAMING.md) — physical hardware gets a `-y`
   name (never in git); everything logical is
@@ -299,7 +305,7 @@ change explicitly if one no longer fits.
 - **Docker socket:** only `tecnativa/docker-socket-proxy` mounts it
   (`POST=0`); consumers use `DOCKER_HOST=tcp://…:2375`. Exceptions:
   Dockhand-home on its own VM and the Hawser agents it manages, until
-  they retire (see above).
+  they retire (see above), and Arcane on the homenas.
 - **README acknowledgements** (kaywoz, 2026-11-19): every open-source
   project home0ps uses gets a line under README "Acknowledgments" crediting
   the **people behind it**: its creator or main maintainer, linked, or the

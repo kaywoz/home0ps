@@ -1,15 +1,62 @@
-# PROPOSAL — not deployed. Infra stack on the replacement homenas (MOS), replacing the infra VM.
-# Design, open questions and migration: docker-compose/homenas/README.md. Nothing here runs until kaywoz OKs it.
+# Infra stack on the homenas (MOS), replacing the infra VM. Design and migration: docker-compose/homenas/README.md.
 #
-# The services that serve other services: cloudflared, the read-only socket proxy and the Beszel agent.
+# The services that serve other services: Arcane (Docker UI and git-sync deployer for the other stacks),
+# cloudflared, the read-only socket proxy and the Beszel agent. This stack itself stays a MOS stack (MOS
+# autostart), so Arcane comes back after a reboot and can then bring up the rest.
 # The proxy and the agent only feed the monitoring host, which isn't running now (kaywoz, 2026-11-18): both are
-# behind the profile `monitoring`, so `up` (and MOS autostart) start cloudflared only. Enable the profile when
+# behind the profile `monitoring`, so `up` (and MOS autostart) start Arcane and cloudflared only. Enable the profile when
 # the monitoring host is back; their secret files are only needed then.
 # Baseline (kaywoz, 2026-11-17): Docker as MOS ships it (no userns-remap), each stack owns its networks,
 # admin UIs are served by the host's own tailscaled (`tailscale serve`, tag:storage) to 127.0.0.1 ports.
 # No Tailscale sidecars. Appdata and secret files are owned by the uid in `user:`. The stack needs MOS
 # autostart on: `restart:` alone doesn't bring it back.
 services:
+  # Arcane: the homenas's Docker UI and git-sync deployer (kaywoz/home0ps#352, kaywoz 2026-11-19). It manages
+  # only this host's Docker, so it gets the full socket (CLAUDE.md §8 exception, README E9): ≈ root here,
+  # like any compose deployer. Git sync pulls docker-compose/homenas/<stack>/compose.yaml from main, pull
+  # only, set up in its UI. UI only via svc:arcane (127.0.0.1:3552); own login with passkeys, OIDC later.
+  # Docs: getarcane.app/docs (installation, environment variables, projects, git sync); file-based secrets
+  # per backend/internal/config/config.go (`options:"file"` fields).
+  arcane:
+    image: ghcr.io/getarcaneapp/manager:latest
+    container_name: kr-ccp-arcane-0101
+    restart: unless-stopped
+    # No `user:`: the image starts as root to set up, then drops to PUID:PGID (docs). Not read_only and no
+    # cap_drop until the build shows what that setup needs (README "Unverified").
+    security_opt:
+      - no-new-privileges:true
+    cgroup: host                       # upstream's compose: container self-detection
+    stop_grace_period: 15s
+    pids_limit: 500
+    mem_limit: 512m
+    environment:
+      ARCANE_APP_URL: https://arcane.${TAILNET}.ts.net
+      PUID: "2202"
+      PGID: "2202"
+      TZ: ${TZ}
+      ARCANE_ENCRYPTION_KEY_FILE: /run/secrets/arcane_encryption_key   # never ARCANE_ENCRYPTION_KEY: env is readable via the API
+      ARCANE_DEFAULT_ADMIN_PASSWORD_FILE: /run/secrets/arcane_admin_password
+      ARCANE_PROJECTS_DIRECTORY: ${APPDATA}/arcane/projects   # same path inside and outside (docs)
+      ARCANE_ANALYTICS_ENABLED: "false"
+      ARCANE_UPDATE_CHECK_ENABLED: "false"     # images stay on :latest (§8); Arcane's own update notices off
+    secrets:
+      - arcane_encryption_key
+      - arcane_admin_password
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock     # full socket: E9
+      - ${APPDATA}/arcane/data:/app/data              # database, git work dir; owned 2202
+      - ${APPDATA}/arcane/projects:${APPDATA}/arcane/projects   # git-synced stacks; Docker's own files: disk path
+    ports:
+      - "127.0.0.1:3552:3552"          # svc:arcane
+    networks:
+      - proxy-arcane                   # egress: git pulls from GitHub, image pulls, Trivy database
+    healthcheck:
+      test: ["CMD", "./arcane", "health", "--timeout", "2s"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   # cloudflared: the Cloudflare Tunnel for user-facing apps (second access plane, CLAUDE.md §8). Outbound
   # only. Token as a file. Ingress rules are kept in Cloudflare (remotely managed tunnel). A public app is
   # reached by cloudflared joining that app's proxy-<app> network (README I-Q2); no app is public yet (I-Q3).
@@ -106,12 +153,18 @@ services:
       retries: 3
 
 networks:
+  proxy-arcane:
+    name: proxy-arcane
   cloudflared:
     name: cloudflared
   socketproxy:
     name: socketproxy
 
 secrets:
+  arcane_encryption_key:
+    file: ${APPDATA}/arcane/secrets/encryption_key   # openssl rand -hex 32 with a hex: prefix; 600, owned 2202
+  arcane_admin_password:
+    file: ${APPDATA}/arcane/secrets/admin_password   # the first login; change it in the UI; 600, owned 2202
   cf_tunnel_token:
     file: ${APPDATA}/cloudflared/token         # from the Cloudflare dashboard; 600, owned 2201
   beszel_key:

@@ -40,6 +40,7 @@ Names reserved by the homenas stacks proposal ([`homenas/README.md`](homenas/REA
 | `kr-ccp-jellyfin-0201` | homenas (MOS), media stack | [`homenas/media/compose.yaml`](homenas/media/compose.yaml) |
 | `kr-ccp-komga-0201` | homenas (MOS), media stack | [`homenas/media/compose.yaml`](homenas/media/compose.yaml) |
 | `kr-ccp-homey-0201` | homenas (MOS), media stack | [`homenas/media/compose.yaml`](homenas/media/compose.yaml) |
+| `kr-ccp-arcane-0101` | homenas (MOS), infra stack | [`homenas/infra/compose.yaml`](homenas/infra/compose.yaml) |
 | `kr-ccp-cloudflared-0101` | homenas (MOS), infra stack | [`homenas/infra/compose.yaml`](homenas/infra/compose.yaml) |
 | `kr-ccp-mediasort-0201` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
 | `kr-ccp-paperless-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |

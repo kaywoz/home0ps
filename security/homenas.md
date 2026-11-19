@@ -34,7 +34,7 @@ Containers are deployed from [MOS templates](https://github.com/kaywoz/mos-templ
 | Container compromise | Socket proxy: `--read-only`, tmpfs `/run` + `/tmp`, `no-new-privileges`, 64 MB, 100 pids. Beszel agent: uid 65534, `--read-only`, `--cap-drop ALL`, `no-new-privileges`, 128 MB, 50 pids. No `userns-remap` (Docker as MOS ships it; see "Container escape") |
 | LXC guest → host | Unprivileged LXCs (root = uid 100000 on the host; MOS has no `newuidmap`, LXC writes the maps itself), device allowlist before the `common.conf` include, GPU group mapped 1:1 only where passed (`config-files/mos/create-lxc.sh`) |
 | LXC filling the pool | No disk limit yet (btrfs simple quota idea parked in kaywoz/home0ps#174) |
-| Central Docker management | None: no Hawser agent here, Dockhand-home doesn't manage this host's Docker (kaywoz, 2026-11-09). Containers are managed in MOS |
+| Central Docker management | **Arcane** (`kr-ccp-arcane-0101`, infra stack, #352): this host's Docker UI and git-sync deployer, **full local socket** (≈ root here; README E9). Manages only this host, no agents elsewhere; UI only via `svc:arcane` (admins), `127.0.0.1:3552`; own login with passkeys (OIDC later); git sync pull-only from `main`, no webhook, so nothing inbound; encryption key and first admin password as files (600, 2202). Compromise of Arcane or its login = root on this host. MOS runs the infra stack itself, so Arcane comes back with MOS autostart *(untested on host)* |
 
 ## Secrets
 
