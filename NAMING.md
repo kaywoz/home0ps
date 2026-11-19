@@ -44,6 +44,15 @@ New site or code: add it here first, in the same change that uses it.
 - Members of an **HA pair or cluster** share a group: `0401` + `0402`. They sort next to each other everywhere.
 - Groups are counted per `<service>` across all sites and classes.
 
+## In-house apps: `h0ps-<name>`
+
+Tools built for home0ps itself (scripts, containers, CLIs) get the project prefix **`h0ps-`** (kaywoz, 2026-11-19). The prefix marks them as ours, not upstream.
+
+- **`<name>`** is an animal whose letters are an acronym for what the tool does. Example: **`h0ps-tern`**, the git-pull compose deployer (kaywoz/home0ps#314), **T**rack, **E**valuate, **R**edeploy, **N**otify.
+- The app name is used as-is for its folder, script, journal tag and Healthchecks check: `config-files/h0ps-tern/`, `h0ps-tern.sh`.
+- A **running instance** follows the scheme above. The service field drops the hyphen: `kr-ccl-h0pstern-0101` for the first lab instance.
+- Upstream images and forks keep their upstream names.
+
 ## Examples
 
 | Name | Meaning |
@@ -56,3 +65,4 @@ New site or code: add it here first, in the same change that uses it.
 | `kr-all-xenorchestra-0201` | home, appliance Linux, lab — a separate instance, so group 2 |
 | `kr-cll-testdocker-0101` + `-0102` | a lab pair: group 1, members 1 and 2 |
 | `kr-tlp-debian13-0101` | home, template Linux, production, Debian 13 image |
+| `kr-ccl-h0pstern-0101` | home, custom container, lab, the in-house deployer `h0ps-tern`, group 1 |
