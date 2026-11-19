@@ -180,7 +180,7 @@ What each dropped layer would have bought, and why it went:
 **Tailscale follow-ups:** add `svc:paperless`, `svc:cannoncommander`, `svc:immich`, `svc:atuin`, `svc:hedgedoc`, `svc:filestash`, `svc:rackpeek`, auto-approved for `tag:storage`, a grant per Service (Atuin: every syncing machine). `svc:archivebox` and `svc:archivewarrior` already auto-approve `tag:storage`. Retire the mover's grant to `tag:docker:8089` (the mover is local now), the Hawser grant, the apps VM's monitoring grants and its Cockpit Service.
 **UniFi follow-ups:** internet-only rules for both archiver addresses (block RFC1918 and the other VLANs); allow the homenas → them on 5797 and 8001; **device isolation on VLAN 31** (G9).
 
-**Migration from the apps VM:** copy `mediasort/secrets/`, re-own to 2104, set the mover's `CLASSIFIER_URL=http://127.0.0.1:8089`, run one dry run. Immich imports existing photos as an external library (A-Q3). Retire the VM once the mover has run cleanly for a day.
+**Migration from the apps VM:** the VM is gone (2026-11-19), so nothing is copied from it. `apps-stack.sh` creates mediasort's secrets: it reuses the mover's token or generates one (both copies), and asks for the TMDB token and a new LLM key (revoke the VM's old one). Then set the mover's `CLASSIFIER_URL=http://127.0.0.1:8089` and run one dry run. Immich imports existing photos as an external library (A-Q3).
 
 **Decisions** (kaywoz, 2026-11-17):
 - **A-Q1:** mediasort built in GitHub Actions and pushed to ghcr.io; the workflow is its own PR.
