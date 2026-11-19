@@ -59,7 +59,7 @@ REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/kaywoz/home0ps/main}"
 
 # Phase-1 Services: name port (127.0.0.1). mediasort has none: the mover calls 127.0.0.1:8089.
 SERVICES="cannoncommander:8080 atuin:8888 hedgedoc:3000 filestash:8334 rackpeek:8081"
-CONTAINERS="kr-ccp-mediasort-0201 kr-ccp-cannoncommander-0101 kr-ccp-atuin-0101 kr-ccp-hedgedoc-0101 kr-ccp-filestash-0101 kr-ccp-rackpeek-0101"
+CONTAINERS="kr-ccp-mediasort-0101 kr-ccp-cannoncommander-0101 kr-ccp-atuin-0101 kr-ccp-hedgedoc-0101 kr-ccp-filestash-0101 kr-ccp-rackpeek-0101"
 
 FAIL=0
 step() { echo; echo "== $*"; }

@@ -91,9 +91,9 @@ What each dropped layer would have bought, and why it went:
 
 | App | Container | Network | Served as |
 |---|---|---|---|
-| Jellyfin | `kr-ccp-jellyfin-0201` | `media-vlan13`, fixed address | `svc:jellyfin` → its VLAN 13 address, 8096 |
-| Komga | `kr-ccp-komga-0201` | `proxy-komga`, `127.0.0.1:25600` | `svc:komga` |
-| Homey SHS | `kr-ccp-homey-0201` | `media-vlan13`, fixed address | its own app/cloud (no Service) |
+| Jellyfin | `kr-ccp-jellyfin-0101` | `media-vlan13`, fixed address | `svc:jellyfin` → its VLAN 13 address, 8096 |
+| Komga | `kr-ccp-komga-0101` | `proxy-komga`, `127.0.0.1:25600` | `svc:komga` |
+| Homey SHS | `kr-ccp-homey-0101` | `media-vlan13`, fixed address | its own app/cloud (no Service) |
 
 | Service | Deviation | Why |
 |---|---|---|
@@ -121,8 +121,8 @@ What each dropped layer would have bought, and why it went:
 |---|---|---|---|
 | Arcane | `kr-ccp-arcane-0101` | `proxy-arcane`, `127.0.0.1:3552` | `svc:arcane`: the homenas's Docker UI and the git-sync deployer for the media, apps and storage stacks (#352) |
 | cloudflared | `kr-ccp-cloudflared-0101` | own bridge, egress only | the Cloudflare Tunnel for user-facing apps (§8's second access plane) |
-| socket proxy | `kr-ccp-socketproxy-0301` | bridge, `127.0.0.1:2375` | read-only Docker API for Dozzle and the Beszel agent (`tailscale serve --tcp=2375`, tag:monitoring only) |
-| Beszel agent | `kr-ccp-beszelagent-0201` | host network | host metrics and container stats, `LISTEN` on the tailnet IP only |
+| socket proxy | `kr-ccp-socketproxy-0101` | bridge, `127.0.0.1:2375` | read-only Docker API for Dozzle and the Beszel agent (`tailscale serve --tcp=2375`, tag:monitoring only) |
+| Beszel agent | `kr-ccp-beszelagent-0101` | host network | host metrics and container stats, `LISTEN` on the tailnet IP only |
 
 | Service | Deviation | Why |
 |---|---|---|
@@ -144,7 +144,7 @@ What each dropped layer would have bought, and why it went:
 
 **Tailscale follow-ups:** `svc:arcane` (Service, auto-approval for `tag:storage`, admin grant: own PRs). The socket proxy's serve and grant stay. Retire `svc:dockhand`, the Hawser grants and tests, and the infra VM's monitoring grants. **Cloudflare:** tunnel, hostnames and Access policies once I-Q3 is decided.
 
-**Migration:** remove the MOS-template socket proxy and Beszel agent, then start the stack (same names, same data folder; the agent needs its key and token as files first). Keep Dockhand's data for rollback only; retire the infra VM after the rollback window.
+**Migration:** the MOS-template socket proxy (`-0301`) and Beszel agent (`-0201`) ran on the old storage box and keep their names there; this box gets its own, group 01, when the `monitoring` profile is switched on (the agent needs its key and token as files first). Keep Dockhand's data for rollback only; retire the infra VM after the rollback window.
 
 ## Stack 3 — apps, replaces the apps VM
 
@@ -152,7 +152,7 @@ What each dropped layer would have bought, and why it went:
 
 | App | Container | Network / port | Served as |
 |---|---|---|---|
-| mediasort | `kr-ccp-mediasort-0201` | `127.0.0.1:8089` | the mover on this host calls it directly; no Service |
+| mediasort | `kr-ccp-mediasort-0101` | `127.0.0.1:8089` | the mover on this host calls it directly; no Service |
 | paperless-ngx | `kr-ccp-paperless-0101` + `-paperlessredis-0101` | `127.0.0.1:8000` | `svc:paperless` |
 | CannonCommander | `kr-ccp-cannoncommander-0101` | `127.0.0.1:8080` | `svc:cannoncommander` |
 | Immich | `kr-ccp-immich-0101`, `-immichml-0101`, `-immichdb-0101`, `-immichredis-0101` | `127.0.0.1:2283` | `svc:immich` |
