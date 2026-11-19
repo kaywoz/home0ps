@@ -163,8 +163,7 @@ verify() {
   docker info 2>/dev/null | grep -q 'userns'                && ok "Docker userns-remap" || bad "userns-remap not active"
   docker info 2>&1 | grep -qi 'no memory limit support'     && bad "Docker memory limits unsupported" || ok "Docker memory limits"
   [ "$(docker info --format '{{.LoggingDriver}}' 2>/dev/null)" = journald ] && ok "Docker log driver journald" || bad "Docker log driver not journald"
-  grep -qs '^Storage=persistent' /etc/systemd/journald.conf.d/*.conf && ok "journal persistent" || bad "journal not persistent (run log-shipping setup)"
-  systemctl is-active --quiet fluent-bit                    && ok "fluent-bit running"  || bad "fluent-bit not running"
+  grep -qs '^Storage=persistent' /etc/systemd/journald.conf.d/*.conf && ok "journal persistent" || bad "journal not persistent (run config-files/logging/setup-logging.sh)"
   if command -v tailscale >/dev/null; then
     tailscale status --self --json 2>/dev/null | grep -q "\"${TS_TAG}\"" && ok "tailnet tag ${TS_TAG}" || bad "tag ${TS_TAG} missing"
     tailscale debug prefs 2>/dev/null | grep '"RunSSH": true' >/dev/null && ok "Tailscale SSH on" || bad "Tailscale SSH off"
