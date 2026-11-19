@@ -77,11 +77,11 @@ What each dropped layer would have bought, and why it went:
 
 **Deploy procedure:**
 1. Put the secret files and data folders on the pool, owned by each service's uid (tables per stack).
-2. Per stack, in any order: create the stack in the MOS UI, paste `compose.yaml` and the filled-in `.env` values, turn its **autostart on**, start it.
+2. **infra** is a MOS stack: paste `compose.yaml` and `.env` in the MOS UI, **autostart on**. **media, apps and storage** go through **Arcane** (kaywoz, 2026-11-19): one project per stack, a pull-only git sync of `docker-compose/homenas/<stack>/compose.yaml` from `main`, the stack's `.env` values in the Arcane project. The host script per stack (`config-files/mos/<stack>-stack.sh`) prepares folders, secrets and the `.env` values first.
 3. Add the host's `tailscale serve --service=…` lines for the stack's Services.
-4. Later changes go through the UI too. MOS keeps two copies of each stack (the boot stick's and appdata's `compose_<stack>/`); an edit on disk leaves the stick copy stale. The repo's file stays the source of truth; what runs is checked against it with a `diff` (CLAUDE.md §2).
+4. Later changes: merge to `main`; Arcane's sync picks them up for its stacks. The infra stack is edited in the MOS UI (MOS keeps two copies of each MOS stack, the boot stick's and appdata's `compose_<stack>/`; an edit on disk leaves the stick copy stale). The repo's file stays the source of truth; what runs is checked against it with a `diff` (CLAUDE.md §2).
 
-**Restarts:** `restart: unless-stopped` alone isn't enough: MOS's stop runs `docker stop`, so stacks come back through **MOS autostart**. Start and restart Docker **only from the MOS UI** (or a reboot): a restart of the init script by hand doesn't bring the stacks back, and Docker isn't guaranteed to come up on MOS's data-root mount (2026-11-17: it ran on RAM after a manual restart).
+**Restarts:** MOS stacks come back through **MOS autostart**. **Arcane projects with `restart: unless-stopped` come back too** (reboot test, 2026-11-19: a throwaway Arcane project with `unless-stopped` was up again after the reboot, next to the infra stack), so the stack files keep `unless-stopped`. Start and restart Docker **only from the MOS UI** (or a reboot): a restart of the init script by hand doesn't bring the stacks back, and Docker isn't guaranteed to come up on MOS's data-root mount (2026-11-17: it ran on RAM after a manual restart).
 
 **NIC watchdog:** every macvlan container (Jellyfin, Homey, the archivers, Time Machine) hangs off the built-in NIC, as does the host's own Tailscale. A receive wedge takes them off the network until the watchdog clears it, about a minute end to end. Whether `<nic>.<vlan>` and the containers recover after the watchdog's down/up is test (b).
 
@@ -270,7 +270,7 @@ Not in these files; each closed before the stacks hold real data:
 
 ## Unverified (checked at build)
 
-- **Arcane** (#352 tests): whether its setup needs capabilities beyond the defaults (then `cap_drop` with the needed ones added back); default sync interval; whether a pull sync removes containers of a deleted service; how the MOS UI shows stacks Arcane deployed. **After a reboot, do Arcane-deployed stacks come back?** MOS stops Docker with `docker stop`, so `restart: unless-stopped` containers stay down and only MOS-autostart stacks return. If they don't, those stacks need `restart: always` (Docker restarts those when the daemon starts) or Arcane's own start-on-boot, if it has one.
+- **Arcane** (#352 tests): whether its setup needs capabilities beyond the defaults (then `cap_drop` with the needed ones added back); default sync interval; whether a pull sync removes containers of a deleted service; how the MOS UI shows stacks Arcane deployed. (The reboot question is answered: they come back with `unless-stopped`, see Restarts.)
 
 - `read_only` for cloudflared, paperless-ngx, CannonCommander, Kopia, RustFS, HedgeDoc, Filestash and the Immich containers. **Where it fails, drop it** and note it in the stack's table.
 - Non-root: Immich Postgres with an arbitrary uid, Kopia.

@@ -11,13 +11,13 @@
 #     -o /var/mergerfs/merger-nvme/disk1/mos-docker/appdata/home0ps/apps-stack.sh
 #
 #   bash $H/apps-stack.sh --dry-run   show what would change
-#   bash $H/apps-stack.sh             folders, secrets, image checks, the stack's .env
-#                                     and compose.yaml to paste into the MOS UI
+#   bash $H/apps-stack.sh             folders, secrets, image checks, the stack's .env values
+#                                     for its Arcane project (and compose.yaml, for reference)
 #   bash $H/apps-stack.sh --serve     the Tailscale Services (after the stack runs)
 #   bash $H/apps-stack.sh --verify    check everything, change nothing; exit 1 on a failure
 #
 # Re-runnable: existing secrets and configs are kept, never overwritten. Nothing prints a secret.
-# The MOS UI steps (create the stack, autostart, start) and the first logins stay manual; the default
+# The Arcane steps (project with its git sync, start) and the first logins stay manual; the default
 # mode prints them at the end.
 #
 # Settings file (host-local, not in git): $H/apps-stack.env
@@ -202,7 +202,7 @@ EOF
     ok "written (600, $SHARE_UID:$SHARE_GID)"
   fi
 
-  step "the stack's .env and compose.yaml (to paste into the MOS UI)"
+  step "the stack's .env values for Arcane (and compose.yaml, for reference)"
   local tn render atuin_open=false
   tn=$(tailnet); render=$(getent group render | cut -d: -f3)
   [ -n "$tn" ] || { echo "Couldn't read the tailnet name (tailscale status)." >&2; exit 1; }
@@ -248,17 +248,18 @@ EOF
   [ "$MODE" = dry ] && return 0
   cat <<MSG
 
-Next, in the MOS UI:
-  1. Docker -> Stacks -> new stack "apps": paste $OUT_DIR/compose.yaml and $OUT_DIR/apps.env
-  2. Autostart on, then start it.
-  3. bash $0 --serve
-  4. First logins, right away:
+Next, in Arcane (https://arcane.$tn.ts.net):
+  1. New project "apps" from the repo's git sync: pull only, branch main,
+     file docker-compose/homenas/apps/compose.yaml. Put the values of $OUT_DIR/apps.env
+     into the project's environment. Start it.
+  2. Once the six containers run: bash $0 --serve
+  3. First logins, right away:
      - Filestash: https://filestash.$tn.ts.net/admin/setup -> set the admin password (open until you do)
      - Atuin: atuin register against https://atuin.$tn.ts.net, then re-run this script
-       (it renders ATUIN_OPEN_REGISTRATION=false once atuin.db exists), paste the new .env, restart the stack
+       (it renders ATUIN_OPEN_REGISTRATION=false once atuin.db exists), update the project's environment in Arcane, redeploy
      - HedgeDoc: docker exec -it kr-ccp-hedgedoc-0101 bin/manage_users --add <your login email>
      - CannonCommander: sign in as admin with the password you just set
-  5. bash $0 --verify
+  4. bash $0 --verify
 MSG
 }
 
