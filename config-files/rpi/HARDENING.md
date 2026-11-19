@@ -78,7 +78,7 @@ Raspberry Pi 5 (8 GB, 128 GB NVMe), Raspberry Pi OS Lite 64-bit. Observational-o
 
 ## 8. Tailscale Services (`iac/tailscale-services/`, OpenTofu) and ACL (`iac/tailscale/policy.hujson`)
 
-- [ ] `tailscale_service` per UI: `svc:gatus`, `svc:beszel`, `svc:cockpit-janky`, `svc:dozzle`, `svc:logtide`, `svc:logtide-api`, `svc:healthchecks`
+- [ ] `tailscale_service` per UI: `svc:gatus`, `svc:beszel`, `svc:cockpit-janky`, `svc:dozzle`, `svc:healthchecks`
 - [ ] `autoApprovers.services` → `tag:monitoring` for each service
 - [ ] Grant `autogroup:admin` → the `svc:*` list on `tcp:443` only
 - [ ] ACL `tests` deny the old per-port paths on the node
@@ -102,16 +102,15 @@ Raspberry Pi 5 (8 GB, 128 GB NVMe), Raspberry Pi OS Lite 64-bit. Observational-o
 - [ ] `docker compose ps`: every service with a healthcheck shows `(healthy)`
 - [ ] Each `https://<svc>.<tailnet>.ts.net` loads from an admin device and asks for its own login
 
-## 12. Log shipping (`config-files/log-shipping/`)
+## 12. Logging (`config-files/logging/`)
 
-- [ ] Run `sudo ./setup-log-shipping.sh` from the repo (not from `/srv/docker`)
+- [ ] Run `sudo ./setup-logging.sh` from the repo (not from `/srv/docker`)
   - journald: persistent, 2 GB cap, 30 days, 10 GB kept free, rate limits relaxed, `Seal=yes`
   - The script flushes the journal first; `--setup-keys` fails if `/var/log/journal/<machine-id>` doesn't exist yet
 - [ ] Store the **sealing verification key** in the password manager, never on the host; check with `journalctl --verify`
-- [ ] `/etc/fluent-bit/logtide.env` (root 600): shared `LOGTIDE_API_KEY`; the monitoring host uses `127.0.0.1:8083` without TLS, other hosts `logtide-api.<tailnet>.ts.net:443` with TLS
-- [ ] Fluent Bit runs as `fluentbit` (group `systemd-journal`), no capabilities, `ProtectSystem=strict`, disk buffer in `/var/lib/fluent-bit`
 - [ ] Recreate containers after the driver change: `docker compose up -d --force-recreate`
-- [ ] Verify: an SSH login shows up in LogTide with `metadata.host` set; no 4xx/5xx in `journalctl -u fluent-bit`
+
+Logs stay in the local journal. Off-box shipping (Fluent Bit → LogTide) is archived in `archive/config-files/log-shipping/` (kaywoz/home0ps#207).
 
 ## Gotchas learned the hard way
 

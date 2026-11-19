@@ -13,7 +13,7 @@
 #   daemon  /etc/docker/daemon.json: userns-remap, no-new-privileges, icc off,
 #           no userland proxy, live-restore, journald log driver
 #   layout  /srv/docker owned by the admin user (one compose.yaml, one folder per service)
-#   logs    journald + Fluent Bit -> LogTide (config-files/log-shipping/)
+#   logs    persistent, sealed journald; logs stay on the host (config-files/logging/)
 #
 # Settings (environment, optional):
 #   REPO_RAW=https://raw.githubusercontent.com/kaywoz/home0ps/main   where `logs` fetches its files
@@ -27,7 +27,7 @@ DOCKER_ROOT="/srv/docker"
 [ "${SUDO_USER:-}" = root ] && SUDO_USER=""
 ADMIN_USER="${SUDO_USER:-${LOCAL_UNIX_ACCOUNT:-}}"
 REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/kaywoz/home0ps/main}"
-LOG_FILES="setup-log-shipping.sh daemon.json fluent-bit.conf fluent-bit-override.conf journald-50-logging.conf logtide.lua logtide.env.example"
+LOG_FILES="setup-logging.sh daemon.json journald-50-logging.conf"
 
 # ---- framework (same as baseline.sh) ----------------------------------------
 MODE=apply; ONLY=""; SKIP=""
@@ -121,7 +121,7 @@ verify_docker() {
   apt-config dump 2>/dev/null | grep 'origin=Docker,label=Docker CE' >/dev/null && ok "Docker CE in unattended upgrades" || bad "Docker CE not in unattended upgrades"
 }
 
-# ---- daemon: daemon.json (identical to config-files/log-shipping/daemon.json) -
+# ---- daemon: daemon.json (identical to config-files/logging/daemon.json) ----
 apply_daemon() {
   step "daemon: userns-remap, no-new-privileges, icc off, journald"
   # LXC mode: an unprivileged LXC already maps root to an unprivileged host user;
@@ -175,24 +175,21 @@ verify_layout() {
   [ -d "$DOCKER_ROOT" ] && ok "$DOCKER_ROOT exists" || bad "$DOCKER_ROOT missing"
 }
 
-# ---- logs: journald + Fluent Bit -> LogTide ----------------------------------
+# ---- logs: persistent, sealed journald (local only) -------------------------
 apply_logs() {
-  step "logs: journald + Fluent Bit -> LogTide"
+  step "logs: persistent, sealed journald (local only)"
   local here src f tmp
   here=$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo /nonexistent)
-  src="$here/../log-shipping"
-  if [ ! -f "$src/setup-log-shipping.sh" ]; then   # piped via curl: fetch the files
+  src="$here/../logging"
+  if [ ! -f "$src/setup-logging.sh" ]; then   # piped via curl: fetch the files
     tmp=$(mktemp -d); src="$tmp"
-    for f in $LOG_FILES; do run curl -fsSL "$REPO_RAW/config-files/log-shipping/$f" -o "$src/$f"; done
+    for f in $LOG_FILES; do run curl -fsSL "$REPO_RAW/config-files/logging/$f" -o "$src/$f"; done
   fi
-  if [ "$MODE" = dry ]; then echo "  + $src/setup-log-shipping.sh"; return 0; fi
-  bash "$src/setup-log-shipping.sh"
-  echo "  Then: put the shared LogTide key in /etc/fluent-bit/logtide.env (LOGTIDE_HOST=logtide-api.<tailnet>.ts.net, PORT 443, TLS On) and restart fluent-bit"
+  if [ "$MODE" = dry ]; then echo "  + $src/setup-logging.sh"; return 0; fi
+  bash "$src/setup-logging.sh"
 }
 verify_logs() {
   grep -qs '^Storage=persistent' /etc/systemd/journald.conf.d/*.conf && ok "journal persistent" || bad "journal not persistent"
-  systemctl is-active --quiet fluent-bit && ok "fluent-bit running" || bad "fluent-bit not running"
-  grep -qs 'lp_REPLACE' /etc/fluent-bit/logtide.env && bad "logtide.env still has the placeholder key" || ok "logtide.env has a key"
 }
 
 # ---- main -------------------------------------------------------------------
