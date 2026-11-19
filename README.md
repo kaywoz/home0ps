@@ -115,7 +115,27 @@ No credentials, bucket names or personal identities are committed. Code only ref
 
 ## Acknowledgments
 
-Acks go here :
+Thanks to the people behind the open-source projects home0ps runs: their maintainers, or the volunteer community that runs them. Corporations and enterprises aren't listed.
+
+- [ArchiveBox](https://github.com/ArchiveBox/ArchiveBox) by [pirate](https://github.com/pirate)
+- [ArchiveTeam Warrior](https://github.com/ArchiveTeam/warrior-dockerfile) by [the ArchiveTeam volunteers](https://github.com/ArchiveTeam)
+- [Atuin](https://github.com/atuinsh/atuin) by [ellie](https://github.com/ellie)
+- [Beszel](https://github.com/henrygd/beszel) by [henrygd](https://github.com/henrygd)
+- [CannonCommander](https://github.com/junkerderprovinz/cannoncommander) by [junkerderprovinz](https://github.com/junkerderprovinz)
+- [docker-timemachine](https://github.com/mbentley/docker-timemachine) by [mbentley](https://github.com/mbentley)
+- [Dozzle](https://github.com/amir20/dozzle) by [amir20](https://github.com/amir20)
+- [Filestash](https://github.com/mickael-kerjean/filestash) by [mickael-kerjean](https://github.com/mickael-kerjean)
+- [Gatus](https://github.com/TwiN/gatus) by [TwiN](https://github.com/TwiN)
+- [GuessIt (used by mediasort)](https://github.com/guessit-io/guessit) by [Toilal](https://github.com/Toilal)
+- [Healthchecks](https://github.com/healthchecks/healthchecks) by [cuu508](https://github.com/cuu508)
+- [HedgeDoc](https://github.com/hedgedoc/hedgedoc) by [the HedgeDoc community](https://github.com/hedgedoc)
+- [Immich](https://github.com/immich-app/immich) by [alextran1502](https://github.com/alextran1502)
+- [Jellyfin](https://github.com/jellyfin/jellyfin) by [the Jellyfin community](https://github.com/jellyfin)
+- [Komga](https://github.com/gotson/komga) by [gotson](https://github.com/gotson)
+- [Kopia](https://github.com/kopia/kopia) by [jkowalski](https://github.com/jkowalski)
+- [Paperless-ngx](https://github.com/paperless-ngx/paperless-ngx) by [the paperless-ngx community](https://github.com/paperless-ngx)
+- [RackPeek](https://github.com/Timmoth/RackPeek) by [Timmoth](https://github.com/Timmoth)
+- [Scrutiny](https://github.com/AnalogJ/scrutiny) by [AnalogJ](https://github.com/AnalogJ)
 
 ## License
 

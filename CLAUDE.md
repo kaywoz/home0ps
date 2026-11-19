@@ -297,11 +297,12 @@ change explicitly if one no longer fits.
   (`POST=0`); consumers use `DOCKER_HOST=tcp://…:2375`. Exceptions:
   Dockhand-home on its own VM and the Hawser agents it manages, until
   they retire (see above).
-- **README acknowledgements** (kaywoz, 2026-11-19): every service home0ps
-  uses gets a line under README "Acknowledgments" crediting the **owner of
-  its upstream repo** (the account or org that owns the source repo, linked),
-  not the image publisher, a fork or a wrapper. Add it in the same change
-  that adds the service.
+- **README acknowledgements** (kaywoz, 2026-11-19): every open-source
+  project home0ps uses gets a line under README "Acknowledgments" crediting
+  the **people behind it**: its creator or main maintainer, linked, or the
+  volunteer community that runs it. Never corporations or enterprises (and
+  nothing closed source), never an image publisher, fork or wrapper. Add it
+  in the same change that adds the project.
 - **Images on `:latest`**, no digest/version pinning — decided, don't
   propose it. (OpenTofu providers are different: exact pins, §3.)
 - **rclone always shows progress** (kaywoz, 2026-11-10): every rclone

@@ -886,3 +886,11 @@ mistakes, not a diary.
 - **Root cause:** the board holds items from more than one repo, and I listed them by number only, dropping `content.repository`. `gh issue close N` resolves N against the current repo.
 - **Fix applied:** home0ps#17 reopened; the intended item is closed in its own repo with `-R`.
 - **Rule going forward:** when acting on board items, list them as `owner/repo#N` (from `content.repository`) and pass `-R owner/repo` to every `gh issue` write; before closing, check the issue's title matches the board item's title.
+
+### 2026-11-19 — docs (acknowledgements credited companies)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** for "acknowledgements always go to the owner of a repo for a service I use", I credited the GitHub owner of every upstream repo, including companies (Cloudflare, Redis, Ollama, Tecnativa, Finsys, RustFS), a foundation project and a closed-source product. kaywoz meant the people behind open-source projects, not corporations.
+- **Root cause:** I read "owner of a repo" as the GitHub account field, not as the people who make the project.
+- **Fix applied:** kaywoz/home0ps#362 now lists only creators, main maintainers or volunteer communities, and CLAUDE.md §8's rule says so.
+- **Rule going forward:** when a rule names an owner or author, credit the people behind the work. If an owner is a company, foundation or closed-source vendor, leave it out, or ask.
