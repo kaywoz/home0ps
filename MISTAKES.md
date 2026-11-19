@@ -902,3 +902,11 @@ mistakes, not a diary.
 - **Root cause:** I followed the README's "deploy procedure" style instead of checking how host steps had been handed over before.
 - **Fix applied:** `config-files/mos/apps-stack.sh` replaces `BUILD.md`: it creates folders and secrets, checks the unverified image facts, renders the stack's `.env`, serves the Services and verifies the result. Only the MOS UI steps and the first-start logins stay manual.
 - **Rule going forward:** host steps are a re-runnable script in `config-files/<platform>/` with `--dry-run` and `--verify` (now in CLAUDE.md §8 "Host layout"). A doc lists only what can't be scripted (UI clicks, first logins).
+
+### 2026-11-19 — mos (stack script files put on the boot stick)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** `apps-stack.sh` kept its settings, rendered `.env` and `compose.yaml` under `/boot/config/home0ps/`, copied from `nic-watchdog.sh`. kaywoz asked why they weren't with MOS's Docker data.
+- **Root cause:** I copied a convention without its reason: the watchdog lives on the stick because it must run while the pool or the NIC is in trouble. The stack script needs Docker and the pool anyway.
+- **Fix applied:** everything moved to `<mos-docker>/home0ps/` (kaywoz/home0ps#365).
+- **Rule going forward:** on MOS, files go on the boot stick only when they must work before or without the pool (boot, network recovery). Docker-related files live under MOS's Docker folder.
