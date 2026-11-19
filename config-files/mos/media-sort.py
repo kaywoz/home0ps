@@ -7,11 +7,11 @@ credentials; the classifier never sees them. Nothing in a library is ever delete
 no `sync`, no `purge`, no `delete` against library folders. Every job is a dry run until its
 RUN_* switch is 1 in the settings file. All data-moving rclone calls carry -P (CLAUDE.md §8).
 
-Cron (as root on MOS; via python3: /boot doesn't allow executing files directly):
-  0 * * * *   python3 /boot/config/home0ps/media-sort.py sort
-  30 4 * * *  python3 /boot/config/home0ps/media-sort.py junk
-  45 4 * * *  python3 /boot/config/home0ps/media-sort.py holding
-  0 8 * * *   python3 /boot/config/home0ps/media-sort.py digest
+Cron (as root on MOS, in the MOS UI's cron jobs; files in appdata/home0ps on the disk path, kaywoz 2026-11-19):
+  0 * * * *   python3 /var/mergerfs/merger-nvme/disk1/mos-docker/appdata/home0ps/media-sort.py sort
+  30 4 * * *  python3 /var/mergerfs/merger-nvme/disk1/mos-docker/appdata/home0ps/media-sort.py junk
+  45 4 * * *  python3 /var/mergerfs/merger-nvme/disk1/mos-docker/appdata/home0ps/media-sort.py holding
+  0 8 * * *   python3 /var/mergerfs/merger-nvme/disk1/mos-docker/appdata/home0ps/media-sort.py digest
 
 Jobs:
   sort     list the download remote, ask the classifier, `rclone moveto` each item into
@@ -36,17 +36,19 @@ Jobs:
 
 Stopping (Ctrl-C, kill, hangup): the running rclone gets one SIGINT and stops cleanly, the run logs
 INTERRUPTED, pings Healthchecks /fail and exits 130; the lock is released by the OS. A move cut
-short is recorded in STATE_FILE (on /boot, survives reboots) and finished first by the next real
+short is recorded in STATE_FILE (on the pool's disk path, survives reboots) and finished first by the next real
 sort run, so an item is never left split between the download remote and a library. A second
 Ctrl-C kills rclone immediately.
 
-Settings: /boot/config/home0ps/media-sort.env (override with MEDIA_SORT_ENV=<file>); see
+Settings: /var/mergerfs/merger-nvme/disk1/mos-docker/appdata/home0ps/media-sort.env
+(override with MEDIA_SORT_ENV=<file>); see
 media-sort.env.example. Healthchecks: one ping per run with a summary as the ping body
 (/fail on errors), so the last run's report is visible in Healthchecks.
 """
 import datetime, fcntl, json, os, re, signal, subprocess, sys, time, urllib.request
 
-ENV_FILE = os.environ.get("MEDIA_SORT_ENV", "/boot/config/home0ps/media-sort.env")
+HOME0PS = "/var/mergerfs/merger-nvme/disk1/mos-docker/appdata/home0ps"   # Docker-side host files: disk path, outside mergerfs
+ENV_FILE = os.environ.get("MEDIA_SORT_ENV", HOME0PS + "/media-sort.env")
 JUNK = ["._*", ".DS_Store", "Thumbs.db"]
 DATED = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -80,7 +82,7 @@ SRC_HOLD = E.get("SRC_HOLDING", SRC.split(":", 1)[0] + ":" + HOLD).rstrip("/")
 LOG_FILE = E["LOG_FILE"]
 MIN_AGE = int(E.get("MIN_AGE_MIN", "15")) * 60
 LOG_LINES = []
-STATE_FILE = E.get("STATE_FILE", "/boot/config/home0ps/media-sort.inprogress")  # survives reboots
+STATE_FILE = E.get("STATE_FILE", HOME0PS + "/media-sort.inprogress")  # survives reboots
 CHILD = None          # the rclone process currently running (own process group)
 STOP = None           # name of the signal that asked us to stop
 
