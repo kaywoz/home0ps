@@ -119,26 +119,30 @@ What each dropped layer would have bought, and why it went:
 
 | App | Container | Network | Serves |
 |---|---|---|---|
+| Arcane | `kr-ccp-arcane-0101` | `proxy-arcane`, `127.0.0.1:3552` | `svc:arcane`: the homenas's Docker UI and the git-sync deployer for the media, apps and storage stacks (#352) |
 | cloudflared | `kr-ccp-cloudflared-0101` | own bridge, egress only | the Cloudflare Tunnel for user-facing apps (§8's second access plane) |
 | socket proxy | `kr-ccp-socketproxy-0301` | bridge, `127.0.0.1:2375` | read-only Docker API for Dozzle and the Beszel agent (`tailscale serve --tcp=2375`, tag:monitoring only) |
 | Beszel agent | `kr-ccp-beszelagent-0201` | host network | host metrics and container stats, `LISTEN` on the tailnet IP only |
 
 | Service | Deviation | Why |
 |---|---|---|
+| Arcane | **E9:** full Docker socket; starts as root and drops to `PUID`/`PGID` 2202 (no `user:`); not `read_only`, no `cap_drop` until the build shows what its setup needs; `cgroup: host` | a deployer needs to create containers (≈ root on the box, like MOS's own UI); the start-as-root setup and `cgroup: host` are upstream's documented way (getarcane.app installation docs) |
 | cloudflared | metrics pinned to `127.0.0.1:20241` | container builds otherwise bind `0.0.0.0` |
 | socket proxy | **E6:** root, no `cap_drop` | it opens `docker.sock`; `POST=0` is the control, as today |
 | Beszel agent | `network_mode: host` | upstream requirement for interface stats; key and token as files |
 | socket proxy, Beszel agent | compose profile `monitoring`, off | they only feed the monitoring host, which isn't running now (kaywoz, 2026-11-18); started with the profile once it's back |
 
-**Secrets:** the tunnel token as a file (`TUNNEL_TOKEN_FILE`; never `TUNNEL_TOKEN`, env vars are readable through the socket proxy); the Beszel `key` and `token` (owned 65534).
+**Secrets:** Arcane's encryption key and first admin password as files (`ARCANE_ENCRYPTION_KEY_FILE`, `ARCANE_DEFAULT_ADMIN_PASSWORD_FILE`, owned 2202; Arcane's `config.go` marks both `options:"file"`); the tunnel token as a file (`TUNNEL_TOKEN_FILE`; never `TUNNEL_TOKEN`, env vars are readable through the socket proxy); the Beszel `key` and `token` (owned 65534).
 
 **Decisions** (kaywoz, 2026-11-17):
-- **I-Q1:** Dockhand-home retires for home; the MOS UI is the home Docker UI. Dockhand-lab is unaffected.
+- **I-Q1:** Dockhand-home retires for home. **Updated 2026-11-19 (kaywoz, #352):** Arcane in this stack is the homenas's Docker UI and deploys the media, apps and storage stacks by git sync; the MOS UI stays the hardware portal and runs this infra stack (MOS autostart). Dockhand-lab is unaffected.
 - **I-Q2:** a public app is reached by cloudflared joining that app's `proxy-<app>` network. Jellyfin, if ever public: a UniFi rule from cloudflared's egress to Jellyfin's address, 8096 only.
 - **I-Q3 — open (tbd):** no app is public yet; cloudflared joins no app network until one is picked.
 - **I-Q4 — superseded by the baseline:** no sidecars; the host serves every Service.
 
-**Tailscale follow-ups:** the socket proxy's serve and grant stay. Retire `svc:dockhand`, the Hawser grants and tests, and the infra VM's monitoring grants. **Cloudflare:** tunnel, hostnames and Access policies once I-Q3 is decided.
+**Arcane, after the first start (UI, not scriptable):** sign in with the admin password file's value and change it; add a passkey; add this repo as a Git repository (public, no credential) and one **pull-only** sync per stack (`docker-compose/homenas/<stack>/compose.yaml`, branch `main`), each with its `.env` values set in the project. Push and pull-and-push stay off.
+
+**Tailscale follow-ups:** `svc:arcane` (Service, auto-approval for `tag:storage`, admin grant: own PRs). The socket proxy's serve and grant stay. Retire `svc:dockhand`, the Hawser grants and tests, and the infra VM's monitoring grants. **Cloudflare:** tunnel, hostnames and Access policies once I-Q3 is decided.
 
 **Migration:** remove the MOS-template socket proxy and Beszel agent, then start the stack (same names, same data folder; the agent needs its key and token as files first). Keep Dockhand's data for rollback only; retire the infra VM after the rollback window.
 
@@ -232,6 +236,7 @@ Named exceptions to the container standard (CLAUDE.md §8). Without remap, conta
 | E5 | Scrutiny collector | root, `SYS_RAWIO` + `SYS_ADMIN`, NVMe controller devices | collector only, controller devices only (no namespaces), runs seconds a day |
 | E6 | socket proxy | root | `POST=0`, `read_only`, `127.0.0.1` + tailnet (tag:monitoring) only |
 | E7 | Immich Postgres | a version tag | no moving tag exists (A-Q5) |
+| E9 | Arcane | full Docker socket; starts as root, drops to 2202; not `read_only`, no `cap_drop` (yet) | manages only this host (no agents elsewhere); UI only via `svc:arcane`, admins only; own login with passkeys; git sync pull-only from `main`, no webhook; `127.0.0.1` port |
 | (E8) | CannonCommander | only if the bypassed entrypoint fails at build: root entrypoint dropping to the data user | see A-Q2 |
 
 **Further mitigations for E1 and E2**, when built: Beszel alerts on sustained CPU/network spikes, Diun (#101) and Trivy (#102) for the two images, IDS/IPS on VLAN 31 if the gateway allows it (#202). Not proposed: Falco or Tetragon (privileged eBPF agents; proportionality).
@@ -264,6 +269,8 @@ Not in these files; each closed before the stacks hold real data:
 - **#255 — an offsite copy host root can't delete** (Storage Box snapshots or an append-only receiver).
 
 ## Unverified (checked at build)
+
+- **Arcane** (#352 tests): whether its setup needs capabilities beyond the defaults (then `cap_drop` with the needed ones added back); default sync interval; whether a pull sync removes containers of a deleted service; how the MOS UI shows stacks Arcane deployed. **After a reboot, do Arcane-deployed stacks come back?** MOS stops Docker with `docker stop`, so `restart: unless-stopped` containers stay down and only MOS-autostart stacks return. If they don't, those stacks need `restart: always` (Docker restarts those when the daemon starts) or Arcane's own start-on-boot, if it has one.
 
 - `read_only` for cloudflared, paperless-ngx, CannonCommander, Kopia, RustFS, HedgeDoc, Filestash and the Immich containers. **Where it fails, drop it** and note it in the stack's table.
 - Non-root: Immich Postgres with an arbitrary uid, Kopia.
