@@ -13,8 +13,8 @@ Area rules live in `.claude/rules/` (`iac.md`, `cloudflare.md`,
 area is read or edited. Before planning work in an area without opening its
 files, read the matching rule file.
 
-In a claude.ai session without a local checkout, fetch both files and
-`.claude/rules/*.md` from
+In a claude.ai session without a local checkout, fetch both files,
+`.claude/rules/*.md` and `.claude/skills/home0ps-pr/SKILL.md` from
 `https://raw.githubusercontent.com/kaywoz/home0ps/main/` (or read them from the
 Project files) before planning or writing anything.
 
@@ -165,38 +165,11 @@ merge pipelines or hand one job another area's credentials.
 
 ### Project board
 
-kaywoz tracks work on the user-owned GitHub Project
-`https://github.com/users/kaywoz/projects/4` (items are mostly issues in
-this repo). Status options: `backlog`, `selected`, `done`, `wont do`.
-
-- **The board check is the last step of every PR in this repo**, after the
-  work is committed, pushed and the PR description written. List the open
-  items (`backlog`, `selected`, no status) with
-  `gh project item-list 4 --owner kaywoz` and compare them with what the PR
-  actually does. Say whether one matches. Link it only after kaywoz
-  confirms the match: then add `Closes kaywoz/home0ps#N` to the PR body and
-  set the item to `selected`.
-- Every PR description ends (before rollback) with a **"Project board"**
-  section: the matched item number, or "No matching item".
-- **Closing**: the PR body carries `Closes kaywoz/home0ps#N`, so the issue
-  closes when kaywoz merges, and the board's built-in "Item closed" workflow
-  sets it to `done`. Don't set `done` by hand for issues. Never close an
-  item before its PR is merged. Draft items (no issue) are set to `done` by
-  hand after merge.
-- **No match**: every task is tracked as an issue. Open one (generic title,
-  no device names), add it to the board, set it to `selected`, and link it
-  from the PR(s): `Closes kaywoz/home0ps#N` on the PR that finishes the task,
-  `Part of kaywoz/home0ps#N` on earlier ones. No need to ask first.
-- Status has two options named `done`; use option id `98236657` (the one
-  in use) until the duplicate is removed.
-- The board is public and some item titles name devices. Refer to items by
-  number only in branches, commits and PRs (§4) — never copy titles.
-- **Reads** use the normal `gh` login (`gh project item-list|view|field-list`).
-  **Writes** go through `.claude/gh-project.sh <gh project args>`, which uses
-  a classic token (scopes `project`, `read:org`, `read:discussion`) from the
-  macOS Keychain service `gh-project-token`. Fine-grained tokens can't write
-  to user-owned projects. Never print the token or pass it on the command
-  line.
+Every PR here ends with a board check on the user-owned GitHub Project
+`https://github.com/users/kaywoz/projects/4`. The rules and the tested
+commands are in the `home0ps-pr` skill (`.claude/skills/home0ps-pr/SKILL.md`):
+use it before pushing to a PR branch, before writing any PR description, and
+after merge.
 
 ## 7. When something goes wrong
 
