@@ -127,3 +127,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** sorted rules by the folder they mention, not by when they are needed (planning and chat vs. editing a file in that area).
 - **Fix applied:** those rules stay in root CLAUDE.md; only file-editing rules moved; the PR states the smaller saving.
 - **Rule going forward:** before moving a rule into a path-scoped file, check whether it also applies to chat output (commands handed over, proposals); if so, it stays in root CLAUDE.md.
+
+### 2026-11-20 — docs (`/memory` check for rule files)
+
+- **Trigger:** wrong assumption — the check didn't show what it was meant to
+- **What happened:** the verification step for the path-scoped rules told kaywoz to run `/memory` and look for `.claude/rules/*.md`. `/memory` only lists CLAUDE.md files and the auto-memory folder, not rule files, so the check showed nothing either way.
+- **Root cause:** described the menu from the memory docs page (part of which came back only as a summary) instead of confirming what `/memory` displays.
+- **Fix applied:** verified instead in a cloud session on the PR branch, where reading `docker-compose/CONTAINERS.md` loaded `compose.md` and `readme.md` only; kaywoz got a check that asks the session itself.
+- **Rule going forward:** before giving kaywoz a UI or slash-command check, confirm what that screen actually shows; if unconfirmed, say so and give a check whose output is certain.
