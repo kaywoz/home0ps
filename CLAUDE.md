@@ -247,6 +247,13 @@ change explicitly if one no longer fits.
     hardware.
   - All are tier 0 for their zone: UI only via their Tailscale Services,
     own auth (prefer OIDC + MFA), logged, own security-summary entry.
+- **Names:** [`NAMING.md`](NAMING.md) — physical hardware gets a `-y`
+  name (never in git); everything logical is
+  `<site>-<type><platform><env>-<service>-<GGMM>`, e.g. `kr-ccp-gatus-0101`,
+  GGMM = group then member. Containers are registered in
+  `docker-compose/CONTAINERS.md`; take the next free group there.
+  Tools built for home0ps are named `h0ps-<animal>`, the animal an acronym
+  for what it does (e.g. `h0ps-tern`; NAMING.md).
 - **Host steps ship as a script** (kaywoz, 2026-11-19): re-runnable, in
   `config-files/<platform>/`, with `--dry-run` and `--verify`. A doc lists
   only what can't be scripted (UI clicks, first logins).

@@ -143,3 +143,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** described a UI from assumption and wrote tasks as prose instead of commands or exact click paths.
 - **Fix applied:** offered a route with no UI step (merge, then test on `main`, revert if it fails).
 - **Rule going forward:** every step for kaywoz is a copy-paste command or an exact, checked click path. If I can't confirm a UI path, say so and give a route that needs no UI step.
+
+### 2026-11-20 — docs (NAMING rule scoped to compose)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** the CLAUDE.md split (PR 377) moved the "Names" bullet into `.claude/rules/compose.md`, which loads only for `docker-compose/` files. NAMING.md covers everything logical (devices, LXCs, tools, containers), so the rule was missing for any other naming work.
+- **Root cause:** sorted the bullet by its example (container register) instead of by its scope (every logical name).
+- **Fix applied:** "Names" moved back into CLAUDE.md §8, unchanged.
+- **Rule going forward:** before moving a rule into a path-scoped file, check that every case it covers lies under those paths; repo-wide standards (naming, PII, security summaries) stay in root CLAUDE.md.

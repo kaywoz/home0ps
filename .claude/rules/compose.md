@@ -8,13 +8,6 @@ paths:
 
 Moved from `CLAUDE.md` unchanged, except one cross-reference.
 
-- **Names:** [`NAMING.md`](NAMING.md) — physical hardware gets a `-y`
-  name (never in git); everything logical is
-  `<site>-<type><platform><env>-<service>-<GGMM>`, e.g. `kr-ccp-gatus-0101`,
-  GGMM = group then member. Containers are registered in
-  `docker-compose/CONTAINERS.md`; take the next free group there.
-  Tools built for home0ps are named `h0ps-<animal>`, the animal an acronym
-  for what it does (e.g. `h0ps-tern`; NAMING.md).
 - **Host layout:** `/srv/docker/compose.yaml` — one file, all services
   inline, no `include:` — plus one data subfolder per service. Host-level
   config lives in this repo (`config-files/`), not in `/srv/docker`.
