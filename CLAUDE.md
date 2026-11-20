@@ -5,7 +5,8 @@ on this repo consistently, safely, and without repeating past mistakes.
 
 **Before doing anything else in this repo, read `MISTAKES.md` in full.**
 It contains lessons from past work that was wrong, misread, or had to be
-corrected. Do not repeat an entry from that log.
+corrected. Do not repeat an entry from that log. The full older entries are in
+`archive/MISTAKES-2026.md`; open it only when a rule needs its context.
 
 In a claude.ai session without a local checkout, fetch both files from
 `https://raw.githubusercontent.com/kaywoz/home0ps/main/` (or read them from the
