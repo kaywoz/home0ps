@@ -119,3 +119,11 @@ These archived entries are fully covered by the section named; no extra rule:
 ---
 
 ## New entries
+
+### 2026-11-20 — docs (CLAUDE.md split over-estimated)
+
+- **Trigger:** wrong assumption
+- **What happened:** the approved split plan moved rclone `-P`, "host steps ship as a script" and the `:latest` rule into path-scoped rule files and promised about 35% less root CLAUDE.md. Those rules also govern commands and proposals given in chat, before any file is opened, so moving them would have dropped them there. Kept in root, the saving is about 13%.
+- **Root cause:** sorted rules by the folder they mention, not by when they are needed (planning and chat vs. editing a file in that area).
+- **Fix applied:** those rules stay in root CLAUDE.md; only file-editing rules moved; the PR states the smaller saving.
+- **Rule going forward:** before moving a rule into a path-scoped file, check whether it also applies to chat output (commands handed over, proposals); if so, it stays in root CLAUDE.md.
