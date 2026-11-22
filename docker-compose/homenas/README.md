@@ -1,6 +1,6 @@
 # Proposal: Docker stacks on the replacement homenas
 
-> **Status: proposal — nothing is deployed or built.** kaywoz OKs (or changes) this before anything runs. The four compose files next to this README are drafts that validate (`docker compose config --quiet`), not deploy instructions.
+> **Status (2026-11-22):** **infra** runs as a MOS stack (cloudflared, Arcane). **apps phase 1** runs as an Arcane project since 2026-11-19; `apps-stack.sh --verify` all ok on 2026-11-22 (Atuin registration closed). **storage** was taken down while troubleshooting Time Machine and comes back as an Arcane project. **media** and the apps profiles (paperless, Immich, archivers) are not deployed yet. Everything else in this README is the design those stacks follow.
 >
 > **Phase 1 approved (kaywoz, 2026-11-19):** the apps stack's bridge-only apps (mediasort, CannonCommander, Atuin, HedgeDoc, Filestash, RackPeek) are built first; paperless, Immich and the archivers wait behind compose profiles. Host steps: [`config-files/mos/apps-stack.sh`](../../config-files/mos/apps-stack.sh).
 >

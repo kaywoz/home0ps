@@ -15,6 +15,12 @@ Every container on the home0ps hosts, so names stay unique. Scheme: [`NAMING.md`
 | `kr-ccp-kopia-0101` | homenas (MOS), storage stack | [`homenas/storage/compose.yaml`](homenas/storage/compose.yaml) | |
 | `kr-ccp-timemachine-0101` | homenas (MOS), storage stack | [`homenas/storage/compose.yaml`](homenas/storage/compose.yaml) | |
 | `kr-ccp-rustfs-0101` | homenas (MOS), storage stack | [`homenas/storage/compose.yaml`](homenas/storage/compose.yaml) | |
+| `kr-ccp-mediasort-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) | 2026-11-19 |
+| `kr-ccp-cannoncommander-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) | 2026-11-19 |
+| `kr-ccp-atuin-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) | 2026-11-19 |
+| `kr-ccp-hedgedoc-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) | 2026-11-19 |
+| `kr-ccp-filestash-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) | 2026-11-19 |
+| `kr-ccp-rackpeek-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) | 2026-11-19 |
 
 ## homenas (MOS) — reserved, not deployed yet
 
@@ -25,20 +31,14 @@ Names reserved by the homenas stacks ([`homenas/README.md`](homenas/README.md)).
 | `kr-ccp-jellyfin-0101` | homenas (MOS), media stack | [`homenas/media/compose.yaml`](homenas/media/compose.yaml) |
 | `kr-ccp-komga-0101` | homenas (MOS), media stack | [`homenas/media/compose.yaml`](homenas/media/compose.yaml) |
 | `kr-ccp-homey-0101` | homenas (MOS), media stack | [`homenas/media/compose.yaml`](homenas/media/compose.yaml) |
-| `kr-ccp-mediasort-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
 | `kr-ccp-paperless-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
 | `kr-ccp-paperlessredis-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
-| `kr-ccp-cannoncommander-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
 | `kr-ccp-immich-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
 | `kr-ccp-immichml-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
 | `kr-ccp-immichdb-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
 | `kr-ccp-immichredis-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
 | `kr-ccp-archivebox-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
 | `kr-ccp-archivewarrior-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
-| `kr-ccp-atuin-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
-| `kr-ccp-hedgedoc-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
-| `kr-ccp-filestash-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
-| `kr-ccp-rackpeek-0101` | homenas (MOS), apps stack | [`homenas/apps/compose.yaml`](homenas/apps/compose.yaml) |
 | `kr-ccp-scrutinycollector-0101` | homenas (MOS), storage stack (run from MOS cron) | [`homenas/storage/compose.yaml`](homenas/storage/compose.yaml) |
 | `kr-ccp-socketproxy-0101` | homenas (MOS), infra stack (profile `monitoring`, off) | [`homenas/infra/compose.yaml`](homenas/infra/compose.yaml) |
 | `kr-ccp-beszelagent-0101` | homenas (MOS), infra stack (profile `monitoring`, off) | [`homenas/infra/compose.yaml`](homenas/infra/compose.yaml) |
