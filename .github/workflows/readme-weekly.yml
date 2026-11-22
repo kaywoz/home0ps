@@ -78,7 +78,8 @@ jobs:
           prompt: |
             You are doing the weekly README refresh for this repository.
 
-            1. Read CLAUDE.md and MISTAKES.md in full first and follow them.
+            1. Follow CLAUDE.md (already loaded). Do not read MISTAKES.md or
+               archive/MISTAKES-2026.md; the rules for this job are in step 5.
             2. Read ${{ runner.temp }}/week.md: everything merged to main since
                ${{ steps.week.outputs.since }}.
             3. Compare README.md against the actual current files (workflows,

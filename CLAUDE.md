@@ -5,9 +5,16 @@ on this repo consistently, safely, and without repeating past mistakes.
 
 **Before doing anything else in this repo, read `MISTAKES.md` in full.**
 It contains lessons from past work that was wrong, misread, or had to be
-corrected. Do not repeat an entry from that log.
+corrected. Do not repeat an entry from that log. The full older entries are in
+`archive/MISTAKES-2026.md`; open it only when a rule needs its context.
 
-In a claude.ai session without a local checkout, fetch both files from
+Area rules live in `.claude/rules/` (`iac.md`, `cloudflare.md`,
+`compose.md`, `readme.md`). Claude Code loads each one when a file in its
+area is read or edited. Before planning work in an area without opening its
+files, read the matching rule file.
+
+In a claude.ai session without a local checkout, fetch both files,
+`.claude/rules/*.md` and `.claude/skills/home0ps-pr/SKILL.md` from
 `https://raw.githubusercontent.com/kaywoz/home0ps/main/` (or read them from the
 Project files) before planning or writing anything.
 
@@ -34,10 +41,6 @@ Homelab IaC / GitOps for kaywoz. Relevant areas:
     `deploy-tailscale-services.yml` on merge, no approver. Who may reach a
     service and auto-approval live in `iac/tailscale/policy.hujson`.
   - Nothing lives directly in `iac/` except `.gitignore`.
-  - OpenTofu backends use **partial configuration**: `endpoint` and `bucket`
-    come from the `S3_ENDPOINT` / `S3_BUCKET` secrets via `-backend-config` at
-    `tofu init`; only `key` (a state path like `<area>/terraform.tfstate`)
-    stays in `backend.tf`. Never put credentials or bucket names in code.
 - NetBird is retired: config in `archive/netbird/`, token revoked. Don't
   reintroduce it without asking.
 - `docker-compose/` — active service stacks only. Retired stacks live in
@@ -75,16 +78,7 @@ merge pipelines or hand one job another area's credentials.
   (e.g. the Tailscale policy), the only allowed change is the one explicitly
   agreed (e.g. identity → placeholder). Flag anything else noticed (duplicate
   grants, stale comments) as a suggestion — never fix it silently.
-- Honeypot / training-domain records (`m41w423mu572un.xyz`,
-  `obviousphish.com`) are deliberate detection-engineering content. Copy them
-  verbatim as opaque strings; never decode, "clean up", reformat or comment on
-  them in code.
 
-- **Providers are pinned exactly** (`version = "x.y.z"`) and every root
-  module commits its `.terraform.lock.hcl`. A provider upgrade is its own PR;
-  never mix it with a content change, or schema noise hides the real diff.
-- **Read the plan's summary line, not the job colour.** Green means it ran;
-  the expected `N to add, N to change, N to destroy` is stated in the PR.
 
 ## 4. Security practices (non-negotiable)
 
@@ -171,38 +165,11 @@ merge pipelines or hand one job another area's credentials.
 
 ### Project board
 
-kaywoz tracks work on the user-owned GitHub Project
-`https://github.com/users/kaywoz/projects/4` (items are mostly issues in
-this repo). Status options: `backlog`, `selected`, `done`, `wont do`.
-
-- **The board check is the last step of every PR in this repo**, after the
-  work is committed, pushed and the PR description written. List the open
-  items (`backlog`, `selected`, no status) with
-  `gh project item-list 4 --owner kaywoz` and compare them with what the PR
-  actually does. Say whether one matches. Link it only after kaywoz
-  confirms the match: then add `Closes kaywoz/home0ps#N` to the PR body and
-  set the item to `selected`.
-- Every PR description ends (before rollback) with a **"Project board"**
-  section: the matched item number, or "No matching item".
-- **Closing**: the PR body carries `Closes kaywoz/home0ps#N`, so the issue
-  closes when kaywoz merges, and the board's built-in "Item closed" workflow
-  sets it to `done`. Don't set `done` by hand for issues. Never close an
-  item before its PR is merged. Draft items (no issue) are set to `done` by
-  hand after merge.
-- **No match**: every task is tracked as an issue. Open one (generic title,
-  no device names), add it to the board, set it to `selected`, and link it
-  from the PR(s): `Closes kaywoz/home0ps#N` on the PR that finishes the task,
-  `Part of kaywoz/home0ps#N` on earlier ones. No need to ask first.
-- Status has two options named `done`; use option id `98236657` (the one
-  in use) until the duplicate is removed.
-- The board is public and some item titles name devices. Refer to items by
-  number only in branches, commits and PRs (§4) — never copy titles.
-- **Reads** use the normal `gh` login (`gh project item-list|view|field-list`).
-  **Writes** go through `.claude/gh-project.sh <gh project args>`, which uses
-  a classic token (scopes `project`, `read:org`, `read:discussion`) from the
-  macOS Keychain service `gh-project-token`. Fine-grained tokens can't write
-  to user-owned projects. Never print the token or pass it on the command
-  line.
+Every PR here ends with a board check on the user-owned GitHub Project
+`https://github.com/users/kaywoz/projects/4`. The rules and the tested
+commands are in the `home0ps-pr` skill (`.claude/skills/home0ps-pr/SKILL.md`):
+use it before pushing to a PR branch, before writing any PR description, and
+after merge.
 
 ## 7. When something goes wrong
 
@@ -287,37 +254,16 @@ change explicitly if one no longer fits.
   `docker-compose/CONTAINERS.md`; take the next free group there.
   Tools built for home0ps are named `h0ps-<animal>`, the animal an acronym
   for what it does (e.g. `h0ps-tern`; NAMING.md).
-- **Host layout:** `/srv/docker/compose.yaml` — one file, all services
-  inline, no `include:` — plus one data subfolder per service. Host-level
-  config lives in this repo (`config-files/`), not in `/srv/docker`.
-  **Host steps ship as a script** (kaywoz, 2026-11-19): re-runnable, in
+- **Host steps ship as a script** (kaywoz, 2026-11-19): re-runnable, in
   `config-files/<platform>/`, with `--dry-run` and `--verify`. A doc lists
   only what can't be scripted (UI clicks, first logins).
   File names on the host (kaywoz, 2026-11-19): what kaywoz writes is
   `<script>.conf`; what the script generates goes in `<script>/`, named
   for where it goes (`arcane.env`, `mos.env`), and starts with a
   `# GENERATED … don't edit` line.
-  **Exception — homenas** (MOS, kaywoz 2026-11-17): one compose file per
-  stack (`docker-compose/homenas/<stack>/compose.yaml`), each one MOS
-  stack, because MOS starts, stops and autostarts per stack.
-- **Networks:** one bridge per app, `proxy-<app>`; `internal: true` only when
-  the container needs no egress **and** publishes no ports.
-- **Container standard:** non-root `user`, `read_only` + `tmpfs`,
-  `cap_drop: [ALL]`, `no-new-privileges`, `mem_limit`, `pids_limit`,
-  healthcheck where the image allows, ports on `127.0.0.1` only, secrets as
-  files (`600`, owned by the container's remapped host UID), never in git.
-- **Docker socket:** only `tecnativa/docker-socket-proxy` mounts it
-  (`POST=0`); consumers use `DOCKER_HOST=tcp://…:2375`. Exceptions:
-  Dockhand-home on its own VM and the Hawser agents it manages, until
-  they retire (see above), and Arcane on the homenas.
-- **README acknowledgements** (kaywoz, 2026-11-19): every open-source
-  project home0ps uses gets a line under README "Acknowledgments" crediting
-  the **people behind it**: its creator or main maintainer, linked, or the
-  volunteer community that runs it. Never corporations or enterprises (and
-  nothing closed source), never an image publisher, fork or wrapper. Add it
-  in the same change that adds the project.
 - **Images on `:latest`**, no digest/version pinning — decided, don't
-  propose it. (OpenTofu providers are different: exact pins, §3.)
+  propose it. (OpenTofu providers are different: exact pins,
+  `.claude/rules/iac.md`.)
 - **rclone always shows progress** (kaywoz, 2026-11-10): every rclone
   command that copies, moves, syncs, checks or deletes data carries `-P`,
   dry runs included, in scripts (plus `--stats 2s`) and in commands handed

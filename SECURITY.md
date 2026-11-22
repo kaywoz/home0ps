@@ -29,6 +29,7 @@ Two independent planes:
 | Services reachable from LAN/internet | Containers publish on `127.0.0.1` only; admin UIs via Tailscale Services, user apps via Cloudflare Tunnel |
 | Over-broad tailnet access | Per-service and per-flow grants, tag-based identities, ACL `tests` run on every policy PR |
 | Policy mistakes | Policy in git, `test` job gates every PR; merge = deploy (no approver, by choice) |
+| Personal data or device names published by AI-assisted changes | Rules in `CLAUDE.md` §4, plus the `pii-guard` Claude Code hook (`.claude/hooks/`): blocks Claude's `git push`, `gh pr`/`gh issue` and GitHub writes that contain a `-y` device name, an email address or a word from a local private list. Claude only; commits made outside Claude are not checked |
 
 ## Authentication
 

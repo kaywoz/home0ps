@@ -32,7 +32,7 @@ Personal home-lab and home-ops repo: Docker Compose service stacks, infrastructu
 | `files/pix/`, `images/` | Logo and image assets used in this README and in diagrams                                         |
 | `d2/`             | [d2](https://d2lang.com/)-format architecture, threat-modeling, and SOC-process diagrams                |
 | `archive/`        | Retired docs, diagrams and config (e.g. NetBird), kept for reference and not actively maintained          |
-| `CLAUDE.md`, `MISTAKES.md` | Working rules for AI-assisted changes, and the log of past mistakes those rules come from        |
+| `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, `MISTAKES.md` | Working rules for AI-assisted changes (area rules load only when that area's files are opened; the PR and board routine is a skill), and the log of past mistakes those rules come from |
 | `NAMING.md`       | Naming standard: `-y` names for physical hardware (never in git), `<site>-<type><platform><env>-<service>-<GGMM>` for everything logical |
 
 ## Services (docker-compose stacks)
