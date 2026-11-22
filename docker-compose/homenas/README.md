@@ -1,6 +1,6 @@
 # Proposal: Docker stacks on the replacement homenas
 
-> **Status (2026-11-22):** **infra** runs as a MOS stack (cloudflared, Arcane). **apps phase 1** runs as an Arcane project since 2026-11-19; `apps-stack.sh --verify` all ok on 2026-11-22 (Atuin registration closed). **storage** was taken down while troubleshooting Time Machine and comes back as an Arcane project. **media** and the apps profiles (paperless, Immich, archivers) are not deployed yet. Everything else in this README is the design those stacks follow.
+> **Status (2026-11-22):** **infra** runs as a MOS stack (cloudflared, Arcane). **apps phase 1** runs as an Arcane project since 2026-11-19; `apps-stack.sh --verify` all ok on 2026-11-22 (Atuin registration closed). **storage** runs as the Arcane project `storage` since 2026-11-22; Time Machine is discovered on VLAN 11 and the Mac mini's first backup is running; the Kopia repository is created once with the script's next steps. **media** and the apps profiles (paperless, Immich, archivers) are not deployed yet. Everything else in this README is the design those stacks follow.
 >
 > **Phase 1 approved (kaywoz, 2026-11-19):** the apps stack's bridge-only apps (mediasort, CannonCommander, Atuin, HedgeDoc, Filestash, RackPeek) are built first; paperless, Immich and the archivers wait behind compose profiles. Host steps: [`config-files/mos/apps-stack.sh`](../../config-files/mos/apps-stack.sh).
 >
@@ -195,6 +195,8 @@ What each dropped layer would have bought, and why it went:
 
 ## Stack 4 — storage
 
+Host steps: [`config-files/mos/storage-stack.sh`](../../config-files/mos/storage-stack.sh) (`--dry-run`, then apply, `--serve`, `--verify`). The Scrutiny collector stays off (profile `cron`) while the monitoring host is down.
+
 | App | Container | Network / port | Served as |
 |---|---|---|---|
 | Kopia | `kr-ccp-kopia-0101` | `127.0.0.1:51515` | `svc:kopia` (`https+insecure://`) |
@@ -214,8 +216,9 @@ What each dropped layer would have bought, and why it went:
 
 **Tailscale follow-ups:** add `svc:s3` (S-Q3), auto-approved for `tag:storage`, admins first, then per client host (#28). Grants per backup client to `svc:kopia`. `svc:scrutiny` on the monitoring host plus one push grant `tag:storage` → `svc:scrutiny`: a new push flow outside §8's list, so it needs kaywoz's OK.
 **UniFi follow-ups:** VLAN 13 → Time Machine's address, tcp:445 only; mDNS on for VLANs 11 and 13 if Macs on VLAN 13 should discover it.
+**UniFi lesson (2026-11-22):** VLAN 11 had Device Isolation on; turning it off didn't reach the switch until the port profile was **re-applied**. Until then Macs on VLAN 11 couldn't reach the share at all (ARP unanswered, while the gateway still got through). After changing isolation on any network, re-apply the port profile (or force-provision the switch) and test client to client.
 
-**Migration:** Kopia and RustFS are new here (a MOS-template RustFS, if any, is migrated or retired separately). Mac backups start fresh, or are copied with the share's owner changed to 2303.
+**Migration:** Kopia and RustFS are new here (a MOS-template RustFS, if any, is migrated or retired separately). Mac backups start fresh, or are copied with the share's owner changed to 2303: an older bundle on the share owned by root can't be continued until it's re-owned (`storage-stack.sh --verify` lists such bundles). The share's `VOLUME_SIZE_LIMIT` (1 TiB) is for all Macs together; Time Machine prunes its oldest backups when it's reached.
 
 **Decisions** (kaywoz, 2026-11-17):
 - **S-Q1:** containers on plain bridges reaching the host's listeners is accepted; MOS ships no firewall tooling. Condition: NFS exports, if enabled, never cover `*` or a Docker subnet. A MOS firewall plugin is parked (#339).
