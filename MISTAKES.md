@@ -151,3 +151,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** sorted the bullet by its example (container register) instead of by its scope (every logical name).
 - **Fix applied:** "Names" moved back into CLAUDE.md §8, unchanged.
 - **Rule going forward:** before moving a rule into a path-scoped file, check that every case it covers lies under those paths; repo-wide standards (naming, PII, security summaries) stay in root CLAUDE.md.
+
+### 2026-11-22 — homenas (Kopia UI user)
+
+- **Trigger:** misunderstanding found on the host
+- **What happened:** the storage setup and `storage-stack.sh` asked for any "Kopia UI user" for the htpasswd file. Kopia's web UI only admits the account named `kopia`; any other htpasswd user gets "UI Access denied".
+- **Root cause:** relied on the `--htpasswd-file` flag description without checking how the UI authenticates; the rule is only in the maintainer's comment on kopia/kopia#880, not on kopia.io.
+- **Fix applied:** htpasswd rewritten on the host with the user `kopia`; the script writes `kopia` and `--verify` checks it (PR 387).
+- **Rule going forward:** before letting a script or step choose a login name for an app, check the app's issue tracker as well as its docs for constraints on that name; prefer a fixed, verified value over a prompt.
