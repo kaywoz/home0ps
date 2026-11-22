@@ -25,6 +25,9 @@
 #   REPO_RAW=https://raw.githubusercontent.com/kaywoz/home0ps/main
 set -euo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Compose CLI: the plugin (`docker compose`) where installed, else the standalone `docker-compose` that
+# MOS itself uses (its autostart runs docker-compose); the plugin isn't always there.
+dc() { if docker compose version >/dev/null 2>&1; then docker compose "$@"; else docker-compose "$@"; fi; }
 
 MODE=apply
 case "${1:-}" in
@@ -137,10 +140,10 @@ TZ=$zone
 BESZEL_LISTEN=$ip:45876
 EOF
 )
-  ( cd "$OUT_DIR" && docker compose -f compose.yaml --env-file mos.env config --quiet ) \
+  ( cd "$OUT_DIR" && dc -f compose.yaml --env-file mos.env config --quiet ) \
     && ok "rendered and validated: $OUT_DIR/compose.yaml, $OUT_DIR/mos.env" \
     || bad "docker compose config failed on the rendered files"
-  local services; services=$(cd "$OUT_DIR" && docker compose -f compose.yaml --env-file mos.env config --services | sort | tr '\n' ' ')
+  local services; services=$(cd "$OUT_DIR" && dc -f compose.yaml --env-file mos.env config --services | sort | tr '\n' ' ')
   [ "$services" = "arcane cloudflared " ] && ok "services: $services(monitoring profile off)" || bad "unexpected services: $services"
 
   cat <<MSG

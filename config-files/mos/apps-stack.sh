@@ -34,6 +34,9 @@
 #   REPO_RAW=https://raw.githubusercontent.com/kaywoz/home0ps/main
 set -euo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Compose CLI: the plugin (`docker compose`) where installed, else the standalone `docker-compose` that
+# MOS itself uses (its autostart runs docker-compose); the plugin isn't always there.
+dc() { if docker compose version >/dev/null 2>&1; then docker compose "$@"; else docker-compose "$@"; fi; }
 
 MOS_DOCKER="${MOS_DOCKER:-/var/mergerfs/merger-nvme/disk1/mos-docker}"
 case "$MOS_DOCKER" in /mnt/merger*) echo "MOS_DOCKER is the mergerfs mount ($MOS_DOCKER): use the disk path, e.g. /var/mergerfs/merger-nvme/disk1/mos-docker" >&2; exit 1 ;; esac
@@ -241,10 +244,10 @@ ARCHIVEBOX_IP=192.0.2.241
 WARRIOR_IP=192.0.2.242
 EOF
 )
-    ( cd "$OUT_DIR" && docker compose -f compose.yaml --env-file arcane.env config --quiet ) \
+    ( cd "$OUT_DIR" && dc -f compose.yaml --env-file arcane.env config --quiet ) \
       && ok "rendered and validated: $OUT_DIR/compose.yaml, $OUT_DIR/arcane.env" \
       || bad "docker compose config failed on the rendered files"
-    local services; services=$(cd "$OUT_DIR" && docker compose -f compose.yaml --env-file arcane.env config --services | sort | tr '\n' ' ')
+    local services; services=$(cd "$OUT_DIR" && dc -f compose.yaml --env-file arcane.env config --services | sort | tr '\n' ' ')
     [ "$services" = "atuin cannoncommander filestash hedgedoc mediasort rackpeek " ] \
       && ok "phase 1 services only: $services" || bad "unexpected services: $services"
   else
