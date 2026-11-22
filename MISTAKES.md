@@ -40,7 +40,7 @@ archive and condense their rules into the checklist.
 - Ambiguous placement, ownership or pronoun ("X is planned there", "replace it with it"): ask in one line before writing it into a plan or issue. Hardware moving between roles: restate box → role for every box and get it confirmed. *(2026-10-25 Xen Orchestra placement; 2026-11-12 hardware role swap)*
 - A device name that doesn't map to a known role: ask. In issues name the role precisely, never a bare "storage host". *(2026-10-30 host guessed)*
 - "Build from the earlier list" means every item is in scope; anything I'd drop or move goes to kaywoz as a question first. *(2026-11-16 stack scope)*
-- "Risky workloads go to the lab" (§8) means security tooling: malware, analysis, forensics. Ordinary apps stay; flag their gaps. *(2026-11-16 risky workload)*
+- "Risky workloads go to the lab" (§8) means security work that runs untrusted code or handles malware. Ordinary apps stay; flag their gaps. Log/telemetry analysis without code execution or malware stays home (§8). *(2026-11-16 risky workload; 2026-11-22 log analysis)*
 - Summarising a CLAUDE.md rule: quote its wording, not its heading; if two bullets overlap, state the broader one. *(2026-11-13 management portal rule)*
 - Credit the people behind a project, never a company, foundation or closed-source vendor; ask if unsure. *(2026-11-19 acknowledgements)*
 - Don't infer a naming scheme from one example; ask what each part means. *(2026-11-08 container instance numbers)*
@@ -159,3 +159,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** relied on the `--htpasswd-file` flag description without checking how the UI authenticates; the rule is only in the maintainer's comment on kopia/kopia#880, not on kopia.io.
 - **Fix applied:** htpasswd rewritten on the host with the user `kopia`; the script writes `kopia` and `--verify` checks it (PR 387).
 - **Rule going forward:** before letting a script or step choose a login name for an app, check the app's issue tracker as well as its docs for constraints on that name; prefer a fixed, verified value over a prompt.
+
+### 2026-11-22 — plans (log analysis placed in the lab)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** the plan for a local redaction tool with cloud LLM analysis put it in the XCP-ng lab as a "risky workload", because the checklist listed "forensics". kaywoz: the data (exported logs) isn't inherently risky; there's no code execution and no malware, so it can run at home.
+- **Root cause:** matched the keyword "forensics" in the checklist instead of the reason for the rule (untrusted code, malware).
+- **Fix applied:** §8 now defines "risky" (untrusted code or malware) and says log/telemetry analysis may run at home; the checklist line was updated.
+- **Rule going forward:** CLAUDE.md §8, "Risky means …". Place a workload by what it executes or handles, not by its topic.
