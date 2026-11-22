@@ -127,14 +127,15 @@ prepare() {
     fi
   fi
   if [ -f "$kc/htpasswd" ]; then ok "htpasswd present (kept)"
-  elif [ "$MODE" = dry ]; then note "would ask for the Kopia UI user and password"
+  elif [ "$MODE" = dry ]; then note "would ask for the Kopia UI password (user kopia)"
   else
-    local u pw pw2
-    read -r -p "  Kopia UI user: " u < /dev/tty
-    read -rs -p "  Kopia UI password: " pw < /dev/tty; echo
+    # The web UI only admits the account named `kopia` (maintainer, kopia/kopia#880); any other htpasswd
+    # user is a repository user and gets "UI Access denied".
+    local pw pw2
+    read -rs -p "  Kopia UI password (user kopia): " pw < /dev/tty; echo
     read -rs -p "  again: " pw2 < /dev/tty; echo
-    [ -n "$u" ] && [ -n "$pw" ] && [ "$pw" = "$pw2" ] || { echo "Empty or not matching." >&2; exit 1; }
-    (umask 077; printf '%s:%s\n' "$u" "$(openssl passwd -apr1 "$pw")" > "$kc/htpasswd"); unset pw pw2
+    [ -n "$pw" ] && [ "$pw" = "$pw2" ] || { echo "Empty or not matching." >&2; exit 1; }
+    (umask 077; printf 'kopia:%s\n' "$(openssl passwd -apr1 "$pw")" > "$kc/htpasswd"); unset pw pw2
     chown $KOPIA_UID:$KOPIA_UID "$kc/htpasswd"; ok "htpasswd written (600, $KOPIA_UID)"
   fi
 
@@ -230,6 +231,8 @@ verify() {
   step "secret and config files"
   check_file "$A/kopia/config/tls.key" $KOPIA_UID
   check_file "$A/kopia/config/htpasswd" $KOPIA_UID
+  [ "$(cut -d: -f1 "$A/kopia/config/htpasswd" 2>/dev/null | head -1)" = kopia ] && ok "Kopia UI user is kopia" \
+    || bad "Kopia's htpasswd user isn't 'kopia': the UI denies any other (kopia/kopia#880)"
   check_file "$A/rustfs/secrets/access_key" $RUSTFS_UID
   check_file "$A/rustfs/secrets/secret_key" $RUSTFS_UID
   check_file "$A/timemachine/password" 0

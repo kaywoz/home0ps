@@ -206,7 +206,7 @@ Host steps: [`config-files/mos/storage-stack.sh`](../../config-files/mos/storage
 
 | Service | Deviation | Why |
 |---|---|---|
-| Kopia | TLS with its own certificate; UI login from an htpasswd file; repository password persisted by Kopia (600) | the repository server's gRPC needs TLS; no password on the command line or in env |
+| Kopia | TLS with its own certificate; UI login from an htpasswd file, **user `kopia`** (the UI admits no other: kopia/kopia#880); repository password persisted by Kopia (600) | the repository server's gRPC needs TLS; no password on the command line or in env |
 | Time Machine | **E4:** root, not `read_only`, six capabilities (CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, NET_BIND_SERVICE) | its entrypoint writes users and the Samba config into `/etc`; each capability confirmed at build |
 | Time Machine | macvlan on VLAN 11 | MOS's own Samba holds 445 on the host |
 | RustFS | keys as files; console CORS limited to its Service URL | never the default `rustfsadmin`; the image defaults CORS to `*` |
