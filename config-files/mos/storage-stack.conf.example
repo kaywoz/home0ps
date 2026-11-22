@@ -1,0 +1,13 @@
+# <appdata>/home0ps/storage-stack.conf (/var/mergerfs/merger-nvme/disk1/mos-docker/appdata/home0ps/): YOUR settings
+# for storage-stack.sh (host-local, not in git; 600). The script's output goes to storage-stack/arcane.env.
+# No secrets in here. Use plain values, no quotes needed.
+# Time Machine's macvlan on VLAN 11 (trusted clients): a block outside the gateway's DHCP pool.
+VLAN11_SUBNET=VLAN11_SUBNET_CIDR
+VLAN11_GATEWAY=VLAN11_GATEWAY_IP
+VLAN11_RANGE=SMALL_BLOCK_OUTSIDE_DHCP_CIDR
+TIMEMACHINE_IP=ADDRESS_IN_THAT_BLOCK
+#VLAN11_PARENT=eth0.11
+# Pool folders (defaults shown)
+#BACKUPS=/mnt/merger-nvme/2.backup/kopia
+#TIMEMACHINE=/mnt/merger-nvme/2.backup/timemachine
+#S3DATA=/mnt/merger-nvme/2.backup/s3
