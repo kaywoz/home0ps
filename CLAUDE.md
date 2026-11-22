@@ -257,6 +257,10 @@ change explicitly if one no longer fits.
 - **Host steps ship as a script** (kaywoz, 2026-11-19): re-runnable, in
   `config-files/<platform>/`, with `--dry-run` and `--verify`. A doc lists
   only what can't be scripted (UI clicks, first logins).
+  File names on the host (kaywoz, 2026-11-19): what kaywoz writes is
+  `<script>.conf`; what the script generates goes in `<script>/`, named
+  for where it goes (`arcane.env`, `mos.env`), and starts with a
+  `# GENERATED … don't edit` line.
 - **Images on `:latest`**, no digest/version pinning — decided, don't
   propose it. (OpenTofu providers are different: exact pins,
   `.claude/rules/iac.md`.)
