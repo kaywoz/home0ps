@@ -167,3 +167,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** matched the keyword "forensics" in the checklist instead of the reason for the rule (untrusted code, malware).
 - **Fix applied:** §8 now defines "risky" (untrusted code or malware) and says log/telemetry analysis may run at home; the checklist line was updated.
 - **Rule going forward:** CLAUDE.md §8, "Risky means …". Place a workload by what it executes or handles, not by its topic.
+
+### 2026-11-23 — chat (guessed checkout path)
+
+- **Trigger:** command failed on the host
+- **What happened:** a board command for the admin Mac started with `cd ~/github/home0ps`. The checkout isn't under the home folder's `github`, so `cd` failed; the earlier, working command had used `cd home0ps` from kaywoz's `github` folder.
+- **Root cause:** wrote an absolute path from assumption instead of reusing the path form that had already worked.
+- **Fix applied:** re-issued the command with `cd home0ps`, run from the `github` folder.
+- **Rule going forward:** paths in commands for kaywoz's machines come from a path that already worked in the session, or from a lookup on that machine; never an assumed absolute path.
