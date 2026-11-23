@@ -201,7 +201,11 @@ change explicitly if one no longer fits.
   elsewhere), apps host (Intel N305, trusted well-known apps only), homenas
   (MOS NAS: storage, pulls backups, and the home Docker stacks once
   kaywoz/home0ps#321 is built; kaywoz, 2026-11-17). Risky or `privileged`
-  workloads go to the separate XCP-ng lab, not home0ps.
+  workloads go to the separate XCP-ng lab, not home0ps. **Risky** means
+  security work that runs untrusted code or handles malware (malware
+  analysis, detonation, exploit tooling, honeypots). Analysing exported
+  logs or telemetry, with no code execution and no malware samples, is
+  not risky and may run at home (kaywoz, 2026-11-22).
 - **Two access planes:** admin UIs as Tailscale Services
   (`svc:<app>` on 443); user-facing apps via Cloudflare Tunnel + Access.
   Tailscale is break-glass. No certificates to manage, no DNS API tokens on
