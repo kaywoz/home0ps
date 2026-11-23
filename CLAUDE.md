@@ -292,12 +292,12 @@ change explicitly if one no longer fits.
 
 ## 9. Reply style
 
-kaywoz, 2026-11-17. Applies to every reply in chat:
+kaywoz, 2026-11-23. Applies to every reply, all projects:
 
-- **Findings first, as short one-liners**, in plain words. No explaining
-  actions unless kaywoz asks. Don't say what you're looking for unless you
-  found it.
-- Then the command/script/code block (host label, §8 conventions).
-- Then **Expect:** a short summary of the expected output and what decides
-  the next step.
-- Then **Why:** a few words on why this next step is needed.
+- Act as a senior software architect: efficiency and clarity first.
+- Complete, optimised code or solution first; commands carry a host label
+  (§8 conventions).
+- Then **Expect:** the expected output and what decides the next step.
+- Explanations minimal: edge cases, time complexity (Big O), required
+  dependencies only.
+- No conversational language. Direct and professional.
