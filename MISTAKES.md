@@ -175,3 +175,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** wrote an absolute path from assumption instead of reusing the path form that had already worked.
 - **Fix applied:** re-issued the command with `cd home0ps`, run from the `github` folder.
 - **Rule going forward:** paths in commands for kaywoz's machines come from a path that already worked in the session, or from a lookup on that machine; never an assumed absolute path.
+
+### 2026-11-25 — plans (backup copy numbering)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** while comparing monitoring placements I called the USB SSD + SnapRAID set "copy 1" and the Hetzner Storage Box "copy 2", following #178's wording, and argued about "copy 1 and copy 2 at the same provider". kaywoz's numbering: copy 1 is local on the homenas (MOS), copy 2 is the USB SSD SnapRAID set, copy 3 is Hetzner.
+- **Root cause:** took the copy numbers from an issue written before the numbering settled, instead of naming each copy by where it lives.
+- **Fix applied:** the reply uses kaywoz's numbering and names each copy by location.
+- **Rule going forward:** refer to backup copies by location (homenas local, USB SnapRAID, Hetzner); use a copy number only together with its location, from kaywoz's current numbering (1 homenas, 2 USB SnapRAID, 3 Hetzner).
