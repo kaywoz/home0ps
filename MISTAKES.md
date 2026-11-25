@@ -182,4 +182,12 @@ These archived entries are fully covered by the section named; no extra rule:
 - **What happened:** while comparing monitoring placements I called the USB SSD + SnapRAID set "copy 1" and the Hetzner Storage Box "copy 2", following #178's wording, and argued about "copy 1 and copy 2 at the same provider". kaywoz's numbering: copy 1 is local on the homenas (MOS), copy 2 is the USB SSD SnapRAID set, copy 3 is Hetzner.
 - **Root cause:** took the copy numbers from an issue written before the numbering settled, instead of naming each copy by where it lives.
 - **Fix applied:** the reply uses kaywoz's numbering and names each copy by location.
-- **Rule going forward:** refer to backup copies by location (homenas local, USB SnapRAID, Hetzner); use a copy number only together with its location, from kaywoz's current numbering (1 homenas, 2 USB SnapRAID, 3 Hetzner).
+- **Rule going forward:** refer to backup copies by location (homenas local, USB SnapRAID, Hetzner); use a copy number only together with its location, from kaywoz's current numbering (1 homenas local, 2 USB SnapRAID on the homenas, 3 Hetzner, 4 Storadera; kaywoz, 2026-11-25).
+
+### 2026-11-25 — plans (USB SSD host without USB3)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** I offered the N305 as the host for the USB SSD SnapRAID set (copy 2). The N305 has no USB3, so it can't run that set; copy 2 runs on the homenas.
+- **Root cause:** proposed hardware for a role without checking its ports; the repo lists only its NICs and NVMe slots.
+- **Fix applied:** the N305 option was dropped; the plan uses the homenas for copy 2.
+- **Rule going forward:** before proposing a box for a role that needs specific interfaces (USB3, NIC speed, slots), check them in the repo or with one command on the host (`lsusb -t`, `ethtool`); if unknown, mark the option unverified.
