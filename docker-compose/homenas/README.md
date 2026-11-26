@@ -54,7 +54,7 @@ What each dropped layer would have bought, and why it went:
 - **Considered and not used:** the MOS "Docker Local Host Access" plugin (tested in #310 §7d: one shim on the main interface only, no help for VLAN containers); tsdproxy and DockTail (both still need a path to every container; parked).
 
 ### Container standard and MOS specifics
-- **Applied everywhere** unless a stack's table says otherwise: non-root `user:`, `read_only` + `tmpfs` where it works, `cap_drop: [ALL]`, `no-new-privileges`, `mem_limit`, `pids_limit`, healthcheck where the image has one, secrets as files (600, owned by the uid in `user:`), images on `:latest` (one exception, E7).
+- **Applied everywhere** unless a stack's table says otherwise: non-root `user:`, `read_only` + `tmpfs` where it works, `cap_drop: [ALL]`, `no-new-privileges`, `mem_limit`, `cpus`, `pids_limit`, healthcheck where the image has one, secrets as files (600, owned by the uid in `user:`), images on `:latest` (one exception, E7).
 - **No userns-remap** (kaywoz, 2026-11-17). A uid in `user:` is the same uid on the host, so appdata and secret files are owned by it. Distinct uids per service keep one app out of another's data.
 
   | Range | Stack | uids |
@@ -252,6 +252,7 @@ Named exceptions to the container standard (CLAUDE.md §8). Without remap, conta
 - **G5:** container logs go to the monitoring host; driver chosen with its revival (#225).
 - **G6:** VLANs 11, 13 and 31 tagged on the homenas's switch port, each with an address block outside DHCP for the macvlans.
 - **G7 — 8 GB of RAM.** Sum of `mem_limit`s: media 2.8 GB, infra 0.3 GB, apps 5.4 GB (Immich ML off), storage 1.3 GB, ≈ 9.8 GB of caps before MOS itself. Caps over physical RAM are fine while peaks don't line up (Jellyfin transcoding, paperless OCR, ArchiveBox's Chromium, Immich imports). Watch Beszel the first weeks; next cuts are the archivers (start on demand), then Filestash.
+- **G7b — 4 CPUs** (`nproc` 4, kaywoz, 2026-11-26). Every service has a `cpus` cap, at most 3 so MOS, Samba and mergerfs keep a core: Jellyfin 3 (transcoding); Immich server, Immich ML, paperless and Kopia 2; databases, ArchiveBox, Komga, Homey, Arcane, Time Machine and RustFS 1; the rest 0.5 or less. Caps, not reservations: their sum is over 4, which is fine while peaks don't line up (as G7). A container held at its cap shows `CPU %` near `cpus` × 100 in `docker stats`; raise that cap first.
 - **G8 — egress** (narrowed 2026-11-17): containers get egress through their bridge via the host; only the archivers leave through VLAN 31 (macvlan), and Jellyfin and Homey through VLAN 13 as its members. VLAN 24 isn't used by Docker.
 - **G9 — device isolation on VLAN 31** (kaywoz, 2026-11-18): VLAN 31 also holds containers from other hosts, so UniFi's device isolation is on for that network: VLAN 31 clients can't reach each other through the switch, only the gateway (internet, and routed traffic such as the macvlan Services' path from the homenas). Services that need to talk across hosts do it over Tailscale with a grant. It doesn't cover macvlan containers on the same host (the kernel switches those internally); on the homenas that is only the two archivers. To verify after enabling: test (d) still answers.
 

@@ -29,6 +29,7 @@ services:
     stop_grace_period: 15s
     pids_limit: 500
     mem_limit: 512m
+    cpus: 1
     environment:
       ARCANE_APP_URL: https://arcane.${TAILNET}.ts.net
       PUID: "2202"
@@ -71,6 +72,7 @@ services:
       - no-new-privileges:true
     pids_limit: 100
     mem_limit: 128m
+    cpus: 0.5
     # Metrics pinned to loopback: container builds otherwise bind 0.0.0.0:20241.
     command: ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:20241", "run"]
     environment:
@@ -102,6 +104,7 @@ services:
       - no-new-privileges:true
     pids_limit: 100
     mem_limit: 64m
+    cpus: 0.25
     environment:
       - CONTAINERS=1   # list/inspect/logs/stats
       - INFO=1
@@ -134,6 +137,7 @@ services:
       - no-new-privileges:true
     pids_limit: 50
     mem_limit: 128m
+    cpus: 0.25
     environment:
       DOCKER_HOST: tcp://127.0.0.1:2375
       LISTEN: ${BESZEL_LISTEN}         # <tailnet-ip>:45876

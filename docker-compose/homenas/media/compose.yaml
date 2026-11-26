@@ -29,6 +29,7 @@ services:
       - /tmp:size=256m
     pids_limit: 500
     mem_limit: 1536m
+    cpus: 3
     environment:
       JELLYFIN_PublishedServerUrl: http://${JELLYFIN_IP}:8096   # what LAN discovery hands out
     networks:
@@ -53,6 +54,7 @@ services:
       - /tmp:size=256m,exec                   # exec: the SQLite JDBC driver loads its native library from /tmp
     pids_limit: 300
     mem_limit: 768m
+    cpus: 1
     environment:
       JAVA_TOOL_OPTIONS: -Xmx512m        # 8 GB box: heap capped below mem_limit
     ports:
@@ -87,6 +89,7 @@ services:
       - /run:size=16m
     pids_limit: 300
     mem_limit: 512m
+    cpus: 1
     environment:
       HOMEY_LOCAL_ADDRESS: ${HOMEY_IP}
     networks:
