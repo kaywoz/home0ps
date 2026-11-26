@@ -261,13 +261,19 @@ change explicitly if one no longer fits.
   `docker-compose/CONTAINERS.md`; take the next free group there.
   Tools built for home0ps are named `h0ps-<animal>`, the animal an acronym
   for what it does (e.g. `h0ps-tern`; NAMING.md).
+  Accounts that move data (backup clients, sync jobs) are always
+  `mover@<hostname>` (kaywoz, 2026-11-26); the hostname is read on the
+  host at run time, so it never lands in git.
 - **Host steps ship as a script** (kaywoz, 2026-11-19): re-runnable, in
   `config-files/<platform>/`, with `--dry-run` and `--verify`. A doc lists
   only what can't be scripted (UI clicks, first logins).
   File names on the host (kaywoz, 2026-11-19): what kaywoz writes is
   `<script>.conf`; what the script generates goes in `<script>/`, named
   for where it goes (`arcane.env`, `mos.env`), and starts with a
-  `# GENERATED … don't edit` line.
+  `# GENERATED … don't edit` line. On the homenas both live in
+  `<appdata>/home0ps/`. On Ubuntu/Debian hosts and VMs (kaywoz,
+  2026-11-26): `/etc/home0ps/<script>.conf` (root, 600) and
+  `/var/lib/home0ps/<script>/`; systemd units `home0ps-<script>.*`.
 - **Images on `:latest`**, no digest/version pinning — decided, don't
   propose it. (OpenTofu providers are different: exact pins,
   `.claude/rules/iac.md`.)
