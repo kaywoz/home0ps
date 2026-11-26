@@ -14,3 +14,8 @@
 
 # d2 diagrams are left exactly as originally authored -- do not renormalize
 *.d2 -text
+
+# MISTAKES.md only grows at the end, from many branches at once: union merge keeps both sides' new
+# entries instead of conflicting (kaywoz, 2026-11-26). Applies to local git merges and rebases; GitHub's
+# web merge may not use it (unverified), so a PR can still show a conflict until main is merged locally.
+MISTAKES.md merge=union
