@@ -5,11 +5,10 @@
 
 locals {
   services = {
-    gatus           = "Status page"
-    "cockpit-janky" = "Host admin UI (monitoring host)"
-    beszel          = "Monitoring hub"
-    dozzle          = "Container log viewer"
-    healthchecks    = "Job heartbeats (UI + ping endpoint)"
+    gatus        = "Status page"
+    beszel       = "Monitoring hub"
+    dozzle       = "Container log viewer"
+    healthchecks = "Job heartbeats (UI + ping endpoint)"
 
     # storage host (tag:storage)
     archivebox     = "Web archive"
@@ -29,8 +28,8 @@ locals {
     rackpeek        = "Homelab inventory"
     arcane          = "Docker management and git-sync deploys (homenas)"
 
-    # apps host (tag:observed)
-    "cockpit-sexy" = "Host admin UI (apps host)"
+    # host admin UIs (Cockpit), auto-approved for tag:cockpit
+    "cockpit-sexy" = "Host admin UI (monitoring host)"
 
     # infra VM (tag:infra)
     dockhand = "Docker management (home)"

@@ -9,9 +9,9 @@ Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh)
 | Risk | Control |
 |---|---|
 | Lateral movement from this host | Own zone on the monitoring VLAN, internet-only egress; access port, tagged VLANs blocked |
-| Services reachable from LAN/internet | UIs only as Tailscale Services on 443 (`svc:gatus`, `svc:beszel`, `svc:dozzle`, `svc:healthchecks`, `svc:cockpit-janky`); all ports on `127.0.0.1`, Beszel agent on `172.31.250.1` (bridge gateway only) |
+| Services reachable from LAN/internet | UIs only as Tailscale Services on 443 (`svc:gatus`, `svc:beszel`, `svc:dozzle`, `svc:healthchecks`, `svc:cockpit-sexy`); all ports on `127.0.0.1`, Beszel agent on `172.31.250.1` (bridge gateway only) |
 | Non-tailnet inbound | Only LAN syslog (UDP/TCP 514), restricted to LAN ranges, not on the Tailscale interface — kaywoz/home0ps#97 (blocked while LogTide is benched, #207) |
-| Tailscale feature abuse | `tag:monitoring` only; no `--accept-routes`; stale nodes removed. Tailscale SSH on: privusers only, admin account only, 24h check, never root (`sshTests`); sshd stays on the LAN address as break-glass |
+| Tailscale feature abuse | `tag:monitoring` and `tag:cockpit` only (no `tag:observed`); no `--accept-routes`; stale nodes removed. Tailscale SSH on: privusers only, admin account only, 24h check, never root (`sshTests`); sshd stays on the LAN address as break-glass |
 | Over-broad tailnet access | Admin grant to the `svc:*` list on 443; explicit outbound grants per flow (Beszel agent pull on 45876, Dozzle reads remote hosts' read-only socket proxies on 2375); observed hosts may push only to `svc:healthchecks` and `svc:beszel` (Beszel agent WebSocket), each with an ACL test |
 
 ## Authentication
@@ -54,6 +54,7 @@ Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh)
 
 ## Accepted risks (this role)
 
+- `svc:cockpit-sexy` is auto-approved for any `tag:cockpit` host, so another host with that tag could claim this name (kaywoz, 2026-11-26, one admin; Cockpit's own login and pinned Origins still apply).
 - `userns-remap` exemptions: socket proxy, Beszel agent.
 - Healthchecks secrets are env vars (visible via the socket proxy).
 - Dozzle → remote socket proxies is plain HTTP inside WireGuard (no TLS of its own); the ACL grant (tcp:2375, `tag:monitoring` only) is the gate, and the proxies only allow read calls. Dozzle documents remote-host mode as superseded by agents (no upstream support for its issues).
