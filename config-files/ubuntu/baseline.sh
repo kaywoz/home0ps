@@ -23,8 +23,11 @@
 #   SSH_IMPORT_ID=gh:kaywoz  ssh-import-id source for the admin user's authorized_keys
 #                         (adds keys, never removes them). Empty = skip the import.
 #   COCKPIT_SVC=          Tailscale Service name for this host's Cockpit: cockpit-<device>,
-#                         e.g. cockpit-sexy (CLAUDE.md §4 Service-name exception). Unset = section skipped.
-#   TS_TAILNET_DNS=       <tailnet>.ts.net, for Cockpit's Origins (needed with COCKPIT_SVC)
+#                         e.g. cockpit-sexy (CLAUDE.md §4 Service-name exception). Unset: taken
+#                         from an existing /etc/cockpit/cockpit.conf, else asked on the terminal
+#                         (default cockpit-<hostname>, "n" skips). No terminal = section skipped.
+#   TS_TAILNET_DNS=       <tailnet>.ts.net, for Cockpit's Origins. Unset: from cockpit.conf, else
+#                         from Tailscale (MagicDNS suffix), else asked on the terminal.
 #   COCKPIT_MODULES="cockpit-ws cockpit-system cockpit-bridge cockpit-storaged cockpit-packagekit cockpit-files cockpit-sosreport"
 #   PACKAGES="htop ncdu git tealdeer|tldr unzip curl ca-certificates"
 #            apt packages; "a|b" = first one installable on this release.
@@ -462,6 +465,40 @@ verify_tailscale() {
   tailscale status --self --json 2>/dev/null | grep "\"${TS_TAG}\"" >/dev/null && ok "tagged ${TS_TAG}" || bad "not tagged ${TS_TAG} (yet)"
   tailscale debug prefs 2>/dev/null | grep "\"RunSSH\": ${TS_SSH}" >/dev/null && ok "Tailscale SSH ${TS_SSH}" || bad "Tailscale SSH not ${TS_SSH}"
 }
+
+# ---- cockpit settings: env, else the existing config, else ask (once, before any step runs) ----
+cockpit_resolve() {
+  local conf=/etc/cockpit/cockpit.conf have svc dns ans def
+  have=""
+  if [ -f "$conf" ]; then have=$(sed -n 's#^Origins = https://\([a-z0-9-]*\)\.\([a-z0-9.-]*\) .*#\1 \2#p' "$conf" | head -1 || true); fi
+  svc=${have% *}; dns=${have#* }
+  [ -n "$COCKPIT_SVC" ] || COCKPIT_SVC=$svc
+  [ -n "$TS_TAILNET_DNS" ] || TS_TAILNET_DNS=$dns
+  if [ -z "$TS_TAILNET_DNS" ] && command -v tailscale >/dev/null 2>&1; then
+    TS_TAILNET_DNS=$(tailscale status --json 2>/dev/null \
+      | python3 -c 'import sys,json; print(json.load(sys.stdin).get("MagicDNSSuffix") or "")' 2>/dev/null || true)
+  fi
+  # Prompts only when applying from a terminal; --verify checks what is configured.
+  if [ "$MODE" != verify ] && { : </dev/tty; } 2>/dev/null; then
+    if [ -z "$COCKPIT_SVC" ]; then
+      def="cockpit-$(hostname -s)"
+      read -r -p "Cockpit Tailscale Service name [$def] (n = no Cockpit): " ans </dev/tty || true
+      case "$ans" in n|N|no) COCKPIT_SVC="" ; return 0 ;; "") COCKPIT_SVC=$def ;; *) COCKPIT_SVC=$ans ;; esac
+    fi
+    if [ -n "$COCKPIT_SVC" ] && [ -z "$TS_TAILNET_DNS" ]; then
+      read -r -p "Tailnet DNS name (<tailnet>.ts.net): " TS_TAILNET_DNS </dev/tty || true
+    fi
+  fi
+  case "$COCKPIT_SVC" in svc:*) COCKPIT_SVC=${COCKPIT_SVC#svc:} ;; esac
+  if [ -n "$COCKPIT_SVC" ] && ! [[ "$COCKPIT_SVC" =~ ^cockpit-[a-z0-9-]+$ ]]; then
+    echo "Invalid Cockpit Service name: $COCKPIT_SVC (expected cockpit-<device>)" 1>&2; exit 1
+  fi
+  if [ -n "$TS_TAILNET_DNS" ] && ! [[ "$TS_TAILNET_DNS" =~ ^[a-z0-9-]+\.ts\.net$ ]]; then
+    echo "Invalid tailnet DNS name: $TS_TAILNET_DNS (expected <tailnet>.ts.net)" 1>&2; exit 1
+  fi
+  if [ -n "$COCKPIT_SVC" ] && [ -n "$TS_TAILNET_DNS" ]; then echo "Cockpit: svc:${COCKPIT_SVC} at ${COCKPIT_SVC}.${TS_TAILNET_DNS}"; fi
+}
+if wanted cockpit; then cockpit_resolve; fi
 
 # ---- main -------------------------------------------------------------------
 for s in $SECTIONS; do
