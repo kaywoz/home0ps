@@ -15,7 +15,8 @@
 # Server side first (homenas, in the Kopia container; see the PR): user mover@<hostname>, ACLs enabled,
 # that user APPEND on its own snapshots (no delete). Retention runs on the server, never here.
 # File names (CLAUDE.md §8): what kaywoz writes is /etc/home0ps/kopia-backup.conf (root, 600):
-#   KOPIA_URL=https://kopia.<tailnet>.ts.net     the svc:kopia URL
+#   KOPIA_URL=https://kopia.<tailnet>.ts.net:443 the svc:kopia URL; the port is required by Kopia's gRPC
+#                                                client (added as :443 when missing)
 #   KOPIA_HOST=                                  optional: identity mover@<KOPIA_HOST>; default this host's short
 #                                                hostname (data-moving accounts are mover@<hostname>, CLAUDE.md §8)
 #   SOURCES="/srv/docker"                        absolute paths, space-separated; snapshotted under the same paths
@@ -87,6 +88,8 @@ need_conf() {
   [ -r "$CONF" ] || { echo "Missing $CONF (root, 600): see the header." >&2; exit 1; }
   [ "$(stat -c %a "$CONF")" = 600 ] || { echo "$CONF must be mode 600." >&2; exit 1; }
   [[ "$KOPIA_URL" =~ ^https://[a-z0-9.-]+(:[0-9]+)?$ ]] || { echo "KOPIA_URL must be https://HOST[:PORT]" >&2; exit 1; }
+  # Kopia's gRPC client builds "host:port" and fails on an empty port ("missing port after port-separator")
+  [[ "$KOPIA_URL" =~ :[0-9]+$ ]] || KOPIA_URL="$KOPIA_URL:443"
   [[ "$KOPIA_HOST" =~ ^[a-z][a-z0-9-]{0,30}$ ]] || { echo "KOPIA_HOST must be a lowercase host name" >&2; exit 1; }
   [ -n "$SOURCES" ] || { echo "SOURCES is empty" >&2; exit 1; }
   local p; for p in $SOURCES; do

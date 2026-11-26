@@ -255,3 +255,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** planned home0ps work without reading home0ps's CLAUDE.md, because the session started in another repo.
 - **Fix applied:** CL-0004 and CL-0019 are off in every stack's `.compose-lint.yml`, with §8 as the reason.
 - **Rule going forward:** before proposing anything for home0ps from another repo's session, read home0ps's CLAUDE.md and the matching `.claude/rules/` file (CLAUDE.md header).
+
+### 2026-11-26 — ubuntu (Kopia URL without a port)
+
+- **Trigger:** command failed on the host
+- **What happened:** `kopia-backup.sh --setup` on the monitoring host failed: `invalid target address "kopia.<tailnet>.ts.net:": missing port after port-separator colon`. The documented example `KOPIA_URL=https://kopia.<tailnet>.ts.net` had no port; Kopia's gRPC client needs one.
+- **Root cause:** wrote the example from the URL form browsers accept, without checking how Kopia's repository-server client parses it (the docs' examples all carry a port).
+- **Fix applied:** the script adds `:443` when the URL has no port; the example shows it.
+- **Rule going forward:** URLs handed to a client other than a browser are written with an explicit port, as in that client's docs.
