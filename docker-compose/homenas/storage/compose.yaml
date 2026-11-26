@@ -32,6 +32,7 @@ services:
       - /tmp:size=256m
     pids_limit: 300
     mem_limit: 512m
+    cpus: 2
     environment:
       KOPIA_CONFIG_PATH: /app/config/repository.config
       KOPIA_PERSIST_CREDENTIALS_ON_CONNECT: "true"   # repository password in /app/config/*.kopia-password
@@ -86,6 +87,7 @@ services:
         hard: 65536
     pids_limit: 200
     mem_limit: 256m
+    cpus: 1
     environment:
       TM_USERNAME: timemachine
       TM_GROUPNAME: timemachine
@@ -121,6 +123,7 @@ services:
       - /tmp:size=64m
     pids_limit: 300
     mem_limit: 512m
+    cpus: 1
     environment:
       RUSTFS_VOLUMES: /data
       RUSTFS_ADDRESS: 0.0.0.0:9000
@@ -174,6 +177,7 @@ services:
       - /tmp:size=16m
     pids_limit: 50
     mem_limit: 128m
+    cpus: 0.5
     devices:
       - /dev/nvme0:/dev/nvme0
       - /dev/nvme1:/dev/nvme1

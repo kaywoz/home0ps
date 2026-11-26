@@ -35,6 +35,7 @@ services:
       - /tmp
     pids_limit: 64
     mem_limit: 128m
+    cpus: 0.5
     environment:
       LLM_PROVIDER: anthropic           # openai | anthropic (no local LLM in this stack: Ollama dropped)
       OPENAI_MODEL: gpt-6-luna
@@ -72,6 +73,7 @@ services:
       - /var/cache/fontconfig:size=16m
     pids_limit: 300
     mem_limit: 1g
+    cpus: 2
     environment:
       S6_READ_ONLY_ROOT: "1"
       PAPERLESS_URL: ${PAPERLESS_URL}
@@ -114,6 +116,7 @@ services:
     command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
     pids_limit: 64
     mem_limit: 128m
+    cpus: 0.5
     volumes:
       - ${APPDATA}/paperless/redis:/data
       - ${APPDATA}/paperless/secrets/redis.conf:/usr/local/etc/redis/redis.conf:ro   # requirepass <pw>; save 60 1
@@ -145,6 +148,7 @@ services:
       - /tmp:size=64m
     pids_limit: 200
     mem_limit: 256m
+    cpus: 0.5
     environment:
       CC_CONFIG: /config/config.yaml                       # image default, set for clarity
       CC_DATABASE_PATH: /config/cannoncommander.sqlite     # image default
@@ -182,6 +186,7 @@ services:
       - /tmp:size=1g
     pids_limit: 500
     mem_limit: 1g
+    cpus: 2
     environment:
       DB_HOSTNAME: immichdb
       DB_USERNAME: immich
@@ -224,6 +229,7 @@ services:
       - /tmp:size=256m
     pids_limit: 300
     mem_limit: 1536m
+    cpus: 2
     volumes:
       - ${APPDATA}/immich/model-cache:/cache   # HF_HOME + JIT caches; bind mount (named volumes break non-root)
     networks:
@@ -250,6 +256,7 @@ services:
     shm_size: 128mb
     pids_limit: 300
     mem_limit: 512m                      # docs: at least 2 GB when limits are set
+    cpus: 1
     environment:
       POSTGRES_USER: immich
       POSTGRES_DB: immich
@@ -277,6 +284,7 @@ services:
     command: ["valkey-server", "/usr/local/etc/valkey/valkey.conf"]
     pids_limit: 64
     mem_limit: 128m
+    cpus: 0.5
     volumes:
       - ${APPDATA}/immich/redis:/data
       - ${APPDATA}/immich/secrets/valkey.conf:/usr/local/etc/valkey/valkey.conf:ro   # requirepass <pw>
@@ -306,6 +314,7 @@ services:
     shm_size: 1gb                      # as upstream's compose
     pids_limit: 2048                   # as upstream's compose (Chromium)
     mem_limit: 1g
+    cpus: 1
     environment:
       PUBLIC_INDEX: "False"            # the image defaults to True
       PUBLIC_SNAPSHOTS: "False"
@@ -337,6 +346,7 @@ services:
       - /tmp:size=256m
     pids_limit: 500
     mem_limit: 384m
+    cpus: 0.5
     volumes:
       - ${APPDATA}/archivewarrior/projects:/home/warrior/projects   # config.json, project checkouts, item data
     networks:
@@ -359,6 +369,7 @@ services:
       - /tmp:size=16m
     pids_limit: 100
     mem_limit: 128m
+    cpus: 0.5
     command: ["start"]
     environment:
       ATUIN_HOST: 0.0.0.0              # defaults to 127.0.0.1
@@ -388,6 +399,7 @@ services:
       - /tmp:size=64m                  # tmpPath defaults to os.tmpdir()
     pids_limit: 200
     mem_limit: 256m
+    cpus: 0.5
     environment:
       CMD_DOMAIN: hedgedoc.${TAILNET}.ts.net   # behind tailscale serve (TLS terminated there)
       CMD_PROTOCOL_USESSL: "true"
@@ -425,6 +437,7 @@ services:
       - /tmp:size=256m
     pids_limit: 200
     mem_limit: 256m
+    cpus: 0.5
     volumes:
       - ${APPDATA}/filestash/state:/app/data/state   # config.json (admin bcrypt hash), db, logs
     ports:
@@ -451,6 +464,7 @@ services:
       - /app/tmp:size=64m,uid=1654,gid=1654   # TMPDIR
     pids_limit: 200
     mem_limit: 256m
+    cpus: 0.5
     volumes:
       - ${APPDATA}/rackpeek/config:/app/config   # config.yaml, data-protection keys
     ports:
