@@ -231,3 +231,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** described what the installer does without reading it.
 - **Fix applied:** steps to switch the checkout to `main` (or source the `main` version) and reload the shell.
 - **Rule going forward:** before telling kaywoz how to pick up a change, read how it is installed (copied, linked or sourced from the checkout) and give the step that matches.
+
+### 2026-11-26 — ubuntu (new host folders without checking precedent)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** the Kopia backup draft put its settings in `/etc/h0ps/kopia-backup.conf` and its state in `/var/lib/h0ps/kopia-backup/`. No script used these before: the homenas scripts keep `<script>.conf` and `<script>/` in `<appdata>/home0ps/` (CLAUDE.md §8 file names), and the only name on Ubuntu hosts is `home0ps` (`beszel-agent.service.d/home0ps.conf`). `h0ps-` is the prefix for tool names, not folders.
+- **Root cause:** chose where a script reads and writes host files without grepping the repo for the existing convention (repeat of masque-ir's "where the tool reads data is kaywoz's decision").
+- **Fix applied:** paths held until kaywoz picks them; proposal in the PR.
+- **Rule going forward:** before a script gets a new host path, `git grep` the existing scripts for where theirs live and reuse that; if nothing fits, propose the path to kaywoz instead of choosing it.
