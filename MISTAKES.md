@@ -255,3 +255,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** planned home0ps work without reading home0ps's CLAUDE.md, because the session started in another repo.
 - **Fix applied:** CL-0004 and CL-0019 are off in every stack's `.compose-lint.yml`, with §8 as the reason.
 - **Rule going forward:** before proposing anything for home0ps from another repo's session, read home0ps's CLAUDE.md and the matching `.claude/rules/` file (CLAUDE.md header).
+
+### 2026-11-26 — planning (§8 "no extra boxes" read as "no extra VMs")
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** comparing secret stores, Claude ruled out a self-hosted vault (OpenBao, Infisical) as "a new box, against §8". kaywoz: §8's "no extra boxes" is about physical hardware; VMs are allowed.
+- **Root cause:** read "boxes" as any new host, physical or virtual, without asking.
+- **Fix applied:** CLAUDE.md §8 says "boxes" means physical hardware and that VMs are allowed.
+- **Rule going forward:** §8 proportionality limits new physical hardware, not VMs; weigh a VM by its own cost (tier, backups, upkeep), not by §8.

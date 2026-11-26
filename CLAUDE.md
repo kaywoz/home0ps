@@ -190,6 +190,7 @@ change explicitly if one no longer fits.
   per host, phishing-resistant MFA on tier-0 accounts — passkeys in
   1Password first, physical YubiKeys second (kaywoz/home0ps#184). **No PAW,
   no tier model, no extra boxes** for security's sake; fewer boxes is a goal.
+  "Boxes" means physical hardware; VMs are allowed (kaywoz, 2026-11-26).
   Don't propose enterprise-grade controls for home unless asked.
 - **Zones:** the **XCP-ng lab is untrusted**. It never administers the home
   side and gets no grants into it; protection runs from home against the
