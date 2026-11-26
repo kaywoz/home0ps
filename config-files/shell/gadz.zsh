@@ -3,12 +3,22 @@
 # session with no footprint, cleans up on exit. Arch-proof: it ships scripts, not
 # binaries, so an Apple-Silicon client works against x86_64 Linux hosts.
 #
-# Usage:   gadz [--ro] [--copy-id] [ssh-args] user@host
+# Usage:   gadz [--ro] [--copy-id] [--reset] [--lan] [ssh-args] user@host
 #   --ro        forensic/no-trace mode: HISTFILE=/dev/null on the remote, a red
 #               [FORENSIC] prompt marker, and a local timestamped transcript
 #               under ~/gadz-logs/ (chain-of-custody friendly).
 #   --copy-id   run ssh-copy-id first (push your key), then connect.
+#   --reset     close the reused connection first. Needed after the remote
+#               account's groups change (e.g. added to `docker`): a reused
+#               connection keeps the groups it was opened with.
+#   --lan       don't switch to the tailnet address (see Tailnet below).
 #   -h|--help   usage.
+#
+# Tailnet: when the Tailscale CLI is installed and the host is a tailnet peer,
+# gadz connects to its tailnet address (ssh -o HostName=100.x, so ~/.ssh/config
+# Host blocks still match). Tailscale SSH answers there on hosts that enable it;
+# its periodic re-auth prompt shows because the connection is opened in the
+# terminal before anything is captured.
 #
 # Behaviour by host:
 #   host has zsh  -> zsh: prompt, aliases, Dracula LS_COLORS, history, atuin
@@ -25,17 +35,19 @@
 
 gadz() {
   emulate -L zsh
-  local forensic=0 copyid=0
+  local forensic=0 copyid=0 reset=0 lan=0
   while [[ "$1" == -* ]]; do
     case "$1" in
       --ro|--forensic) forensic=1; shift ;;
       --copy-id)       copyid=1;   shift ;;
-      -h|--help) echo "usage: gadz [--ro] [--copy-id] [ssh-args] user@host" >&2; return 0 ;;
+      --reset)         reset=1;    shift ;;
+      --lan)           lan=1;      shift ;;
+      -h|--help) echo "usage: gadz [--ro] [--copy-id] [--reset] [--lan] [ssh-args] user@host" >&2; return 0 ;;
       --) shift; break ;;
       *) break ;;   # pass through ssh flags like -p, -i, -J
     esac
   done
-  [[ $# -eq 0 ]] && { echo "usage: gadz [--ro] [--copy-id] [ssh-args] user@host" >&2; return 1; }
+  [[ $# -eq 0 ]] && { echo "usage: gadz [--ro] [--copy-id] [--reset] [--lan] [ssh-args] user@host" >&2; return 1; }
 
   # --- client prereqs ---
   local c miss=()
@@ -68,6 +80,23 @@ gadz() {
     [[ -f "$blesh/ble.sh" ]] || echo "gadz: ble.sh unavailable — bash hosts won't get highlighting" >&2
   fi
 
+  # --- tailnet address: Tailscale SSH answers there (HostName override keeps ssh_config matching) ---
+  local ts="" host tip
+  if (( ! lan )); then
+    if command -v tailscale >/dev/null 2>&1; then ts=tailscale
+    elif [[ -x /Applications/Tailscale.app/Contents/MacOS/Tailscale ]]; then ts=/Applications/Tailscale.app/Contents/MacOS/Tailscale; fi
+  fi
+  if [[ -n "$ts" ]]; then
+    host="${@[-1]##*@}"
+    tip=$("$ts" ip -4 "$host" 2>/dev/null | head -1)
+    if [[ "$tip" == 100.* ]]; then
+      set -- -o HostName="$tip" "$@"
+      echo "gadz: $host -> $tip (tailnet)" >&2
+    else
+      echo "gadz: $host isn't a tailnet peer; connecting as given" >&2
+    fi
+  fi
+
   # --- optional: push key first ---
   if (( copyid )); then ssh-copy-id "$@" || return 1; fi
 
@@ -82,7 +111,7 @@ gadz() {
 export TERM=xterm-256color
 export LS_COLORS='$lscolors'
 if [[ -n \$GADZ_RO ]]; then HISTFILE=/dev/null; SAVEHIST=0; _m='%F{red}[FORENSIC]%f '; else HISTFILE=~/.zsh_history; SAVEHIST=100000; _m=''; fi
-HISTSIZE=100000; setopt INC_APPEND_HISTORY SHARE_HISTORY
+HISTSIZE=100000; setopt INC_APPEND_HISTORY SHARE_HISTORY INTERACTIVE_COMMENTS
 autoload -Uz compinit && compinit -u 2>/dev/null
 alias ll='ls -lahF --color=auto' la='ls -A --color=auto' grep='grep --color=auto'
 PROMPT="\${_m}%F{magenta}%n@%m%f:%F{blue}%~%f %# "
@@ -105,6 +134,12 @@ BEOF
   # --- ControlMaster (multiplex: repeat connects reuse one auth) ---
   mkdir -p "$HOME/.ssh"
   local cm=(-o ControlMaster=auto -o ControlPath="$HOME/.ssh/cm-gadz-%r@%h:%p" -o ControlPersist=10m)
+  if (( reset )); then ssh "${cm[@]}" -O exit "$@" 2>/dev/null && echo "gadz: closed the reused connection" >&2; fi
+  # Open the shared connection in the terminal first, so auth prompts (password,
+  # Tailscale SSH re-auth URL) are visible; phase 1 below captures its output.
+  if ! ssh "${cm[@]}" -O check "$@" 2>/dev/null; then
+    ssh "${cm[@]}" -fN "$@" || { rm -rf "$stg"; echo "gadz: connection failed" >&2; return 1; }
+  fi
 
   # --- phase 1: push staging over the connection, capture remote temp dir ---
   local rd
