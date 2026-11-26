@@ -38,6 +38,9 @@ jobs:
       - name: Install compose-lint (hash-locked)
         run: pip install --require-hashes --no-deps -r .github/compose-lint/requirements.txt
 
+      - name: No named volumes (bind mounts only, .claude/rules/compose.md)
+        run: python .github/compose-lint/no-named-volumes.py docker-compose/*/compose.yaml docker-compose/homenas/*/compose.yaml
+
       - name: Placeholder .env for homenas stacks
         run: |
           set -euo pipefail

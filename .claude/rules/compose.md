@@ -35,3 +35,7 @@ Moved from `CLAUDE.md` unchanged, except one cross-reference.
   suppression needs a reason that points to its record (CLAUDE.md §8 or
   the homenas exception register); add both in the same change.
   `:latest` and digest rules (CL-0004, CL-0019) are off by §8.
+  **Docker named volumes are never used, always bind mounts** (kaywoz,
+  2026-11-26): CI and the hook fail on a top-level `volumes:`, `type: volume`
+  or a mount whose source isn't a path
+  (`.github/compose-lint/no-named-volumes.py`).

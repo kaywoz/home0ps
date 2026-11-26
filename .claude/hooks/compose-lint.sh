@@ -32,6 +32,19 @@ case "$path" in
 esac
 [ -f "$path" ] || exit 0
 
+# Named volumes are never allowed (bind mounts only): checked even without compose-lint installed.
+# Needs python3 with PyYAML; without it, CI enforces the rule.
+if command -v python3 >/dev/null 2>&1 && python3 -c 'import yaml' 2>/dev/null; then
+  vrc=0
+  vout=$(python3 "$root/.github/compose-lint/no-named-volumes.py" "$path" 2>&1) || vrc=$?
+  if [ "$vrc" -ne 0 ]; then
+    printf 'Named volumes are not allowed: use a bind mount to a folder next to the compose file.
+%s
+' "$vout" >&2
+    exit 2
+  fi
+fi
+
 if command -v compose-lint >/dev/null 2>&1; then
   lint=(compose-lint)
 elif command -v uvx >/dev/null 2>&1; then
