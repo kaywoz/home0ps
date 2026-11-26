@@ -9,7 +9,7 @@
 #   sudo ./baseline.sh --skip tailscale
 #   curl -fsSL https://raw.githubusercontent.com/kaywoz/home0ps/main/config-files/ubuntu/baseline.sh | sudo bash -s -- --dry-run
 #
-# Sections: snap updates user ssh sysctl purge packages cockpit tailscale
+# Sections: snap updates user ssh sysctl purge packages cockpit tailscale op
 #
 # Settings (environment, optional):
 #   REBOOT_TIME=04:00     automatic reboot time for unattended upgrades
@@ -39,7 +39,9 @@ set -euo pipefail
 # Command output is parsed below (apt-cache policy, sshd -T, docker info): force English.
 export LC_ALL=C LANG=C
 
-SECTIONS="snap updates user ssh sysctl purge packages cockpit tailscale"
+SECTIONS="snap updates user ssh sysctl purge packages cockpit tailscale op"
+OP_TOKEN_CRED=/etc/home0ps/op-token.cred   # this zone's 1Password service-account token, systemd-creds sealed
+OP_KEY_FPR=3FEF9748469ADBE15DA7CA80AC2D62742012EA22   # 1Password code-signing key (1Password/install-cli-action)
 REBOOT_TIME="${REBOOT_TIME:-04:00}"
 AUTO_REBOOT="${AUTO_REBOOT:-true}"
 TS_TAG="${TS_TAG:-tag:observed}"
@@ -464,6 +466,104 @@ verify_tailscale() {
   command -v tailscale >/dev/null 2>&1 && ok "tailscale installed" || { bad "tailscale missing"; return 0; }
   tailscale status --self --json 2>/dev/null | grep "\"${TS_TAG}\"" >/dev/null && ok "tagged ${TS_TAG}" || bad "not tagged ${TS_TAG} (yet)"
   tailscale debug prefs 2>/dev/null | grep "\"RunSSH\": ${TS_SSH}" >/dev/null && ok "Tailscale SSH ${TS_SSH}" || bad "Tailscale SSH not ${TS_SSH}"
+}
+
+# ---- op: 1Password CLI (signature-checked) + this zone's service-account token ---------------------
+# How 1Password's own GitHub action installs it (1Password/install-cli-action, linux.ts + linux-signature.ts):
+# version from app-updates.agilebits.com, zip from cache.agilebits.com with op + op.sig, GPG-verified
+# against the pinned key below. The token (vault home0ps or lab, read-only; kaywoz/home0ps#421) is asked
+# once, hidden, and sealed with systemd-creds (TPM 2.0 when present). Enter at the prompt skips the token.
+op_key() { cat <<'KEY'
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+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
+P4I7jHwe0BN3iNAG1nKbGg==
+=+LeX
+-----END PGP PUBLIC KEY BLOCK-----
+KEY
+}
+apply_op() {
+  step "op: 1Password CLI + service-account token ($OP_TOKEN_CRED)"
+  if type -P op >/dev/null; then echo "  op installed ($(op --version 2>/dev/null))"
+  elif [ "$MODE" = dry ]; then echo "  + download op (latest), verify op.sig against $OP_KEY_FPR, install /usr/local/bin/op"
+  else
+    local v arch t g
+    v=$(curl -fsSL -m 30 https://app-updates.agilebits.com/latest | python3 -c 'import sys,json;print(json.load(sys.stdin)["CLI2"]["release"]["version"])' 2>/dev/null || true)
+    [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { bad "op: no valid version from app-updates.agilebits.com ($v)"; return 0; }
+    arch=$(dpkg --print-architecture); case "$arch" in amd64|arm64) ;; *) bad "op: unsupported architecture $arch"; return 0 ;; esac
+    t=$(mktemp -d); g=$(mktemp -d)
+    curl -fsSL -m 120 -o "$t/op.zip" "https://cache.agilebits.com/dist/1P/op2/pkg/v$v/op_linux_${arch}_v$v.zip" && [ -s "$t/op.zip" ] \
+      || { rm -rf "$t" "$g"; bad "op: download failed"; return 0; }
+    python3 -c 'import sys,zipfile;z=zipfile.ZipFile(sys.argv[1]);[z.extract(n,sys.argv[2]) for n in ("op","op.sig")]' "$t/op.zip" "$t" \
+      || { rm -rf "$t" "$g"; bad "op: zip has no op/op.sig"; return 0; }
+    op_key | gpg --homedir "$g" --batch --no-tty --import 2>/dev/null
+    if gpg --homedir "$g" --batch --list-keys --with-colons 2>/dev/null | grep "^fpr:*$OP_KEY_FPR:" >/dev/null \
+       && gpg --homedir "$g" --batch --no-tty --verify "$t/op.sig" "$t/op" 2>/dev/null; then
+      install -m 755 "$t/op" /usr/local/bin/op; echo "  op $v installed (signature verified, key $OP_KEY_FPR)"
+    else bad "op: signature check failed; not installed"; fi
+    rm -rf "$t" "$g"
+  fi
+  if [ -f "$OP_TOKEN_CRED" ]; then echo "  token present (kept)"; return 0; fi
+  if [ "$MODE" = dry ]; then echo "  + ask the service-account token (hidden), seal it to $OP_TOKEN_CRED"; return 0; fi
+  if ! { : </dev/tty; } 2>/dev/null; then echo "  no terminal: token not stored (run --only op in a terminal)"; return 0; fi
+  local tok=""
+  read -rs -p "  1Password service-account token for this zone (hidden; Enter skips): " tok </dev/tty || true; echo
+  [ -n "$tok" ] || { echo "  skipped: no token"; return 0; }
+  install -d -m 700 "$(dirname "$OP_TOKEN_CRED")"
+  printf '%s' "$tok" | systemd-creds encrypt --name=op-token - "$OP_TOKEN_CRED"; unset tok
+  chmod 600 "$OP_TOKEN_CRED"; echo "  token sealed to $OP_TOKEN_CRED ($(systemd-creds has-tpm2 >/dev/null 2>&1 && echo 'TPM 2.0 + host key' || echo 'host key only: no TPM 2.0'))"
+}
+verify_op() {
+  type -P op >/dev/null && ok "op installed ($(op --version 2>/dev/null))" || { bad "op not installed"; return 0; }
+  if [ ! -f "$OP_TOKEN_CRED" ]; then echo "  op: no service-account token (optional; baseline.sh --only op)"; return 0; fi
+  [ "$(stat -c %a "$OP_TOKEN_CRED")" = 600 ] && ok "token file 600" || bad "token file not 600"
+  local tok; tok=$(systemd-creds decrypt --name=op-token "$OP_TOKEN_CRED" - 2>/dev/null || true)
+  [ -n "$tok" ] && ok "token unseals on this host" || { bad "token doesn't unseal"; return 0; }
+  OP_SERVICE_ACCOUNT_TOKEN="$tok" op whoami >/dev/null 2>&1 && ok "token accepted by 1Password" || bad "token rejected (or 1Password unreachable)"
+  unset tok
 }
 
 # ---- cockpit settings: env, else the existing config, else ask (once, before any step runs) ----

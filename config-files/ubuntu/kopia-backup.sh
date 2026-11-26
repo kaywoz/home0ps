@@ -4,9 +4,9 @@
 # The Kopia identity is always mover@<hostname> (CLAUDE.md §8 Names); the host name is read at run time.
 #
 # On the homenas, once per client (root; the Kopia repository must exist):
-#   ./kopia-backup.sh --server          asks the client's host name; adds or resets user mover@<host> (asks its
-#                                       password), enables ACLs, removes the default FULL snapshot rule, adds
-#                                       mover@* APPEND (no delete), restarts the server and checks the rules
+#   ./kopia-backup.sh --server [HOST]   adds or resets user mover@<HOST> (password from 1Password, else asked),
+#                                       enables ACLs, removes the default FULL snapshot rule, adds mover@* APPEND
+#                                       (no delete), restarts the server and checks the rules
 # On each client (root):
 #   ./kopia-backup.sh --setup           creates /etc/home0ps and the state folders, writes the .conf from prompts
 #                                       (defaults read from the host), installs kopia, connects (asks mover's
@@ -22,13 +22,21 @@
 #   KOPIA_URL=https://kopia.<tailnet>.ts.net:443   svc:kopia; Kopia's gRPC client needs the port (:443 added)
 #   SOURCES="/srv/docker"                          absolute paths, space-separated
 #   STOP_COMPOSE=/srv/docker                       compose project stopped during the snapshot; empty = none
-#   HC_PING_URL=                                   optional Healthchecks ping URL (a bearer secret)
-#   ON_CALENDAR="*-*-* 02:47"                      systemd OnCalendar
+#   HC_URL=https://healthchecks.<tailnet>.ts.net   Healthchecks; the check is auto-provisioned on the first ping:
+#   HC_PING_KEY=                                   project ping key (secret: from 1Password, else asked hidden);
+#                                                  pings go to HC_URL/ping/<key>/kopia-backup-<host>?create=1
+#   HC_PING_URL=                                   optional override: a check's own ping URL (replaces the two above)
+#   ON_CALENDAR="*-*-* 02:MM"                      systemd OnCalendar; MM derived from the host name (spreads hosts)
+#
+# 1Password (kaywoz/home0ps#421): with `op` and a sealed zone token (baseline.sh --only op), secrets are read
+# instead of asked: op://home0ps/healthchecks-ping-key/password and op://home0ps/kopia-mover-<host>/password.
+# Items are created on the admin Mac (hosts are read-only), e.g.:
+#   op item create --vault home0ps --category password --title kopia-mover-HOST --generate-password=32,letters,digits
 #   KOPIA_HOST=                                    optional override of the host name in mover@<host>
 #   KOPIA_FINGERPRINT=                             only if svc:kopia is TCP passthrough (Kopia's own TLS)
 # Generated: /var/lib/home0ps/kopia-backup/ (Kopia config, cache, logs; root 700) and the systemd units
 # home0ps-kopia-backup.{service,timer} (first line: GENERATED). The timer is the scheduler (no cron entry).
-# Server mode setting: KOPIA_CONTAINER=kr-ccp-kopia-0101.
+# Server mode setting: KOPIA_CONTAINER=kr-ccp-kopia-0101. 1Password: OP_VAULT=home0ps, OP_TOKEN_CRED.
 set -Eeuo pipefail
 trap 'echo "kopia-backup.sh: failed on line $LINENO" >&2' ERR
 export LC_ALL=C
@@ -36,11 +44,11 @@ export LC_ALL=C
 MODE=run
 case "${1:-}" in
   --setup) MODE=setup ;;
-  --server) MODE=server ;;
+  --server) MODE=server; SERVER_HOST="${2:-}" ;;
   --test-append-only) MODE=test ;;
   --verify) MODE=verify ;;
   --dry-run) MODE=dry ;;
-  -h|--help) sed -n '2,33p' "$0"; exit 0 ;;
+  -h|--help) sed -n '2,42p' "$0"; exit 0 ;;
   "") ;;
   *) echo "unknown option: $1" >&2; exit 1 ;;
 esac
@@ -55,11 +63,14 @@ UNIT=home0ps-kopia-backup
 TEST=/var/lib/home0ps/kopia-backup-test    # empty folder for --test-append-only
 KOPIA_CONTAINER="${KOPIA_CONTAINER:-kr-ccp-kopia-0101}"
 KOPIA_URL=""; KOPIA_HOST=""; SOURCES=""; STOP_COMPOSE=""; KOPIA_FINGERPRINT=""; HC_PING_URL=""
-ON_CALENDAR="*-*-* 02:47"
+HC_URL=""; HC_PING_KEY=""; ON_CALENDAR=""; SERVER_HOST="${SERVER_HOST:-}"
+OP_VAULT="${OP_VAULT:-home0ps}"; OP_TOKEN_CRED="${OP_TOKEN_CRED:-/etc/home0ps/op-token.cred}"
 load_conf() {
   # shellcheck disable=SC1090
   if [ -r "$CONF" ]; then . "$CONF"; fi
   [ -n "$KOPIA_HOST" ] || KOPIA_HOST=$(hostname -s | tr '[:upper:]' '[:lower:]')   # read at run time, never in git
+  # per-host minute so several clients don't hit the server at once (stable: derived from the host name)
+  [ -n "$ON_CALENDAR" ] || ON_CALENDAR=$(printf '*-*-* 02:%02d' "$(( $(printf '%s' "$KOPIA_HOST" | cksum | cut -d' ' -f1) % 60 ))")
 }
 load_conf
 
@@ -81,7 +92,24 @@ ask() {
 ask_secret() { local __v=""; read -rs -p "  $2: " __v </dev/tty || true; echo; printf -v "$1" '%s' "$__v"; }
 yesno() { local __a=""; read -r -p "  $1 [${2}]: " __a </dev/tty || true; [[ "${__a:-$2}" =~ ^[Yy] ]]; }
 safe() { [[ "$1" != *[\"\$\`\\]* ]] || { echo "Not allowed in a value: \" \$ \` \\ ($1)" >&2; exit 1; }; }
-ping_hc() { [ -n "$HC_PING_URL" ] && curl -fsS -m 10 --retry 3 -o /dev/null "$HC_PING_URL$1" || true; }
+# op_get REF: a secret from 1Password with this zone's sealed token; prints nothing when op or the token is absent
+op_get() {
+  type -P op >/dev/null || return 0
+  local tok="${OP_SERVICE_ACCOUNT_TOKEN:-}"
+  if [ -z "$tok" ] && [ -f "$OP_TOKEN_CRED" ]; then
+    tok=$(systemd-creds decrypt --name=op-token "$OP_TOKEN_CRED" - 2>/dev/null || true)
+  fi
+  [ -n "$tok" ] || return 0
+  OP_SERVICE_ACCOUNT_TOKEN="$tok" command op read "$1" 2>/dev/null || true
+}
+# ping_hc SUFFIX (""|/start|/fail): a check's own URL if set, else auto-provisioned by slug (?create=1)
+ping_hc() {
+  local url=""
+  if [ -n "$HC_PING_URL" ]; then url="$HC_PING_URL$1"
+  elif [ -n "$HC_URL" ] && [ -n "$HC_PING_KEY" ]; then url="${HC_URL%/}/ping/$HC_PING_KEY/kopia-backup-$KOPIA_HOST$1?create=1"
+  fi
+  [ -n "$url" ] && curl -fsS -m 10 --retry 3 -o /dev/null "$url" || true
+}
 # kopia ARGS...: the installed binary, as root, with config, cache and logs under $STATE
 kopia() {
   KOPIA_CONFIG_PATH="$STATE/config/repository.config" KOPIA_CACHE_DIRECTORY="$STATE/cache" \
@@ -96,22 +124,26 @@ write_conf() {
   if [ -f "$CONF" ]; then
     run chmod 600 "$CONF"; ok "$CONF present: kept (edit it, or delete it to be asked again)"; return
   fi
-  local dns url src stop hc="" cal="$ON_CALENDAR"
+  local dns url src stop hc="" hcurl cal="$ON_CALENDAR" d
   dns=$(tailscale status --json 2>/dev/null | python3 -c 'import sys,json;print(json.load(sys.stdin).get("MagicDNSSuffix") or "")' 2>/dev/null || true)
   url="https://kopia.${dns:-TAILNET.ts.net}:443"
-  src=""; [ -d /srv/docker ] && src=/srv/docker
+  hcurl="https://healthchecks.${dns:-TAILNET.ts.net}"
+  src=""; for d in /srv/docker /etc/home0ps; do [ -d "$d" ] && src="${src:+$src }$d"; done
+  hc=$(op_get "op://$OP_VAULT/healthchecks-ping-key/password")
+  [ -n "$hc" ] && note "Healthchecks ping key: from 1Password (op://$OP_VAULT/healthchecks-ping-key)"
   stop=""; [ -f /srv/docker/compose.yaml ] && command -v docker >/dev/null 2>&1 && stop=/srv/docker
   if have_tty && [ "$MODE" != dry ]; then
     note "Enter keeps the [default]; - means none"
     ask url "Kopia server URL" "$url"
     ask src "Folders to back up (absolute, space-separated)" "$src"
     ask stop "Compose project to stop during the snapshot" "$stop"
-    ask_secret hc "Healthchecks ping URL (optional, hidden; Enter = none)"
+    ask hcurl "Healthchecks URL (checks are auto-provisioned)" "$hcurl"
+    [ -n "$hc" ] || ask_secret hc "Healthchecks project ping key (hidden; Enter = no pings)"
     ask cal "Schedule (systemd OnCalendar)" "$cal"
   else
     note "no terminal: writing the defaults; check $CONF before the first run"
   fi
-  local v; for v in "$url" "$src" "$stop" "$hc" "$cal"; do safe "$v"; done
+  local v; for v in "$url" "$src" "$stop" "$hc" "$hcurl" "$cal"; do safe "$v"; done
   if [ "$MODE" = dry ]; then echo "  + write $CONF: KOPIA_URL=$url SOURCES=\"$src\" STOP_COMPOSE=$stop ON_CALENDAR=\"$cal\""; return; fi
   ( umask 077
     cat > "$CONF" <<EOF
@@ -120,8 +152,10 @@ write_conf() {
 KOPIA_URL=$url
 SOURCES="$src"
 STOP_COMPOSE=$stop
-HC_PING_URL=$hc
+HC_URL=$hcurl
+HC_PING_KEY=$hc
 ON_CALENDAR="$cal"
+#HC_PING_URL=          optional: a check's own ping URL instead of the auto-provisioned slug
 #KOPIA_HOST=           default: this host's short name -> identity mover@<hostname>
 #KOPIA_FINGERPRINT=    only if svc:kopia is served as TCP passthrough
 EOF
@@ -174,9 +208,23 @@ setup() {
   local fp=(); [ -n "$KOPIA_FINGERPRINT" ] && fp=(--server-cert-fingerprint="$KOPIA_FINGERPRINT")
   if [ "$MODE" != dry ] && kopia repository status >/dev/null 2>&1; then ok "already connected"
   else
-    note "the user must exist on the server first: ./kopia-backup.sh --server on the homenas"
-    run kopia repository connect server --url="$KOPIA_URL" "${fp[@]}" \
-      --override-username="$KUSER" --override-hostname="$KOPIA_HOST"
+    if [ "$MODE" != dry ]; then
+      local code; code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 "$KOPIA_URL/" || true)
+      [ "${code:-000}" != 000 ] || { bad "$KOPIA_URL doesn't answer (svc:kopia served? tailnet grant?)"; exit 1; }
+      ok "$KOPIA_URL answers (HTTP $code)"
+    fi
+    note "the user must exist on the server first: ./kopia-backup.sh --server $KOPIA_HOST on the homenas"
+    local pw; pw=$(op_get "op://$OP_VAULT/kopia-mover-$KOPIA_HOST/password")
+    if [ -n "$pw" ]; then
+      note "password: from 1Password (op://$OP_VAULT/kopia-mover-$KOPIA_HOST)"
+      if [ "$MODE" = dry ]; then echo "  + KOPIA_PASSWORD=*** kopia repository connect server --url=$KOPIA_URL"
+      else KOPIA_PASSWORD="$pw" kopia repository connect server --url="$KOPIA_URL" "${fp[@]}" \
+             --override-username="$KUSER" --override-hostname="$KOPIA_HOST"; fi
+    else
+      run kopia repository connect server --url="$KOPIA_URL" "${fp[@]}" \
+        --override-username="$KUSER" --override-hostname="$KOPIA_HOST"
+    fi
+    unset pw
   fi
   step "schedule: $UNIT.service + .timer ($ON_CALENDAR, catches up after downtime)"
   local self; self=$(readlink -f "$0")
@@ -277,20 +325,35 @@ server_setup() {
   kx repository status >/dev/null 2>&1 \
     || { bad "no repository connected in the container: create it first (storage-stack.sh next steps)"; exit 1; }
   ok "repository connected"
-  have_tty || { echo "--server asks for the client's host name and password: run it in a terminal." >&2; exit 1; }
-  local host="" user
-  ask host "Client host name (its \`hostname -s\`)" ""
+  local host="$SERVER_HOST" user pw
+  if [ -z "$host" ]; then
+    have_tty || { echo "--server: give the client's host name (--server HOST) or run it in a terminal." >&2; exit 1; }
+    ask host "Client host name (its \`hostname -s\`)" ""
+  fi
   host=$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')
   [[ "$host" =~ ^[a-z][a-z0-9-]{0,30}$ ]] || { echo "Not a host name: $host" >&2; exit 1; }
   user="$KUSER@$host"
 
   step "user: $user"
+  pw=$(op_get "op://$OP_VAULT/kopia-mover-$host/password")
+  [ -n "$pw" ] && note "password: from 1Password (op://$OP_VAULT/kopia-mover-$host); passed to kopia for a moment"
+  local verb=add
   if kx server user list 2>/dev/null | grep -Fx "$user" >/dev/null; then
-    ok "$user exists"
-    if yesno "Set a new password for $user?" N; then run kxi server user set "$user" --ask-password; fi
-  else
-    run kxi server user add "$user" --ask-password
+    ok "$user exists"; verb=""
+    if [ -n "$pw" ] || yesno "Set a new password for $user?" N; then verb=set; fi
   fi
+  if [ -n "$verb" ]; then
+    if [ -n "$pw" ]; then
+      # kopia reads a password only from a terminal or --user-password; the env keeps it off the docker command
+      if [ "$MODE" = dry ]; then echo "  + kopia server user $verb $user --user-password ***"
+      else KOPIA_NEW_PW="$pw" docker exec -e KOPIA_NEW_PW "$KOPIA_CONTAINER" \
+             sh -c 'exec kopia server user "$0" "$1" --user-password "$KOPIA_NEW_PW"' "$verb" "$user"; fi
+    else
+      have_tty || { echo "--server: no password in 1Password for $user and no terminal to ask it." >&2; exit 1; }
+      run kxi server user "$verb" "$user" --ask-password
+    fi
+  fi
+  unset pw
 
   step "ACL: only $KUSER@* may write snapshots, append-only (no delete)"
   if ! acl_list | grep 'access:' >/dev/null; then run kx server acl enable; fi
