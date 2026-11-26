@@ -175,3 +175,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** wrote an absolute path from assumption instead of reusing the path form that had already worked.
 - **Fix applied:** re-issued the command with `cd home0ps`, run from the `github` folder.
 - **Rule going forward:** paths in commands for kaywoz's machines come from a path that already worked in the session, or from a lookup on that machine; never an assumed absolute path.
+
+### 2026-11-26 — compose (container groups chosen for kaywoz)
+
+- **Trigger:** misunderstanding corrected by kaywoz ("no stop")
+- **What happened:** asked how to resolve a container-name clash, Claude offered `kr-ccp-socketproxy-0201` and `kr-ccp-beszelagent-0201` as free, though the register still listed them for retired hosts. On finding that, Claude picked `0601`/`0301` itself and started rewriting the register. kaywoz stopped it: groups follow hosts and stacks (homenas `01`; on the monitoring host, infra services `02`, monitoring services `01`), and the retired hosts' rows no longer count.
+- **Root cause:** read only part of the register before writing the option, then treated a naming decision as Claude's to make once the offered option failed.
+- **Fix applied:** names and register follow kaywoz's scheme; retired rows moved to `archive/docker-compose/CONTAINERS-retired.md`.
+- **Rule going forward:** container group numbers are kaywoz's decision (see the CONTAINERS.md rule). Read the whole register before proposing one; if a proposed option turns out wrong, stop and ask again instead of choosing.

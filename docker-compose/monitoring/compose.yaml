@@ -58,7 +58,7 @@ services:
 
   beszel-agent:
     image: henrygd/beszel-agent:latest
-    container_name: kr-ccp-beszelagent-0101
+    container_name: kr-ccp-beszelagent-0201
     restart: always
     userns_mode: host                # required for host networking under userns-remap
     network_mode: host               # host netns = real eth0/tailscale0 traffic stats
@@ -103,7 +103,7 @@ services:
       socketproxy:
         condition: service_healthy
     environment:
-      DOCKER_HOST: tcp://kr-ccp-socketproxy-0101:2375   # this host's own containers, read-only
+      DOCKER_HOST: tcp://kr-ccp-socketproxy-0201:2375   # this host's own containers, read-only
       DOZZLE_HOSTNAME: ${DOZZLE_HOSTNAME}
       DOZZLE_AUTH_PROVIDER: simple   # users in ./dozzle/data/users.yml
       DOZZLE_AUTH_TTL: 48h
@@ -129,7 +129,7 @@ services:
 
   socketproxy:
     image: tecnativa/docker-socket-proxy:latest
-    container_name: kr-ccp-socketproxy-0101
+    container_name: kr-ccp-socketproxy-0201
     restart: always
     userns_mode: host                # must be real root to open docker.sock under userns-remap
     read_only: true

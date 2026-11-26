@@ -4,7 +4,12 @@ Every container on the home0ps hosts, so names stay unique. Scheme: [`NAMING.md`
 
 **Adding a container:** take the next free group for its service here (or the next member, for an HA pair), use it in the compose/deploy settings, and add the row in the same change. Hosts by role only (real device names never in git).
 
-**The homenas is the first host of the current layout (kaywoz, 2026-11-19), so every container on it is group `01`.** The next host to get containers (the monitoring host, rebuilt) takes the next free group per service in the tables below. Names of earlier hosts are listed apart; they're free again once their host is gone.
+**Groups by host and stack** (kaywoz, 2026-11-26; no LXCs or VMs remain):
+
+- **homenas** (MOS): stacks infra, apps, media and storage, all group `01`.
+- **Monitoring host**: stacks infra and monitoring. The infra stack's services also run on the homenas, so they continue at group `02`, then `03` for a further host. Monitoring-stack services exist only here and are group `01`.
+
+Names stay unique across hosts. Retired hosts' names are in [`archive/docker-compose/CONTAINERS-retired.md`](../archive/docker-compose/CONTAINERS-retired.md).
 
 ## homenas (MOS) — built
 
@@ -43,39 +48,15 @@ Names reserved by the homenas stacks ([`homenas/README.md`](homenas/README.md)).
 | `kr-ccp-socketproxy-0101` | homenas (MOS), infra stack (profile `monitoring`, off) | [`homenas/infra/compose.yaml`](homenas/infra/compose.yaml) |
 | `kr-ccp-beszelagent-0101` | homenas (MOS), infra stack (profile `monitoring`, off) | [`homenas/infra/compose.yaml`](homenas/infra/compose.yaml) |
 
-## Earlier hosts (before the homenas layout)
+## Monitoring host — built
 
-The Pi monitoring host, the infra VM, the apps VM and the media LXC, and the MOS-template containers on the old storage box. These hosts are retired or being retired (#320); their names are free again once the host is gone.
+Intel N305, Ubuntu ([`../security/monitoring.md`](../security/monitoring.md)). All six are in one compose file today; the split into an infra and a monitoring stack is not built yet.
 
 | Container | Host role | Defined in | Since |
 |---|---|---|---|
-| `kr-ccp-gatus-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | |
-| `kr-ccp-beszel-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | |
-| `kr-ccp-beszelagent-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | |
-| `kr-ccp-beszelagent-0201` | old storage box (MOS templates) | [`config-files/mos/containers.md`](../config-files/mos/containers.md) | 2026-11-08 |
-| `kr-ccp-dockhand-0101` | infra VM | [`infra/compose.yaml`](infra/compose.yaml) | 2026-11-08 |
-| `kr-ccp-dozzle-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | |
-| `kr-ccp-hawser-0101` | apps VM | [`apps/compose.yaml`](apps/compose.yaml) | 2026-11-09 |
-| `kr-ccp-hawser-0201` | media LXC | [`media/compose.yaml`](media/compose.yaml) | 2026-11-09 |
-| `kr-ccp-socketproxy-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | |
-| `kr-ccp-socketproxy-0201` | media LXC | [`media/compose.yaml`](media/compose.yaml) | 2026-11-07 |
-| `kr-ccp-socketproxy-0301` | old storage box (MOS templates) | [`config-files/mos/containers.md`](../config-files/mos/containers.md) | 2026-11-08 |
-| `kr-ccp-socketproxy-0401` | infra VM | [`infra/compose.yaml`](infra/compose.yaml) | 2026-11-08 |
-| `kr-ccp-socketproxy-0501` | apps VM | [`apps/compose.yaml`](apps/compose.yaml) | 2026-11-08 |
-| `kr-ccp-logtidedb-0101` | monitoring host (archived 2026-11-19, #207) | [`archive/docker-compose/logtide/compose.yaml`](../archive/docker-compose/logtide/compose.yaml) | |
-| `kr-ccp-logtideredis-0101` | monitoring host (archived 2026-11-19, #207) | [`archive/docker-compose/logtide/compose.yaml`](../archive/docker-compose/logtide/compose.yaml) | |
-| `kr-ccp-logtideapi-0101` | monitoring host (archived 2026-11-19, #207) | [`archive/docker-compose/logtide/compose.yaml`](../archive/docker-compose/logtide/compose.yaml) | |
-| `kr-ccp-logtideworker-0101` | monitoring host (archived 2026-11-19, #207) | [`archive/docker-compose/logtide/compose.yaml`](../archive/docker-compose/logtide/compose.yaml) | |
-| `kr-ccp-logtideui-0101` | monitoring host (archived 2026-11-19, #207) | [`archive/docker-compose/logtide/compose.yaml`](../archive/docker-compose/logtide/compose.yaml) | |
-| `kr-ccp-healthchecks-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | |
-| `kr-ccp-jellyfin-0101` | media LXC | [`media/compose.yaml`](media/compose.yaml) | 2026-11-07 |
-| `kr-ccp-mediasort-0101` | apps VM | [`apps/compose.yaml`](apps/compose.yaml) | 2026-11-10 |
-| `kr-ccp-ollama-0101` | apps VM | [`apps/compose.yaml`](apps/compose.yaml) | 2026-11-10 |
-| `kr-ccp-komga-0101` | media LXC | [`media/compose.yaml`](media/compose.yaml) | 2026-11-07 |
-| `kr-ccp-homey-0101` | media LXC | [`media/compose.yaml`](media/compose.yaml) | 2026-11-07 |
-
-Not containers: the Beszel agent on the infra VM and the apps VM runs natively (systemd), so it has no container name.
-
-LXC guests (`kr-cxp-…`): `kr-cxp-media-0101` (homenas).
-
-Not registered yet: anything started by hand outside these files (check `docker ps` on each host).
+| `kr-ccp-gatus-0101` | monitoring host, monitoring services | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
+| `kr-ccp-beszel-0101` | monitoring host, monitoring services | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
+| `kr-ccp-beszelagent-0201` | monitoring host, infra services | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
+| `kr-ccp-dozzle-0101` | monitoring host, monitoring services | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
+| `kr-ccp-socketproxy-0201` | monitoring host, infra services | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
+| `kr-ccp-healthchecks-0101` | monitoring host, monitoring services | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
