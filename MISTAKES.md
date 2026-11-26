@@ -231,3 +231,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** described what the installer does without reading it.
 - **Fix applied:** steps to switch the checkout to `main` (or source the `main` version) and reload the shell.
 - **Rule going forward:** before telling kaywoz how to pick up a change, read how it is installed (copied, linked or sourced from the checkout) and give the step that matches.
+
+### 2026-11-26 — compose (pinning offered against §8)
+
+- **Trigger:** wrong assumption
+- **What happened:** proposing compose-lint for home0ps from a masque-ir session, Claude asked kaywoz to decide between digest pinning and turning the `:latest` rule off. CLAUDE.md §8 already says images stay on `:latest` and not to propose pinning.
+- **Root cause:** planned home0ps work without reading home0ps's CLAUDE.md, because the session started in another repo.
+- **Fix applied:** CL-0004 and CL-0019 are off in every stack's `.compose-lint.yml`, with §8 as the reason.
+- **Rule going forward:** before proposing anything for home0ps from another repo's session, read home0ps's CLAUDE.md and the matching `.claude/rules/` file (CLAUDE.md header).
