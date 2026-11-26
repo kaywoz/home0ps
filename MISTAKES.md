@@ -255,3 +255,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** planned home0ps work without reading home0ps's CLAUDE.md, because the session started in another repo.
 - **Fix applied:** CL-0004 and CL-0019 are off in every stack's `.compose-lint.yml`, with §8 as the reason.
 - **Rule going forward:** before proposing anything for home0ps from another repo's session, read home0ps's CLAUDE.md and the matching `.claude/rules/` file (CLAUDE.md header).
+
+### 2026-11-26 — chat (`sudo install … /dev/stdin` failed on Ubuntu 26.04)
+
+- **Trigger:** command failed on the host
+- **What happened:** the step that writes `/etc/home0ps/kopia-backup.conf` piped `printf` into `sudo install -m 600 /dev/stdin FILE`. On the monitoring host (Ubuntu 26.04, root shell) it failed with `install: No such file or directory`.
+- **Root cause:** handed over a pipe-through-sudo form not used before in this repo and not checked on that release; Ubuntu 26.04 ships sudo-rs and uutils, and the exact cause is unverified (`baseline.sh`'s own `install … /dev/stdin` without sudo works there).
+- **Fix applied:** `(umask 077; printf … > FILE)` in the root shell.
+- **Rule going forward:** files written from a command handed to kaywoz use a shell redirect under `umask 077` (in a root shell, or `sudo sh -c '…'`), never `sudo install … /dev/stdin` from a pipe.
