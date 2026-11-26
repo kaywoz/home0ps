@@ -191,3 +191,19 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** gave a command not used before in this repo without checking it exists on that host (repeat of the checklist rule "A CLI not used before in this repo: check its usage line").
 - **Fix applied:** a fresh login shell instead (`exec sudo -iu "$USER"`, or reconnect), which reads the group list again.
 - **Rule going forward:** a command not used before in this repo is checked for that host's OS and release (package contents or a `command -v` step in the handed-over block) before it is given to kaywoz.
+
+### 2026-11-26 — chat (host label as a `#` line in zsh)
+
+- **Trigger:** command failed on the host
+- **What happened:** command blocks for the monitoring host started with a `# host, account` comment line. kaywoz's shell there is zsh without `INTERACTIVE_COMMENTS`, so pasting the block printed `zsh: command not found: #`.
+- **Root cause:** assumed a pasted `#` line is a no-op in every shell; interactive zsh only treats it as a comment with that option set (`gadz.zsh` doesn't set it).
+- **Fix applied:** proposed `setopt INTERACTIVE_COMMENTS` in `config-files/shell/gadz.zsh`; until then, host labels go on the line above the block.
+- **Rule going forward:** in commands for kaywoz's shells, put the host label outside the code block unless the target shell is known to accept `#` lines interactively.
+
+### 2026-11-26 — docs (`rpi` left in the README layout row)
+
+- **Trigger:** wrong assumption
+- **What happened:** the PR moving the monitoring host to the N305 archived `config-files/rpi/`, but `README.md` still lists `rpi` (with `HARDENING.md`) under `config-files/`.
+- **Root cause:** searched for `config-files/rpi` and `Raspberry Pi 5`, not for the bare folder name.
+- **Fix applied:** removed in the follow-up PR.
+- **Rule going forward:** after moving a folder, grep for its bare name as well as its path (`git grep -nw NAME`).
