@@ -6,3 +6,4 @@ gatus/config/security.yaml
 gatus/config/alerting.yaml
 beszel/
 dozzle/
+healthchecks/
