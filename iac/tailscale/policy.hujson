@@ -23,7 +23,7 @@
 		"tag:test":       ["group:privusers"], //just a test tag
 		"tag:mgmt":       ["group:privusers"], //mgmt ui still exposed directly on 80/443, not yet behind proxy
 		"tag:observed":   ["group:privusers"], //hosts/collectors shipping logs, pinging healthchecks, pulled by the monitor
-		"tag:cockpit":    ["group:privusers"], //hosts serving their own Cockpit as svc:cockpit-<device> (auto-approved)
+		"tag:cockpit":    ["group:privusers"], //hosts serving their own Cockpit as svc:cockpit-<device> (auto-approved); never lab hosts (§8 zones)
 		"tag:infra":      ["group:privusers"], //infra VM on the storage host: tier 0 (Dockhand, cloudflared)
 		"tag:media":      ["group:privusers"], //media LXC on the storage host, IoT VLAN (Jellyfin, Komga, Homey)
 

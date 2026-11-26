@@ -5,10 +5,10 @@
 
 locals {
   services = {
-    gatus           = "Status page"
-    beszel          = "Monitoring hub"
-    dozzle          = "Container log viewer"
-    healthchecks    = "Job heartbeats (UI + ping endpoint)"
+    gatus        = "Status page"
+    beszel       = "Monitoring hub"
+    dozzle       = "Container log viewer"
+    healthchecks = "Job heartbeats (UI + ping endpoint)"
 
     # storage host (tag:storage)
     archivebox     = "Web archive"

@@ -215,3 +215,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** described what the script does from its comment, not from its check; the walkthrough and the script's presence-only `grep` combined into the failure.
 - **Fix applied:** `hc-setup.sh` treats an empty value as missing, replaces the line and fails if it is still empty; kaywoz got commands to set the key on the host.
 - **Rule going forward:** when a walkthrough copies an example file, read every script check that later reads it; "key present" checks test for a value (`^KEY=..*`), not the key name.
+
+### 2026-11-26 — tailscale (`tofu fmt` not run before push)
+
+- **Trigger:** CI failed
+- **What happened:** removing the longest key (`"cockpit-janky"`) from `iac/tailscale-services/services.tf` left the other keys in its group padded for it; the PR `plan` job failed at `tofu fmt -check`.
+- **Root cause:** edited HCL in a session without `tofu` and pushed without formatting or checking the `=` alignment.
+- **Fix applied:** realigned the group (`=` one space after the longest key in each group of consecutive lines).
+- **Rule going forward:** after editing a `.tf` file, run `tofu fmt -check -diff` on it; without `tofu`, check `=` alignment per group of consecutive lines by script before pushing.
