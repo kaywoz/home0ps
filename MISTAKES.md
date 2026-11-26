@@ -183,3 +183,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** read only part of the register before writing the option, then treated a naming decision as Claude's to make once the offered option failed.
 - **Fix applied:** names and register follow kaywoz's scheme; retired rows moved to `archive/docker-compose/CONTAINERS-retired.md`.
 - **Rule going forward:** container group numbers are kaywoz's decision (see the CONTAINERS.md rule). Read the whole register before proposing one; if a proposed option turns out wrong, stop and ask again instead of choosing.
+
+### 2026-11-26 — chat (`newgrp` not on the host)
+
+- **Trigger:** command failed on the host
+- **What happened:** to pick up a new `docker` group in an open shell, Claude handed kaywoz `newgrp docker`. The monitoring host (Ubuntu 26.04) has no `newgrp`: `command not found`.
+- **Root cause:** gave a command not used before in this repo without checking it exists on that host (repeat of the checklist rule "A CLI not used before in this repo: check its usage line").
+- **Fix applied:** a fresh login shell instead (`exec sudo -iu "$USER"`, or reconnect), which reads the group list again.
+- **Rule going forward:** a command not used before in this repo is checked for that host's OS and release (package contents or a `command -v` step in the handed-over block) before it is given to kaywoz.
