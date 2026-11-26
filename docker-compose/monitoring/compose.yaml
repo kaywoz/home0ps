@@ -12,6 +12,7 @@ services:
       - /tmp:size=16m
     pids_limit: 100
     mem_limit: 256m
+    cpus: 0.5
     environment:
       GATUS_CONFIG_PATH: /config     # directory: Gatus merges every *.yaml in it
     ports:
@@ -36,6 +37,7 @@ services:
       - /tmp:size=32m
     pids_limit: 200
     mem_limit: 512m
+    cpus: 1
     environment:
       APP_URL: https://beszel.${TS_TAILNET_DOMAIN}
       USER_CREATION: "false"          # GitHub logins can't create new accounts, only match existing ones
@@ -67,6 +69,7 @@ services:
       - no-new-privileges:true
     pids_limit: 50
     mem_limit: 128m
+    cpus: 0.25
     depends_on:
       socketproxy:
         condition: service_healthy
@@ -95,6 +98,7 @@ services:
       - no-new-privileges:true
     pids_limit: 100
     mem_limit: 256m
+    cpus: 0.5
     depends_on:
       socketproxy:
         condition: service_healthy
@@ -136,6 +140,7 @@ services:
       - no-new-privileges:true
     pids_limit: 100
     mem_limit: 64m
+    cpus: 0.25
     environment:
       - CONTAINERS=1   # list/inspect/stats
       - INFO=1
@@ -163,6 +168,7 @@ services:
     cap_drop: [ALL]
     pids_limit: 100
     mem_limit: 384m
+    cpus: 0.5
     environment:
       SITE_ROOT: https://healthchecks.${TS_TAILNET_DOMAIN}
       SITE_NAME: Healthchecks
