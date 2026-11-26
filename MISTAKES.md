@@ -247,3 +247,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** named a new account myself instead of asking for the convention (none was written down).
 - **Fix applied:** the script connects as `mover@<hostname>`, the hostname read on the host at run time; the convention is in CLAUDE.md §8 (Names).
 - **Rule going forward:** new accounts follow CLAUDE.md §8 Names; if no rule covers the kind of account, ask before naming it.
+
+### 2026-11-26 — compose (pinning offered against §8)
+
+- **Trigger:** wrong assumption
+- **What happened:** proposing compose-lint for home0ps from a masque-ir session, Claude asked kaywoz to decide between digest pinning and turning the `:latest` rule off. CLAUDE.md §8 already says images stay on `:latest` and not to propose pinning.
+- **Root cause:** planned home0ps work without reading home0ps's CLAUDE.md, because the session started in another repo.
+- **Fix applied:** CL-0004 and CL-0019 are off in every stack's `.compose-lint.yml`, with §8 as the reason.
+- **Rule going forward:** before proposing anything for home0ps from another repo's session, read home0ps's CLAUDE.md and the matching `.claude/rules/` file (CLAUDE.md header).

@@ -1,0 +1,19 @@
+# compose-lint policy for this stack (.claude/rules/compose.md, "Lint gate"). Read from beside
+# compose.yaml by CI and the Claude hook, with --strict-config. Suppressed findings stay visible as
+# SUPPRESSED with the reason below. A new exception needs an entry here AND its record
+# (CLAUDE.md §8, or the homenas README "Exception register").
+
+rules:
+  # Images stay on :latest, no tag or digest pinning (CLAUDE.md §8).
+  CL-0004:
+    enabled: false
+    reason: "CLAUDE.md §8: images on :latest by decision"
+  CL-0019:
+    enabled: false
+    reason: "CLAUDE.md §8: no digest pinning by decision"
+  CL-0001:
+    exclude_services:
+      socketproxy: "compose rules: the only general socket mount; POST=0 read-only API (homenas E6)"
+  CL-0008:
+    exclude_services:
+      beszel-agent: "by design: host netns is the only way to read the host's network counters"

@@ -35,6 +35,7 @@ SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../docker-compose/monitoring" && pw
 D="${STACK_DIR:-/srv/docker}"
 ADMIN="${SUDO_USER:-}"; [ "$ADMIN" = root ] && ADMIN=""
 REMAP=165534     # container uid 65534 under userns-remap (base 100000)
+HC_IMAGE=healthchecks/healthchecks:latest
 NOBODY=65534     # Beszel agent: host user namespace, real nobody
 # Service -> local port, as published in compose.yaml
 SERVICES="gatus:8081 beszel:8090 dozzle:8082 healthchecks:8085"
@@ -68,6 +69,35 @@ files() {
   run mkdir -p "$D/gatus/data" "$D/beszel/hub-data" "$D/beszel/agent-data" "$D/dozzle/data"
   run chown -R "$REMAP:$REMAP" "$D/gatus" "$D/beszel/hub-data" "$D/dozzle"
   run chown -R "$NOBODY:$NOBODY" "$D/beszel/agent-data"
+  healthchecks_dir
+}
+
+# Healthchecks: bind mount owned by the image's `hc` user (created with `useradd --system`, so its uid isn't
+# fixed: read it from the image) + the userns-remap base. Moves data from the old named volume once.
+remap_base() { awk -F: '$1=="dockremap"{print $2; exit}' /etc/subuid 2>/dev/null; }
+hc_owner() {   # prints host uid:gid for the image's hc user, or nothing
+  local base u g
+  base=$(remap_base); [ -n "$base" ] || return 0
+  docker image inspect "$HC_IMAGE" >/dev/null 2>&1 || docker pull -q "$HC_IMAGE" >/dev/null 2>&1 || return 0
+  u=$(docker run --rm --userns=host --network none --entrypoint id "$HC_IMAGE" -u 2>/dev/null) || return 0
+  g=$(docker run --rm --userns=host --network none --entrypoint id "$HC_IMAGE" -g 2>/dev/null) || return 0
+  [[ "$u" =~ ^[1-9][0-9]*$ && "$g" =~ ^[1-9][0-9]*$ ]] || return 0   # empty or 0 (root) is never right here
+  echo "$((base + u)):$((base + g))"
+}
+healthchecks_dir() {
+  local own vol mp
+  own=$(hc_owner)
+  [ -n "$own" ] || { bad "healthchecks: image uid or remap base unknown (docker-host.sh run? image pullable?)"; return; }
+  run mkdir -p "$D/healthchecks/data"
+  vol=$(docker volume ls -q 2>/dev/null | grep '_healthchecks_data$' | head -1 || true)
+  if [ -n "$vol" ] && [ -z "$(ls -A "$D/healthchecks/data" 2>/dev/null)" ]; then
+    mp=$(docker volume inspect -f '{{.Mountpoint}}' "$vol")
+    note "moving Healthchecks data from volume $vol (the volume is kept; remove it after checking)"
+    run dc stop healthchecks
+    run cp -a "$mp/." "$D/healthchecks/data/"
+  fi
+  run chown -R "$own" "$D/healthchecks"
+  ok "healthchecks/data owned $own"
 }
 
 # ---- env: .env from the example, values from the host -------------------------------------------------
@@ -117,7 +147,7 @@ serve() {
 # ---- verify ------------------------------------------------------------------------------------------
 verify() {
   step "verify"
-  local f s svc port k st appr
+  local f s svc port k st appr own
   for f in compose.yaml gatus/config/config.yaml; do
     cmp -s "$SRC/$f" "$D/$f" && ok "$f matches the checkout" || bad "$f differs from the checkout"
   done
@@ -131,6 +161,10 @@ verify() {
   fi
   [ "$(stat -c %u "$D/beszel/agent-data" 2>/dev/null)" = "$NOBODY" ] && ok "agent data owned $NOBODY" || bad "agent data not owned $NOBODY"
   [ "$(stat -c %u "$D/gatus/data" 2>/dev/null)" = "$REMAP" ] && ok "gatus data owned $REMAP" || bad "gatus data not owned $REMAP"
+  own=$(hc_owner)
+  [ -n "$own" ] && [ "$(stat -c %u:%g "$D/healthchecks/data" 2>/dev/null)" = "$own" ] && ok "healthchecks data owned $own" || bad "healthchecks data not owned ${own:-?} (run without options)"
+  [ -f "$D/healthchecks/data/hc.sqlite" ] && ok "healthchecks database in the bind mount" || note "no hc.sqlite yet (created on first start)"
+  grep -E '^volumes:' "$D/compose.yaml" >/dev/null && bad "compose.yaml declares named volumes" || ok "no named volumes"
   for s in gatus beszel beszel-agent dozzle socketproxy healthchecks; do
     st=$(dc ps --format '{{.Status}}' "$s" 2>/dev/null | head -1 || true)
     case "$st" in
