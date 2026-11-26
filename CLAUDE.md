@@ -261,6 +261,9 @@ change explicitly if one no longer fits.
   `docker-compose/CONTAINERS.md`; take the next free group there.
   Tools built for home0ps are named `h0ps-<animal>`, the animal an acronym
   for what it does (e.g. `h0ps-tern`; NAMING.md).
+  Accounts that move data (backup clients, sync jobs) are always
+  `mover@<hostname>` (kaywoz, 2026-11-26); the hostname is read on the
+  host at run time, so it never lands in git.
 - **Host steps ship as a script** (kaywoz, 2026-11-19): re-runnable, in
   `config-files/<platform>/`, with `--dry-run` and `--verify`. A doc lists
   only what can't be scripted (UI clicks, first logins).

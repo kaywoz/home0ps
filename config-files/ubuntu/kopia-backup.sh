@@ -12,11 +12,12 @@
 #   sudo ./kopia-backup.sh --verify             config, timer, each source's last snapshot under 26 h; exit 1 on a failure
 #   sudo ./kopia-backup.sh --dry-run            show what --setup and a run would do
 #
-# Server side first (homenas, in the Kopia container; see the PR): user backup@<KOPIA_HOST>, ACLs enabled,
+# Server side first (homenas, in the Kopia container; see the PR): user mover@<hostname>, ACLs enabled,
 # that user APPEND on its own snapshots (no delete). Retention runs on the server, never here.
 # File names (CLAUDE.md §8): what kaywoz writes is /etc/home0ps/kopia-backup.conf (root, 600):
 #   KOPIA_URL=https://kopia.<tailnet>.ts.net     the svc:kopia URL
-#   KOPIA_HOST=monitoring                        Kopia identity backup@<KOPIA_HOST>: the host's role, not its device name
+#   KOPIA_HOST=                                  optional: identity mover@<KOPIA_HOST>; default this host's short
+#                                                hostname (data-moving accounts are mover@<hostname>, CLAUDE.md §8)
 #   SOURCES="/srv/docker"                        absolute paths, space-separated; snapshotted under the same paths
 #   STOP_COMPOSE=/srv/docker                     compose project to stop during the snapshot (SQLite etc.); empty = none
 #   KOPIA_FINGERPRINT=                           only if svc:kopia is TCP passthrough (Kopia's own TLS)
@@ -44,13 +45,14 @@ CONF=/etc/home0ps/kopia-backup.conf
 STATE=/var/lib/home0ps/kopia-backup
 KEYRING=/etc/apt/keyrings/kopia-keyring.gpg
 APT_LIST=/etc/apt/sources.list.d/kopia.list
-KUSER=backup
+KUSER=mover                             # data-moving accounts are always mover@<hostname> (kaywoz, 2026-11-26)
 UNIT=home0ps-kopia-backup
 TEST=/var/lib/home0ps/kopia-backup-test    # empty folder for --test-append-only
 KOPIA_URL=""; KOPIA_HOST=""; SOURCES=""; STOP_COMPOSE=""; KOPIA_FINGERPRINT=""; HC_PING_URL=""
 ON_CALENDAR="*-*-* 02:47"
 # shellcheck disable=SC1090
 [ -r "$CONF" ] && . "$CONF"
+[ -n "$KOPIA_HOST" ] || KOPIA_HOST=$(hostname -s | tr '[:upper:]' '[:lower:]')   # read at run time, never in git
 
 FAIL=0
 step() { echo; echo "== $*"; }
@@ -85,7 +87,7 @@ need_conf() {
   [ -r "$CONF" ] || { echo "Missing $CONF (root, 600): see the header." >&2; exit 1; }
   [ "$(stat -c %a "$CONF")" = 600 ] || { echo "$CONF must be mode 600." >&2; exit 1; }
   [[ "$KOPIA_URL" =~ ^https://[a-z0-9.-]+(:[0-9]+)?$ ]] || { echo "KOPIA_URL must be https://HOST[:PORT]" >&2; exit 1; }
-  [[ "$KOPIA_HOST" =~ ^[a-z][a-z0-9-]{0,30}$ ]] || { echo "KOPIA_HOST must be a lowercase role name" >&2; exit 1; }
+  [[ "$KOPIA_HOST" =~ ^[a-z][a-z0-9-]{0,30}$ ]] || { echo "KOPIA_HOST must be a lowercase host name" >&2; exit 1; }
   [ -n "$SOURCES" ] || { echo "SOURCES is empty" >&2; exit 1; }
   local p; for p in $SOURCES; do
     [[ "$p" == /* && "$p" != / ]] || { echo "SOURCES: absolute paths only, not /: $p" >&2; exit 1; }

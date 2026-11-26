@@ -239,3 +239,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** chose where a script reads and writes host files without grepping the repo for the existing convention (repeat of masque-ir's "where the tool reads data is kaywoz's decision").
 - **Fix applied:** kaywoz chose `/etc/home0ps/<script>.conf` and `/var/lib/home0ps/<script>/` (CLAUDE.md §8 file names).
 - **Rule going forward:** before a script gets a new host path, `git grep` the existing scripts for where theirs live and reuse that; if nothing fits, propose the path to kaywoz instead of choosing it.
+
+### 2026-11-26 — ubuntu (Kopia account named backup@<role>)
+
+- **Trigger:** misunderstanding corrected by kaywoz
+- **What happened:** `kopia-backup.sh` connected as `backup@<role>`. kaywoz: an account that moves data is always `mover@<hostname>`.
+- **Root cause:** named a new account myself instead of asking for the convention (none was written down).
+- **Fix applied:** the script connects as `mover@<hostname>`, the hostname read on the host at run time; the convention is in CLAUDE.md §8 (Names).
+- **Rule going forward:** new accounts follow CLAUDE.md §8 Names; if no rule covers the kind of account, ask before naming it.
