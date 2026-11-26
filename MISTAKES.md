@@ -175,3 +175,35 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** wrote an absolute path from assumption instead of reusing the path form that had already worked.
 - **Fix applied:** re-issued the command with `cd home0ps`, run from the `github` folder.
 - **Rule going forward:** paths in commands for kaywoz's machines come from a path that already worked in the session, or from a lookup on that machine; never an assumed absolute path.
+
+### 2026-11-26 — compose (container groups chosen for kaywoz)
+
+- **Trigger:** misunderstanding corrected by kaywoz ("no stop")
+- **What happened:** asked how to resolve a container-name clash, Claude offered `kr-ccp-socketproxy-0201` and `kr-ccp-beszelagent-0201` as free, though the register still listed them for retired hosts. On finding that, Claude picked `0601`/`0301` itself and started rewriting the register. kaywoz stopped it: groups follow hosts and stacks (homenas `01`; on the monitoring host, services also on the homenas `02`, the rest `01`), and the retired hosts' rows no longer count.
+- **Root cause:** read only part of the register before writing the option, then treated a naming decision as Claude's to make once the offered option failed.
+- **Fix applied:** names and register follow kaywoz's scheme; retired rows moved to `archive/docker-compose/CONTAINERS-retired.md`.
+- **Rule going forward:** container group numbers are kaywoz's decision (see the CONTAINERS.md rule). Read the whole register before proposing one; if a proposed option turns out wrong, stop and ask again instead of choosing.
+
+### 2026-11-26 — chat (`newgrp` not on the host)
+
+- **Trigger:** command failed on the host
+- **What happened:** to pick up a new `docker` group in an open shell, Claude handed kaywoz `newgrp docker`. The monitoring host (Ubuntu 26.04) has no `newgrp`: `command not found`.
+- **Root cause:** gave a command not used before in this repo without checking it exists on that host (repeat of the checklist rule "A CLI not used before in this repo: check its usage line").
+- **Fix applied:** a fresh login shell instead (`exec sudo -iu "$USER"`, or reconnect), which reads the group list again.
+- **Rule going forward:** a command not used before in this repo is checked for that host's OS and release (package contents or a `command -v` step in the handed-over block) before it is given to kaywoz.
+
+### 2026-11-26 — chat (host label as a `#` line in zsh)
+
+- **Trigger:** command failed on the host
+- **What happened:** command blocks for the monitoring host started with a `# host, account` comment line. kaywoz's shell there is zsh without `INTERACTIVE_COMMENTS`, so pasting the block printed `zsh: command not found: #`.
+- **Root cause:** assumed a pasted `#` line is a no-op in every shell; interactive zsh only treats it as a comment with that option set (`gadz.zsh` doesn't set it).
+- **Fix applied:** proposed `setopt INTERACTIVE_COMMENTS` in `config-files/shell/gadz.zsh`; until then, host labels go on the line above the block.
+- **Rule going forward:** in commands for kaywoz's shells, put the host label outside the code block unless the target shell is known to accept `#` lines interactively.
+
+### 2026-11-26 — docs (`rpi` left in the README layout row)
+
+- **Trigger:** wrong assumption
+- **What happened:** the PR moving the monitoring host to the N305 archived `config-files/rpi/`, but `README.md` still lists `rpi` (with `HARDENING.md`) under `config-files/`.
+- **Root cause:** searched for `config-files/rpi` and `Raspberry Pi 5`, not for the bare folder name.
+- **Fix applied:** removed in the follow-up PR.
+- **Rule going forward:** after moving a folder, grep for its bare name as well as its path (`git grep -nw NAME`).
