@@ -263,3 +263,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** handed over a pipe-through-sudo form not used before in this repo and not checked on that release; Ubuntu 26.04 ships sudo-rs and uutils, and the exact cause is unverified (`baseline.sh`'s own `install … /dev/stdin` without sudo works there).
 - **Fix applied:** `(umask 077; printf … > FILE)` in the root shell.
 - **Rule going forward:** files written from a command handed to kaywoz use a shell redirect under `umask 077` (in a root shell, or `sudo sh -c '…'`), never `sudo install … /dev/stdin` from a pipe.
+
+### 2026-11-26 — git (pushed to a merged PR, fourth time)
+
+- **Trigger:** wrong assumption
+- **What happened:** a `MISTAKES.md` commit was pushed to `claude/monitoring-kopia-backup` after its PR had merged; the open-state check ran after the push, not in the same step.
+- **Root cause:** pushed first and checked after, in a cloud session where the gate is an MCP call that can't sit in the push command.
+- **Fix applied:** the commit moved to a new branch from `main` with its own PR.
+- **Rule going forward:** in cloud sessions, the `pull_request_read` state check is the call immediately before every push to an existing PR branch; no other work between them (home0ps-pr skill §1).
