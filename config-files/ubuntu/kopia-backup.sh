@@ -14,7 +14,7 @@
 #
 # Server side first (homenas, in the Kopia container; see the PR): user backup@<KOPIA_HOST>, ACLs enabled,
 # that user APPEND on its own snapshots (no delete). Retention runs on the server, never here.
-# File names (CLAUDE.md §8): what kaywoz writes is /etc/h0ps/kopia-backup.conf (root, 600):
+# File names (CLAUDE.md §8): what kaywoz writes is /etc/home0ps/kopia-backup.conf (root, 600):
 #   KOPIA_URL=https://kopia.<tailnet>.ts.net     the svc:kopia URL
 #   KOPIA_HOST=monitoring                        Kopia identity backup@<KOPIA_HOST>: the host's role, not its device name
 #   SOURCES="/srv/docker"                        absolute paths, space-separated; snapshotted under the same paths
@@ -22,8 +22,8 @@
 #   KOPIA_FINGERPRINT=                           only if svc:kopia is TCP passthrough (Kopia's own TLS)
 #   HC_PING_URL=https://healthchecks.<tailnet>.ts.net/ping/<uuid>   optional; a bearer secret
 #   ON_CALENDAR="*-*-* 02:47"                    optional systemd OnCalendar
-# What the script generates goes to /var/lib/h0ps/kopia-backup/ (Kopia config + cache, root 700) and the
-# systemd units h0ps-kopia-backup.{service,timer} (first line: GENERATED).
+# What the script generates goes to /var/lib/home0ps/kopia-backup/ (Kopia config + cache, root 700) and the
+# systemd units home0ps-kopia-backup.{service,timer} (first line: GENERATED).
 set -Eeuo pipefail
 trap 'echo "kopia-backup.sh: failed on line $LINENO" >&2' ERR
 export LC_ALL=C
@@ -40,13 +40,13 @@ case "${1:-}" in
 esac
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo." >&2; exit 1; }
 
-CONF=/etc/h0ps/kopia-backup.conf
-STATE=/var/lib/h0ps/kopia-backup
+CONF=/etc/home0ps/kopia-backup.conf
+STATE=/var/lib/home0ps/kopia-backup
 KEYRING=/etc/apt/keyrings/kopia-keyring.gpg
 APT_LIST=/etc/apt/sources.list.d/kopia.list
 KUSER=backup
-UNIT=h0ps-kopia-backup
-TEST=/var/lib/h0ps/kopia-backup-test    # empty folder for --test-append-only
+UNIT=home0ps-kopia-backup
+TEST=/var/lib/home0ps/kopia-backup-test    # empty folder for --test-append-only
 KOPIA_URL=""; KOPIA_HOST=""; SOURCES=""; STOP_COMPOSE=""; KOPIA_FINGERPRINT=""; HC_PING_URL=""
 ON_CALENDAR="*-*-* 02:47"
 # shellcheck disable=SC1090
