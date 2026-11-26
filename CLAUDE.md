@@ -216,6 +216,7 @@ change explicitly if one no longer fits.
   similar portal built into the OS), and it manages only that host.
   Cockpit, where used, is its own Tailscale
   Service `svc:cockpit-<device>` (§4 Service-name exception) on `127.0.0.1:9091`, `LoginTo = false`,
+  auto-approved for hosts tagged `tag:cockpit` (kaywoz, 2026-11-26),
   `AllowMultiHost` off. No multi-host Cockpit hub: it would hold SSH to every
   host and share one browser origin across them. The Mac mini is the home
   admin workstation.

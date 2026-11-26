@@ -23,6 +23,7 @@
 		"tag:test":       ["group:privusers"], //just a test tag
 		"tag:mgmt":       ["group:privusers"], //mgmt ui still exposed directly on 80/443, not yet behind proxy
 		"tag:observed":   ["group:privusers"], //hosts/collectors shipping logs, pinging healthchecks, pulled by the monitor
+		"tag:cockpit":    ["group:privusers"], //hosts serving their own Cockpit as svc:cockpit-<device> (auto-approved)
 		"tag:infra":      ["group:privusers"], //infra VM on the storage host: tier 0 (Dockhand, cloudflared)
 		"tag:media":      ["group:privusers"], //media LXC on the storage host, IoT VLAN (Jellyfin, Komga, Homey)
 
@@ -50,7 +51,7 @@
 				"tag:hypervisor", "tag:storage", "tag:service", "tag:docker", "tag:oob",
 				"tag:security", "tag:monitoring", "tag:proxy", "tag:guests",
 				"tag:exit-node", "tag:auto", "tag:ssh", "tag:test", "tag:mgmt", "tag:observed",
-				"tag:infra", "tag:media",
+				"tag:infra", "tag:media", "tag:cockpit",
 			],
 			"users":       ["${LOCAL_UNIX_ACCOUNT}"],
 			"checkPeriod": "24h",
@@ -69,7 +70,6 @@
 	"autoApprovers": {
 		"services": {
 			"svc:gatus":   ["tag:monitoring"],
-			"svc:cockpit-janky": ["tag:monitoring"],
 			"svc:beszel":  ["tag:monitoring"],
 			"svc:dozzle":  ["tag:monitoring"],
 			"svc:healthchecks": ["tag:monitoring"],
@@ -90,8 +90,9 @@
 			"svc:rackpeek":        ["tag:storage"],
 			// homenas Docker UI and git-sync deployer (infra stack, full socket: admins only)
 			"svc:arcane":          ["tag:storage"],
-			// apps host admin UI
-			"svc:cockpit-sexy":    ["tag:observed"],
+			// host admin UIs (Cockpit): any host tagged tag:cockpit, whatever its role (kaywoz, 2026-11-26).
+			// Any tag:cockpit host could claim another host's name; accepted (one admin, Cockpit login + Origins).
+			"svc:cockpit-sexy":    ["tag:cockpit"],
 			// media apps: the media LXC now, the homenas media stack after the move (tag:media goes with the LXC)
 			"svc:jellyfin":        ["tag:media", "tag:storage"],
 			"svc:komga":           ["tag:media", "tag:storage"],
@@ -141,7 +142,7 @@
 		{
 			// admins -> admin UIs by service name (not by node/port)
 			"src": ["autogroup:admin"],
-			"dst": ["svc:gatus", "svc:beszel", "svc:dozzle", "svc:healthchecks", "svc:cockpit-janky", "svc:cockpit-sexy", "svc:dockhand", "svc:arcane"],
+			"dst": ["svc:gatus", "svc:beszel", "svc:dozzle", "svc:healthchecks", "svc:cockpit-sexy", "svc:dockhand", "svc:arcane"],
 			"ip":  ["tcp:443"],
 		},
 		{
@@ -243,6 +244,8 @@
 			"deny": ["tag:monitoring:9090", "tag:monitoring:8443"],
 		},
 		{"src": "tag:monitoring", "accept": ["macmini:45876"], "deny": ["macmini:22"]},
+		// admins reach each host's Cockpit by Service name
+		{"src": "${TS_PRIVUSER}", "accept": ["svc:cockpit-sexy:443"]},
 		{
 			// observed hosts reach heartbeats and the Beszel hub only, nothing else on the monitoring host
 			"src":    "tag:observed",
@@ -290,7 +293,7 @@
 		{
 			// host admin UIs are for admins only: observed hosts can't reach another host's Cockpit
 			"src":  "tag:observed",
-			"deny": ["svc:cockpit-janky:443", "svc:cockpit-sexy:443", "svc:dockhand:443", "svc:arcane:443"],
+			"deny": ["svc:cockpit-sexy:443", "svc:dockhand:443", "svc:arcane:443"],
 		},
 		{
 			// Dockhand reaches the Hawser agents on the managed hosts, nothing else there;
@@ -315,7 +318,7 @@
 		{
 			// tailscale ssh: admin account only after re-auth, never root
 			"src":   "${TS_PRIVUSER}",
-			"dst":   ["tag:storage", "tag:infra", "tag:media", "tag:observed", "tag:monitoring"],
+			"dst":   ["tag:storage", "tag:infra", "tag:media", "tag:observed", "tag:monitoring", "tag:cockpit"],
 			"check": ["${LOCAL_UNIX_ACCOUNT}"],
 			"deny":  ["root"],
 		},
