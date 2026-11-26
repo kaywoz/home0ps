@@ -105,7 +105,12 @@ apply_docker() {
     echo "  docker-ce already installed"
   fi
   run systemctl enable --now docker
-  if [ -n "$ADMIN_USER" ]; then run usermod -aG docker "$ADMIN_USER"; fi
+  if [ -n "$ADMIN_USER" ] && ! id -nG "$ADMIN_USER" 2>/dev/null | tr ' ' '\n' | grep -x docker >/dev/null; then
+    run usermod -aG docker "$ADMIN_USER"
+    # Groups are read at login: open shells and reused SSH connections (gadz: --reset) keep the old list.
+    echo "  NOTE: $ADMIN_USER is in group docker from the next fresh login (new SSH session;"
+    echo "        gadz --reset, or ssh -O exit for a reused connection). Until then docker needs sudo."
+  fi
   # nightly Docker CE upgrades (kaywoz: yes on docker hosts); baseline.sh sets the reboot window
   put /etc/apt/apt.conf.d/53unattended-docker 644 <<'CONF'
 // docker-host.sh (home0ps): include Docker CE in unattended upgrades.
@@ -115,10 +120,37 @@ Unattended-Upgrade::Origins-Pattern {
 };
 CONF
 }
+# caller_has_group NAME: 0 when the shell that ran sudo already carries the group (or it can't be told).
+# Walks up from this script to the first process owned by SUDO_UID: sudo/sudo-rs may sit in between.
+caller_has_group() {
+  local gid pid=$PPID uid
+  gid=$(getent group "$1" | cut -d: -f3); [ -n "$gid" ] && [ -n "${SUDO_UID:-}" ] || return 0
+  while [ "${pid:-0}" -gt 1 ]; do
+    uid=$(awk '/^Uid:/{print $2}' "/proc/$pid/status" 2>/dev/null) || return 0
+    if [ "$uid" = "$SUDO_UID" ]; then
+      awk -v g="$gid" '/^Groups:/{for(i=2;i<=NF;i++) if($i==g) f=1} END{exit !f}' "/proc/$pid/status"; return
+    fi
+    pid=$(awk '/^PPid:/{print $2}' "/proc/$pid/status" 2>/dev/null) || return 0
+  done
+  return 0
+}
 verify_docker() {
   installed docker-ce && ok "docker-ce installed" || bad "docker-ce missing"
   systemctl is-active --quiet docker && ok "docker running" || bad "docker not running"
   apt-config dump 2>/dev/null | grep 'origin=Docker,label=Docker CE' >/dev/null && ok "Docker CE in unattended upgrades" || bad "Docker CE not in unattended upgrades"
+  if [ -n "$ADMIN_USER" ]; then
+    if id -nG "$ADMIN_USER" 2>/dev/null | tr ' ' '\n' | grep -x docker >/dev/null; then
+      ok "$ADMIN_USER in group docker"
+      # The account is in the group, but a shell started before that doesn't have it yet.
+      if [ "${SUDO_USER:-}" = "$ADMIN_USER" ] && ! caller_has_group docker; then
+        echo "  NOTE: this shell predates the group: log in again (gadz --reset) to use docker without sudo"
+      fi
+    else
+      bad "$ADMIN_USER not in group docker (re-run: sudo ./docker-host.sh --only docker)"
+    fi
+  else
+    echo "  admin account unknown (no SUDO_USER/LOCAL_UNIX_ACCOUNT): docker group not checked"
+  fi
 }
 
 # ---- daemon: daemon.json (identical to config-files/logging/daemon.json) ----
