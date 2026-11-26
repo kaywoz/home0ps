@@ -472,7 +472,8 @@ verify_tailscale() {
 # How 1Password's own GitHub action installs it (1Password/install-cli-action, linux.ts + linux-signature.ts):
 # version from app-updates.agilebits.com, zip from cache.agilebits.com with op + op.sig, GPG-verified
 # against the pinned key below. The token (vault home0ps or lab, read-only; kaywoz/home0ps#421) is asked
-# once, hidden, and sealed with systemd-creds (TPM 2.0 when present). Enter at the prompt skips the token.
+# once, hidden, and sealed with systemd-creds when the host has a TPM 2.0. Without one (most VMs) it isn't
+# stored unless you confirm; scripts then ask for it per setup run. Enter at the prompt skips the token.
 op_key() { cat <<'KEY'
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 
@@ -547,6 +548,14 @@ apply_op() {
     rm -rf "$t" "$g"
   fi
   if [ -f "$OP_TOKEN_CRED" ]; then echo "  token present (kept)"; return 0; fi
+  # Without a TPM the seal's key sits on the same disk: a copied disk or VM snapshot opens it. Default: don't
+  # store; kopia-backup.sh asks the token per setup run instead (scripts read 1Password at setup only).
+  local tpm=0; systemd-creds has-tpm2 >/dev/null 2>&1 && tpm=1
+  if [ "$tpm" = 0 ] && [ "$MODE" != dry ] && { : </dev/tty; } 2>/dev/null; then
+    local a=""
+    read -r -p "  No TPM 2.0: store the token sealed with the host key only? [y/N]: " a </dev/tty || true
+    [[ "$a" =~ ^[Yy] ]] || { echo "  token not stored: scripts ask for it per setup run"; return 0; }
+  fi
   if [ "$MODE" = dry ]; then echo "  + ask the service-account token (hidden), seal it to $OP_TOKEN_CRED"; return 0; fi
   if ! { : </dev/tty; } 2>/dev/null; then echo "  no terminal: token not stored (run --only op in a terminal)"; return 0; fi
   local tok=""

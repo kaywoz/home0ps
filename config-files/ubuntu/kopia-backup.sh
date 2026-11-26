@@ -95,12 +95,24 @@ safe() { [[ "$1" != *[\"\$\`\\]* ]] || { echo "Not allowed in a value: \" \$ \` 
 # op_get REF: a secret from 1Password with this zone's sealed token; prints nothing when op or the token is absent
 op_get() {
   type -P op >/dev/null || return 0
-  local tok="${OP_SERVICE_ACCOUNT_TOKEN:-}"
+  local tok="${OP_SERVICE_ACCOUNT_TOKEN:-${OP_RUN_TOKEN:-}}"
   if [ -z "$tok" ] && [ -f "$OP_TOKEN_CRED" ]; then
     tok=$(systemd-creds decrypt --name=op-token "$OP_TOKEN_CRED" - 2>/dev/null || true)
   fi
   [ -n "$tok" ] || return 0
   OP_SERVICE_ACCOUNT_TOKEN="$tok" command op read "$1" 2>/dev/null || true
+}
+# op_run_token: no stored token (a VM without TPM: baseline.sh doesn't store it there) -> ask it once,
+# hidden, for this run only; it is never written anywhere. Called once, outside $(...), by --setup/--server.
+OP_RUN_TOKEN=""
+op_run_token() {
+  type -P op >/dev/null || return 0
+  [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ] && [ ! -f "$OP_TOKEN_CRED" ] || return 0
+  [ "$MODE" != dry ] && have_tty || return 0
+  read -rs -p "  1Password service-account token for this run only (hidden, not stored; Enter = ask instead): " OP_RUN_TOKEN </dev/tty || true
+  echo
+  [ -n "$OP_RUN_TOKEN" ] && note "1Password token held in memory for this run"
+  return 0
 }
 # ping_hc SUFFIX (""|/start|/fail): a check's own URL if set, else auto-provisioned by slug (?create=1)
 ping_hc() {
@@ -199,6 +211,7 @@ install_kopia() {
 }
 
 setup() {
+  op_run_token
   write_conf
   [ "$MODE" = dry ] && [ ! -f "$CONF" ] || need_conf
   step "state: $STATE, $TEST (root, 700)"
@@ -335,6 +348,7 @@ server_setup() {
   user="$KUSER@$host"
 
   step "user: $user"
+  op_run_token
   pw=$(op_get "op://$OP_VAULT/kopia-mover-$host/password")
   [ -n "$pw" ] && note "password: from 1Password (op://$OP_VAULT/kopia-mover-$host); passed to kopia for a moment"
   local verb=add
