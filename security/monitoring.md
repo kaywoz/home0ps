@@ -2,7 +2,7 @@
 
 Intel N305 (8 cores, 64 GB, 1 TB NVMe, 4× 2.5GbE), **Ubuntu 26.04 LTS**, rebuilt for this role with `baseline.sh` (kaywoz, 2026-11-26; earlier on a Raspberry Pi 5, retired). **Observation-only:** may read everything (metrics, logs, health), may change nothing elsewhere. Builds on the [global baseline](../SECURITY.md); this file lists only what is specific to this role.
 
-Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh) then [`docker-host.sh`](../config-files/ubuntu/docker-host.sh). The Pi build is archived in [`archive/config-files/rpi/`](../archive/config-files/rpi/). Stack: [`docker-compose/monitoring/`](../docker-compose/monitoring/).
+Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh), [`docker-host.sh`](../config-files/ubuntu/docker-host.sh), then [`monitoring-stack.sh`](../config-files/ubuntu/monitoring-stack.sh) (stack files, `.env`, start, `--serve`, `--verify`). The Pi build is archived in [`archive/config-files/rpi/`](../archive/config-files/rpi/). Stack: [`docker-compose/monitoring/`](../docker-compose/monitoring/).
 
 ## Network exposure
 
