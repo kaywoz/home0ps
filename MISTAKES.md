@@ -263,3 +263,19 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** read "boxes" as any new host, physical or virtual, without asking.
 - **Fix applied:** CLAUDE.md §8 says "boxes" means physical hardware and that VMs are allowed.
 - **Rule going forward:** §8 proportionality limits new physical hardware, not VMs; weigh a VM by its own cost (tier, backups, upkeep), not by §8.
+
+### 2026-11-26 — ubuntu (Kopia URL without a port)
+
+- **Trigger:** command failed on the host
+- **What happened:** `kopia-backup.sh --setup` on the monitoring host failed: `invalid target address "kopia.<tailnet>.ts.net:": missing port after port-separator colon`. The documented example `KOPIA_URL=https://kopia.<tailnet>.ts.net` had no port; Kopia's gRPC client needs one.
+- **Root cause:** wrote the example from the URL form browsers accept, without checking how Kopia's repository-server client parses it (the docs' examples all carry a port).
+- **Fix applied:** the script adds `:443` when the URL has no port; the example shows it.
+- **Rule going forward:** URLs handed to a client other than a browser are written with an explicit port, as in that client's docs.
+
+### 2026-11-26 — homenas (Kopia `acl remove` without `--delete`)
+
+- **Trigger:** command failed on the host
+- **What happened:** the server-side Kopia step `kopia server acl remove RULE_ID` only printed `would delete entry …, pass --delete to actually delete` on Kopia 0.23, so the default `FULL` snapshot rule stayed and the append-only test showed a delete was allowed.
+- **Root cause:** took the command from Kopia's docs page, which omits `--delete`, without checking the installed version's usage line (repeat of the checklist rule "A CLI not used before in this repo: check its usage line").
+- **Fix applied:** `kopia server acl remove ID --delete`; `acl list` checked afterwards.
+- **Rule going forward:** for a destructive subcommand of a tool not used before, check its `--help` on the installed version (or its source at that tag) for a confirm or dry-run flag before handing the command over.
