@@ -1,5 +1,7 @@
 # Monitoring host (Raspberry Pi 5) rebuild and hardening checklist
 
+> **Archived 2026-11-26:** the Pi 5 monitoring host is retired for now; the monitoring host is an Intel N305 on Ubuntu, built with `config-files/ubuntu/baseline.sh` ([`security/monitoring.md`](../../../security/monitoring.md)).
+
 Raspberry Pi 5 (8 GB, 128 GB NVMe), Raspberry Pi OS Lite 64-bit. Observational-only monitoring box.
 `harden-rpi5.sh` (next to this file) automates everything marked **[script]**. Run it with `sudo TS_TAILNET_DNS=<tailnet>.ts.net`, reboot, then run `sudo ./harden-rpi5.sh --verify`.
 

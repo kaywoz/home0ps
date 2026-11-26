@@ -6,8 +6,8 @@ Shared controls for every home0ps system. Each host role adds its own summary in
 
 | Role | Summary |
 |---|---|
-| Monitoring host (Raspberry Pi 5) | [`security/monitoring.md`](security/monitoring.md) |
-| Apps host (Intel N305) | [`security/apps.md`](security/apps.md) |
+| Monitoring host (Intel N305) | [`security/monitoring.md`](security/monitoring.md) |
+| Apps (apps stack on the homenas) | [`security/homenas.md`](security/homenas.md); the earlier apps host/VM design is in [`archive/security/apps.md`](archive/security/apps.md) |
 | Media LXC (on the homenas, VLAN 13) | [`security/media.md`](security/media.md) |
 | Infra VM (on the homenas, VLAN 24, tier 0) | [`security/infra.md`](security/infra.md) |
 | Homenas (MOS NAS) | [`security/homenas.md`](security/homenas.md) |

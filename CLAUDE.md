@@ -197,8 +197,9 @@ change explicitly if one no longer fits.
   (kaywoz/home0ps#164, lab-only).
 
 - **Host roles** (real device names never in git, §4): monitoring host
-  (Raspberry Pi 5, observation-only: reads everything, changes nothing
-  elsewhere), apps host (Intel N305, trusted well-known apps only), homenas
+  (Intel N305, Ubuntu; observation-only: reads everything, changes nothing
+  elsewhere), apps (the homenas apps stack, trusted well-known apps only;
+  no separate apps host or VM, kaywoz, 2026-11-26), homenas
   (MOS NAS: storage, pulls backups, and the home Docker stacks once
   kaywoz/home0ps#321 is built; kaywoz, 2026-11-17). Risky or `privileged`
   workloads go to the separate XCP-ng lab, not home0ps. **Risky** means
@@ -318,7 +319,7 @@ number of PRs. Each PR still covers one area (§5).
 | Cloudflare | home0ps | `iac/cloudflare` |
 | UniFi | home0ps | `config-files/unifi` |
 | Tailscale | home0ps | `iac/tailscale`, `iac/tailscale-services` |
-| Monitoring | home0ps | `config-files/rpi`, `docker-compose/monitoring` |
+| Monitoring | home0ps | `docker-compose/monitoring`, `security/monitoring.md` |
 | Planning | none | none |
 
 Work outside the table: ask which unit it belongs to, or whether it is a
