@@ -183,7 +183,8 @@ services:
     networks:
       - proxy-healthchecks                 # egress to Slack + tailnet
     volumes:
-      - healthchecks_data:/data            # named volume: image's own uid, remap-safe
+      - ./healthchecks/data:/data          # bind mount (no named volumes): owned by the image's `hc` uid + remap base,
+                                           # set by config-files/ubuntu/monitoring-stack.sh
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v3/status/', timeout=4)"]
       interval: 30s
@@ -225,6 +226,3 @@ networks:
   proxy-healthchecks:
     name: proxy-healthchecks
     driver: bridge
-
-volumes:
-  healthchecks_data:
