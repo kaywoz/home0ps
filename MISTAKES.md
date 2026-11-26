@@ -223,3 +223,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** edited HCL in a session without `tofu` and pushed without formatting or checking the `=` alignment.
 - **Fix applied:** realigned the group (`=` one space after the longest key in each group of consecutive lines).
 - **Rule going forward:** after editing a `.tf` file, run `tofu fmt -check -diff` on it; without `tofu`, check `=` alignment per group of consecutive lines by script before pushing.
+
+### 2026-11-26 — shell (gadz "reinstall" step)
+
+- **Trigger:** command failed on the host
+- **What happened:** after the gadz PR merged, Claude told kaywoz to reinstall gadz with `install.sh`. The installer only adds `source <checkout>/config-files/shell/gadz.zsh` to `~/.zshrc`, so the Mac kept loading the old file from the checkout's current branch; `gadz --reset` passed `--reset` to ssh (`illegal option`).
+- **Root cause:** described what the installer does without reading it.
+- **Fix applied:** steps to switch the checkout to `main` (or source the `main` version) and reload the shell.
+- **Rule going forward:** before telling kaywoz how to pick up a change, read how it is installed (copied, linked or sourced from the checkout) and give the step that matches.
