@@ -137,7 +137,7 @@ merge pipelines or hand one job another area's credentials.
 ## 5. Git / PR workflow
 
 - New branch per change: `feat/<area>-<slug>`, `fix/<area>-<slug>`,
-  `chore/<slug>`.
+  `chore/<slug>`. In cloud sessions: `claude/<unit>-<slug>` (§10).
 - **Never push to `main` directly. Never merge your own PR.**
 - One area per PR (don't mix Tailscale + Cloudflare + compose changes).
 - After every commit, check `git show --stat HEAD` matches what the PR
@@ -301,3 +301,39 @@ kaywoz, 2026-11-23. Applies to every reply, all projects:
 - Explanations minimal: edge cases, time complexity (Big O), required
   dependencies only.
 - No conversational language. Direct and professional.
+- Every PR, issue or commit mentioned in a reply is a full clickable
+  link (`https://github.com/kaywoz/<repo>/pull/N`), not a bare `#N`, so
+  kaywoz can open it on mobile.
+
+## 10. Work units (sessions)
+
+kaywoz, 2026-11-25. Applies to Claude Code sessions, local and cloud.
+
+**One session = one work unit:** one domain, about one working day, any
+number of PRs. Each PR still covers one area (§5).
+
+| Unit | Repos | home0ps paths |
+|---|---|---|
+| MOS | home0ps, mos-templates, mos-rpi5, mos-iperf3 | `config-files/mos`, `docker-compose/homenas`, `security/homenas.md` |
+| Cloudflare | home0ps | `iac/cloudflare` |
+| UniFi | home0ps | `config-files/unifi` |
+| Tailscale | home0ps | `iac/tailscale`, `iac/tailscale-services` |
+| Monitoring | home0ps | `config-files/rpi`, `docker-compose/monitoring` |
+| Planning | none | none |
+
+Work outside the table: ask which unit it belongs to, or whether it is a
+new one; add new units here.
+
+- **Start a new session** when the domain changes, on a new day, after the
+  session has auto-compacted, or after kaywoz has corrected the same
+  misunderstanding twice (log it, §7, first).
+- **Stay in the session** for more PRs in the same unit, review and CI
+  fixes, and host verification of its own changes.
+- **Branches** (standing permission from kaywoz): the session's assigned
+  branch carries the first PR. Every further PR gets its own branch
+  `claude/<unit>-<slug>`, created from `origin/main`, pushed with
+  `git push -u origin BRANCH`. One branch per PR; the `home0ps-pr` push
+  gate applies to each.
+- **Close-out**, before leaving a session: everything pushed; PRs open or
+  merged; `MISTAKES.md` entry for any correction; open follow-ups filed as
+  issues (not left in chat); deferred ideas parked in an issue.
