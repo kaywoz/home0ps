@@ -7,7 +7,7 @@ Every container on the home0ps hosts, so names stay unique. Scheme: [`NAMING.md`
 **Groups by host and stack** (kaywoz, 2026-11-26; no LXCs or VMs remain):
 
 - **homenas** (MOS): stacks infra, apps, media and storage, all group `01`.
-- **Monitoring host**: stacks infra and monitoring. The infra stack's services also run on the homenas, so they continue at group `02`, then `03` for a further host. Monitoring-stack services exist only here and are group `01`.
+- **Monitoring host**: one stack, `monitoring`, for the whole host (only the homenas has per-stack files). Services that also run on the homenas (socket proxy, Beszel agent) continue at group `02`, then `03` for a further host; services that exist only here are group `01`.
 
 Names stay unique across hosts. Retired hosts' names are in [`archive/docker-compose/CONTAINERS-retired.md`](../archive/docker-compose/CONTAINERS-retired.md).
 
@@ -50,13 +50,13 @@ Names reserved by the homenas stacks ([`homenas/README.md`](homenas/README.md)).
 
 ## Monitoring host — built
 
-Intel N305, Ubuntu ([`../security/monitoring.md`](../security/monitoring.md)). All six are in one compose file today; the split into an infra and a monitoring stack is not built yet.
+Intel N305, Ubuntu ([`../security/monitoring.md`](../security/monitoring.md)).
 
 | Container | Host role | Defined in | Since |
 |---|---|---|---|
-| `kr-ccp-gatus-0101` | monitoring host, monitoring services | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
-| `kr-ccp-beszel-0101` | monitoring host, monitoring services | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
-| `kr-ccp-beszelagent-0201` | monitoring host, infra services | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
-| `kr-ccp-dozzle-0101` | monitoring host, monitoring services | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
-| `kr-ccp-socketproxy-0201` | monitoring host, infra services | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
-| `kr-ccp-healthchecks-0101` | monitoring host, monitoring services | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
+| `kr-ccp-gatus-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
+| `kr-ccp-beszel-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
+| `kr-ccp-beszelagent-0201` | monitoring host (`0101` on the homenas) | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
+| `kr-ccp-dozzle-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
+| `kr-ccp-socketproxy-0201` | monitoring host (`0101` on the homenas) | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
+| `kr-ccp-healthchecks-0101` | monitoring host | [`monitoring/compose.yaml`](monitoring/compose.yaml) | 2026-11-26 |
