@@ -295,7 +295,7 @@ verify_ssh() {
   sshd -T 2>/dev/null | grep -x 'passwordauthentication no' >/dev/null && ok "SSH passwords off" || bad "PasswordAuthentication"
 }
 
-# ---- sysctl: kernel hardening (same values as the Pi) -----------------------
+# ---- sysctl: kernel hardening -----------------------------------------------
 apply_sysctl() {
   step "sysctl: kernel hardening"
   if [ -n "$CONTAINER" ]; then echo "  skipped: inside a container ($CONTAINER) — set on the host"; return 0; fi

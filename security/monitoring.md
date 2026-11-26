@@ -1,8 +1,8 @@
 # Monitoring host security design
 
-Raspberry Pi 5 (8 GB, 128 GB NVMe), Raspberry Pi OS Lite 64-bit. **Observation-only:** may read everything (metrics, logs, health), may change nothing elsewhere. Builds on the [global baseline](../SECURITY.md); this file lists only what is specific to this role.
+Intel N305 (8 cores, 64 GB, 1 TB NVMe, 4× 2.5GbE), **Ubuntu 26.04 LTS**, rebuilt for this role with `baseline.sh` (kaywoz, 2026-11-26; earlier on a Raspberry Pi 5, retired). **Observation-only:** may read everything (metrics, logs, health), may change nothing elsewhere. Builds on the [global baseline](../SECURITY.md); this file lists only what is specific to this role.
 
-Rebuild: [`config-files/rpi/HARDENING.md`](../config-files/rpi/HARDENING.md) + [`harden-rpi5.sh`](../config-files/rpi/harden-rpi5.sh). Stack: [`docker-compose/monitoring/`](../docker-compose/monitoring/).
+Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh) then [`docker-host.sh`](../config-files/ubuntu/docker-host.sh). The Pi build is archived in [`archive/config-files/rpi/`](../archive/config-files/rpi/). Stack: [`docker-compose/monitoring/`](../docker-compose/monitoring/).
 
 ## Network exposure
 
@@ -13,7 +13,6 @@ Rebuild: [`config-files/rpi/HARDENING.md`](../config-files/rpi/HARDENING.md) + [
 | Non-tailnet inbound | Only LAN syslog (UDP/TCP 514), restricted to LAN ranges, not on the Tailscale interface — kaywoz/home0ps#97 (blocked while LogTide is benched, #207) |
 | Tailscale feature abuse | `tag:monitoring` only; no `--accept-routes`; stale nodes removed. Tailscale SSH on: privusers only, admin account only, 24h check, never root (`sshTests`); sshd stays on the LAN address as break-glass |
 | Over-broad tailnet access | Admin grant to the `svc:*` list on 443; explicit outbound grants per flow (Beszel agent pull on 45876, Dozzle reads remote hosts' read-only socket proxies on 2375); observed hosts may push only to `svc:healthchecks` and `svc:beszel` (Beszel agent WebSocket), each with an ACL test |
-| Wireless / serial attack surface | Wi-Fi, Bluetooth, UART disabled (`-pi5` overlays) |
 
 ## Authentication
 
@@ -29,16 +28,16 @@ Rebuild: [`config-files/rpi/HARDENING.md`](../config-files/rpi/HARDENING.md) + [
 | `userns-remap` exemptions | Only the socket proxy (must open `docker.sock`) and the Beszel agent (host networking; runs as real UID 65534) |
 | Docker control via monitoring tools | Dozzle actions off; Beszel agent and Dozzle read through the socket proxy (`POST=0`). Remote hosts also only through their own `POST=0` proxies (Dozzle remote-host mode), never Dozzle agents: an agent needs the full socket and allows exec into containers (decided 2026-11-07) |
 | This host controlling others | No write paths outward (no Dockhand/Hawser here); agents are pulled over scoped grants, or push to the hub's Service; inbound pushes reach only those two Services |
-| Memory limits silently ignored | `cgroup_enable=memory` on the kernel cmdline (off by default on Raspberry Pi OS) |
+| Memory limits silently ignored | cgroup v2 with the memory controller (Ubuntu default; check: `memory` in `/sys/fs/cgroup/cgroup.controllers`) |
 
 ## Platform
 
 | Risk | Control |
 |---|---|
-| Known vulnerabilities | Unattended upgrades incl. Raspberry Pi Foundation origin, auto reboot 04:00 |
-| Unused attack surface | Purged avahi, cups, bluez, wpasupplicant, triggerhappy |
-| Boot tampering | `BOOT_ORDER=0xf6` (NVMe only) |
-| jemalloc-based binaries failing on 16K pages | `kernel=kernel8.img` (4K pages) |
+| Known vulnerabilities | Unattended upgrades: Ubuntu security + updates (+ ESM), Docker CE included (`docker-host.sh`), automatic reboot 04:00 |
+| Snap as a second, auto-updating package channel | All snaps removed, `snapd` purged and pinned out |
+| Kernel exploitation / info leaks | `kptr_restrict=2`, `dmesg_restrict=1`, `unprivileged_bpf_disabled=1`, `rp_filter=1` |
+| Unused attack surface | Purged avahi, cups, bluez, modemmanager, triggerhappy, popularity-contest |
 
 ## Secrets
 

@@ -59,8 +59,7 @@ Earlier stacks were retired to [`archive/docker-compose/`](archive/docker-compos
 
 | Role | Hardware | Purpose | Network | Status |
 |------|----------|---------|---------|--------|
-| Monitoring host | Raspberry Pi 5 (8 GB, 128 GB NVMe) | Observation-only: metrics, logs, health; changes nothing elsewhere | Monitoring VLAN (access port, tagged VLANs blocked) | Built |
-| Apps host | Intel N305, 4× 2.5GbE, dual NVMe | Docker apps, trusted well-known apps only | VLAN 31 native + VLAN 13 tagged (macvlan for IoT-facing apps) | Next phase |
+| Monitoring host | Intel N305 (8 cores, 64 GB, 1 TB NVMe, 4× 2.5GbE), Ubuntu 26.04 LTS | Observation-only: metrics, logs, health; changes nothing elsewhere | Monitoring VLAN (access port, tagged VLANs blocked) | Built |
 | Homenas | MOS NAS | Storage, pulls backups; runs the home Docker stacks (`docker-compose/homenas/`: infra, apps phase 1 and storage built, media not yet) | VLAN 31 | In progress |
 | Lab (not home0ps) | 2× XCP-ng hosts | Risky / experimental / `privileged` workloads as VMs | — | Separate |
 
@@ -74,7 +73,7 @@ Earlier stacks were retired to [`archive/docker-compose/`](archive/docker-compos
 
 ![Homelab network and hardware topology](d2/homelab-topology.svg)
 
-Two XCP-ng hypervisors (Hypervisor1: 24t/128GB/6TB nvme/2TB ssd, Hypervisor2: 24t/112GB/6TB nvme/2TB ssd), a NAS running MOS, a Raspberry Pi 5 monitoring node (Pi5: 8GB/128GB nvme; Gatus, Beszel hub, Healthchecks, Dozzle; hardened with [`config-files/rpi/harden-rpi5.sh`](config-files/rpi/harden-rpi5.sh)), and cloud storage spread across OneDrive (1TB), Filen (200GB), Storadera S3 (1TB), Hetzner S3 (1TB), Hetzner Storagebox (5TB), and Put.io (100GB). Source diagram: [`d2/homelab-topology.d2`](d2/homelab-topology.d2).
+Two XCP-ng hypervisors (Hypervisor1: 24t/128GB/6TB nvme/2TB ssd, Hypervisor2: 24t/112GB/6TB nvme/2TB ssd), a NAS running MOS, an Intel N305 monitoring node (8t/64GB/1TB nvme; Gatus, Beszel hub, Healthchecks, Dozzle; built with [`config-files/ubuntu/baseline.sh`](config-files/ubuntu/baseline.sh)), and cloud storage spread across OneDrive (1TB), Filen (200GB), Storadera S3 (1TB), Hetzner S3 (1TB), Hetzner Storagebox (5TB), and Put.io (100GB). Source diagram: [`d2/homelab-topology.d2`](d2/homelab-topology.d2).
 
 ## Infrastructure as code (`iac/`)
 

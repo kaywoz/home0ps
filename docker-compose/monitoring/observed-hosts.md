@@ -84,7 +84,7 @@ Not part of onboarding, but the same kind of host step:
 sudo tailscale serve --service=svc:<name> --https=443 127.0.0.1:<port>
 ```
 
-Check with `tailscale serve status`; the "approval from an admin is required" message is printed regardless ([`config-files/rpi/HARDENING.md`](../../config-files/rpi/HARDENING.md)).
+Check with `tailscale serve status`; the "approval from an admin is required" message is printed regardless (noted when the Pi monitoring host was built: [`archive/config-files/rpi/HARDENING.md`](../../archive/config-files/rpi/HARDENING.md)).
 
 ## Speeding this up (ideas, parked)
 
