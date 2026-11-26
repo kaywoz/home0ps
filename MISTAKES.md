@@ -207,3 +207,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** searched for `config-files/rpi` and `Raspberry Pi 5`, not for the bare folder name.
 - **Fix applied:** removed in the follow-up PR.
 - **Rule going forward:** after moving a folder, grep for its bare name as well as its path (`git grep -nw NAME`).
+
+### 2026-11-26 — monitoring (empty HC_SECRET_KEY after the deploy walkthrough)
+
+- **Trigger:** apply broke something
+- **What happened:** the monitoring deploy walkthrough copied `.env.example` to `.env` and said `hc-setup.sh` would generate `HC_SECRET_KEY`. The example holds an empty `HC_SECRET_KEY=` line; the script only checked that the key name exists, so it generated nothing. Healthchecks ran with an empty secret key and answered every request with 500.
+- **Root cause:** described what the script does from its comment, not from its check; the walkthrough and the script's presence-only `grep` combined into the failure.
+- **Fix applied:** `hc-setup.sh` treats an empty value as missing, replaces the line and fails if it is still empty; kaywoz got commands to set the key on the host.
+- **Rule going forward:** when a walkthrough copies an example file, read every script check that later reads it; "key present" checks test for a value (`^KEY=..*`), not the key name.
