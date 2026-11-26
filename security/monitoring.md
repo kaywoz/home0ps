@@ -12,7 +12,7 @@ Rebuild: [`config-files/ubuntu/baseline.sh`](../config-files/ubuntu/baseline.sh)
 | Services reachable from LAN/internet | UIs only as Tailscale Services on 443 (`svc:gatus`, `svc:beszel`, `svc:dozzle`, `svc:healthchecks`, `svc:cockpit-sexy`); all ports on `127.0.0.1`, Beszel agent on `172.31.250.1` (bridge gateway only) |
 | Non-tailnet inbound | Only LAN syslog (UDP/TCP 514), restricted to LAN ranges, not on the Tailscale interface — kaywoz/home0ps#97 (blocked while LogTide is benched, #207) |
 | Tailscale feature abuse | `tag:monitoring` and `tag:cockpit` only (no `tag:observed`); no `--accept-routes`; stale nodes removed. Tailscale SSH on: privusers only, admin account only, 24h check, never root (`sshTests`); sshd stays on the LAN address as break-glass |
-| Over-broad tailnet access | Admin grant to the `svc:*` list on 443; explicit outbound grants per flow (Beszel agent pull on 45876, Dozzle reads remote hosts' read-only socket proxies on 2375); observed hosts may push only to `svc:healthchecks` and `svc:beszel` (Beszel agent WebSocket), each with an ACL test |
+| Over-broad tailnet access | Admin grant to the `svc:*` list on 443; explicit outbound grants per flow (Beszel agent pull on 45876, Dozzle reads remote hosts' read-only socket proxies on 2375); observed hosts may push only to `svc:healthchecks` and `svc:beszel` (Beszel agent WebSocket), each with an ACL test. One write flow out: its own backup to `svc:kopia` on 443 (append-only by Kopia ACL) |
 
 ## Authentication
 

@@ -283,6 +283,9 @@ change explicitly if one no longer fits.
   and `svc:beszel` (Beszel agent WebSocket),
   nothing else on the monitoring host. Each push flow is its own grant
   with an ACL test.
+  **Exception — the monitoring host's own backup** (kaywoz, 2026-11-26):
+  it may write to `svc:kopia` on the homenas, append-only (Kopia ACL: no
+  delete), its own snapshots only. Its only write flow outward.
 - **Logs:** journald everywhere (Docker `journald` driver), persistent and
   sealed, kept on each host (`config-files/logging/`). Off-box shipping
   (Fluent Bit → LogTide) is benched (kaywoz, 2026-11-02, kaywoz/home0ps#207;

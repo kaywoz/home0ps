@@ -215,6 +215,13 @@
 			"ip":  ["tcp:8089"],
 		},
 		{
+			// monitoring host backs up its own stack to the homenas Kopia server (kaywoz, 2026-11-26):
+			// one write flow, append-only by Kopia ACL (no delete); CLAUDE.md §8 "Monitoring pulls" exception
+			"src": ["tag:monitoring"],
+			"dst": ["svc:kopia"],
+			"ip":  ["tcp:443"],
+		},
+		{
 			// monitoring host pulls from observed hosts: beszel agent (45876), and Dozzle reading each
 			// host's read-only docker-socket-proxy (2375, POST=0; remote-host mode, no Dozzle agent)
 			"src": ["tag:monitoring"],
@@ -253,9 +260,9 @@
 			"deny":   ["tag:monitoring:22", "tag:monitoring:443", "tag:observed:45876", "tag:observed:2375"],
 		},
 		{
-			// the monitoring host pulls agents and read-only Docker APIs, nothing else
+			// the monitoring host pulls agents and read-only Docker APIs, and backs itself up to Kopia; nothing else
 			"src":    "tag:monitoring",
-			"accept": ["tag:observed:45876", "tag:observed:2375", "macmini:45876"],
+			"accept": ["tag:observed:45876", "tag:observed:2375", "macmini:45876", "svc:kopia:443"],
 			"deny":   ["tag:observed:22", "tag:observed:7007", "macmini:22"],
 		},
 		{
