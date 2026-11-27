@@ -27,18 +27,25 @@ claims; `git status` clean before switching branches.
 
 ## 2. PR description
 
-Headings in this order (CLAUDE.md §5). Generic wording only, no device,
-host or account names (§4):
+Covers what CLAUDE.md §5 asks for, written to §9 "GitHub text". Generic
+wording only, no device, host or account names (§4). In this order:
 
 ```markdown
+<one sentence: what changed and why>
+
+## Action required        (only if kaywoz must do something)
 ## What changed
 ## Source of truth
-## Secrets / env
-## Assumptions
-## Flagged
+## Flagged                (only if anything)
 ## Project board
 ## Rollback
+
+Secrets: none · Assumptions: none
 ```
+
+Secrets / env and Assumptions get their own heading only when there is
+more than one short line to say; otherwise they go in the closing line,
+and a part with nothing in it is left out.
 
 Write "Project board" last, after step 3.
 
@@ -88,7 +95,8 @@ this repo). Status options: `backlog`, `selected`, `done`, `wont do`.
   `gh api -X GET search/issues -f q='repo:kaywoz/home0ps is:issue is:open' -f per_page=100 --jq '.items[] | "#\(.number) \(.title)"'`
   (issues only, not draft items or other repos; say so in the PR). Open
   issues with the GitHub MCP. Hand kaywoz the write commands below as
-  copy-paste blocks labelled `# admin Mac, home0ps checkout (shell)`.
+  copy-paste blocks, label `admin Mac, home0ps checkout (shell)` on the
+  line above each block.
 
 ### Read the open items (Mac)
 
