@@ -111,8 +111,9 @@ before closing anything (MISTAKES.md, issue closed in the wrong repo).
 
 ### Add an issue to the board (**tested**)
 
+admin Mac, home0ps checkout (shell):
+
 ```bash
-# admin Mac, home0ps checkout (shell)
 .claude/gh-project.sh item-add 4 --owner kaywoz --url https://github.com/kaywoz/home0ps/issues/N
 ```
 
@@ -125,8 +126,9 @@ Replace `N` with the issue number and `selected` with the status name
 doesn't cover them (untested; take the item `id` from the item-list JSON and
 use option id `98236657` for `done`).
 
+admin Mac, home0ps checkout (shell):
+
 ```bash
-# admin Mac, home0ps checkout (shell)
 P=$(gh project view 4 --owner kaywoz --format json --jq .id) &&
 I=$(gh project item-list 4 --owner kaywoz --format json --limit 300 \
   --jq '.items[] | select(.content.repository=="kaywoz/home0ps" and .content.number==N) | .id') &&
