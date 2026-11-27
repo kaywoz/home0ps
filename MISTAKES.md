@@ -295,3 +295,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** took the command from Kopia's docs page, which omits `--delete`, without checking the installed version's usage line (repeat of the checklist rule "A CLI not used before in this repo: check its usage line").
 - **Fix applied:** `kopia server acl remove ID --delete`; `acl list` checked afterwards.
 - **Rule going forward:** for a destructive subcommand of a tool not used before, check its `--help` on the installed version (or its source at that tag) for a confirm or dry-run flag before handing the command over.
+
+### 2026-11-27 — backup (Kopia retention for append-only clients)
+
+- **Trigger:** wrong assumption
+- **What happened:** Claude told kaywoz that append-only Kopia clients can't apply retention, so pruning would need its own schedule on the homenas, and that snapshot runs might fail once old snapshots existed. Kopia's source shows the opposite: for repository-server clients the server applies the retention on the client's behalf, needing only APPEND (`snapshot/policy/expire.go`, `internal/server/grpc_session.go`). The real gap was elsewhere: the default ACL gives each user FULL on its own policy, so a compromised client could shorten its retention and have the server delete its history.
+- **Root cause:** reasoned from the ACL levels alone without reading how the server handles retention.
+- **Fix applied:** `--server` sets retention per client (`mover@<host>`) and makes policies read-only for `mover@*`; `--test-append-only` also checks a policy change is refused.
+- **Rule going forward:** before describing how a tool enforces something (deletes, retention, ACLs), read the code path that does it, not just the permission names.
