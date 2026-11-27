@@ -5,8 +5,11 @@
 #
 # On the homenas, once per client (root; the Kopia repository must exist):
 #   ./kopia-backup.sh --server [HOST]   adds or resets user mover@<HOST> (password from 1Password, else asked),
-#                                       enables ACLs, removes the default FULL snapshot rule, adds mover@* APPEND
-#                                       (no delete), restarts the server and checks the rules
+#                                       enables ACLs, removes the default FULL snapshot and own-policy rules, adds
+#                                       mover@* APPEND on snapshots (no delete) and READ on own policies, sets the
+#                                       client's retention (KEEP_DAILY/WEEKLY/MONTHLY), restarts and checks.
+#                                       Retention is applied by the server on the client's behalf after each
+#                                       snapshot (Kopia: snapshot/policy/expire.go); clients can't change it.
 # On each client (root):
 #   ./kopia-backup.sh --setup           creates /etc/home0ps and the state folders, writes the .conf from prompts
 #                                       (defaults read from the host), installs kopia, connects (asks mover's
@@ -62,6 +65,8 @@ KUSER=mover                             # data-moving accounts are always mover@
 UNIT=home0ps-kopia-backup
 TEST=/var/lib/home0ps/kopia-backup-test    # empty folder for --test-append-only
 KOPIA_CONTAINER="${KOPIA_CONTAINER:-kr-ccp-kopia-0101}"
+# Retention per client (kaywoz, 2026-11-27): 14 daily, 8 weekly, 12 monthly; set on mover@<host> by --server
+KEEP_DAILY="${KEEP_DAILY:-14}"; KEEP_WEEKLY="${KEEP_WEEKLY:-8}"; KEEP_MONTHLY="${KEEP_MONTHLY:-12}"
 KOPIA_URL=""; KOPIA_HOST=""; SOURCES=""; STOP_COMPOSE=""; KOPIA_FINGERPRINT=""; HC_PING_URL=""
 HC_URL=""; HC_PING_KEY=""; ON_CALENDAR=""; SERVER_HOST="${SERVER_HOST:-}"
 OP_VAULT="${OP_VAULT:-home0ps}"; OP_TOKEN_CRED="${OP_TOKEN_CRED:-/etc/home0ps/op-token.cred}"
@@ -294,7 +299,7 @@ backup() {
 
 test_append_only() {
   need_conf
-  step "append-only test: snapshot an empty folder, then try to delete it"
+  step "append-only test: snapshot an empty folder, try to delete it, try to change own retention"
   install -d -m 700 "$TEST"
   kopia snapshot create "$TEST" --description="append-only test" >/dev/null
   local id
@@ -303,6 +308,9 @@ test_append_only() {
   if kopia snapshot delete "$id" --delete >/dev/null 2>&1; then
     bad "DELETE WAS ALLOWED: the server ACL isn't append-only for $KUSER@$KOPIA_HOST (run --server on the homenas)"
   else ok "delete refused: append-only works"; fi
+  if kopia policy set "$TEST" --keep-latest 1 >/dev/null 2>&1; then
+    bad "POLICY CHANGE WAS ALLOWED: $KUSER@$KOPIA_HOST could shorten its retention (run --server on the homenas)"
+  else ok "policy change refused: retention is server-controlled"; fi
 }
 
 verify() {
@@ -379,11 +387,28 @@ server_setup() {
   if acl_list | grep -F "user:$KUSER@* access:APPEND target:type=snapshot" >/dev/null; then ok "$KUSER@* APPEND rule present"
   else run kx server acl add --user "$KUSER@*" --access APPEND --target type=snapshot,username=OWN_USER,hostname=OWN_HOST; fi
 
+  step "ACL: policies are admin-only ($KUSER@* may read its own, not change it)"
+  # The default *@* FULL rule on own policies would let a client shorten its retention, and the server applies
+  # retention on the client's behalf: that would delete its history despite APPEND on snapshots.
+  for id in $(acl_list | awk '/user:\*@\* access:FULL target:type=policy/ {sub("^id:","",$1); print $1}'); do
+    note "removing the default FULL own-policy rule $id"
+    run kx server acl remove "$id" --delete
+  done
+  if acl_list | grep -F "user:$KUSER@* access:READ target:type=policy,username=OWN_USER,hostname=OWN_HOST" >/dev/null; then ok "$KUSER@* READ policy rule present"
+  else run kx server acl add --user "$KUSER@*" --access READ --target type=policy,username=OWN_USER,hostname=OWN_HOST; fi
+
+  step "retention: $user keeps $KEEP_DAILY daily, $KEEP_WEEKLY weekly, $KEEP_MONTHLY monthly"
+  run kx policy set "$user" --keep-latest 1 --keep-hourly 0 --keep-daily "$KEEP_DAILY" \
+    --keep-weekly "$KEEP_WEEKLY" --keep-monthly "$KEEP_MONTHLY" --keep-annual 0 >/dev/null
+
   step "restart: the server loads users and ACLs"
   [ "$MODE" = dry ] || { docker restart "$KOPIA_CONTAINER" >/dev/null; sleep 15; }
   local acl; acl=$(acl_list)
   printf '%s\n' "$acl" | grep 'access:FULL target:type=snapshot' >/dev/null && bad "a FULL snapshot rule is still there" || ok "no FULL snapshot rule"
   printf '%s\n' "$acl" | grep -F "user:$KUSER@* access:APPEND target:type=snapshot" >/dev/null && ok "$KUSER@* APPEND rule active" || bad "$KUSER@* APPEND rule missing"
+  printf '%s\n' "$acl" | grep 'access:FULL target:type=policy' >/dev/null && bad "a FULL policy rule is still there" || ok "no FULL policy rule"
+  local pol; pol=$(kx policy show "$user" 2>/dev/null || true)
+  printf '%s\n' "$pol" | grep -E "Daily snapshots:[[:space:]]+$KEEP_DAILY([[:space:]]|\$)" >/dev/null && ok "retention set on $user" || bad "retention not shown for $user (check: kopia policy show $user)"
   kx server user list 2>/dev/null | grep -Fx "$user" >/dev/null && ok "$user listed" || bad "$user not listed"
   note "next, on the client as root: ./kopia-backup.sh --setup (the password just set for $user)"
 }
