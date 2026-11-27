@@ -42,10 +42,11 @@ Ctrl-C kills rclone immediately.
 
 Settings: /var/mergerfs/merger-nvme/disk1/mos-docker/appdata/home0ps/media-sort.env
 (override with MEDIA_SORT_ENV=<file>); see
-media-sort.env.example. Healthchecks: one ping per run with a summary as the ping body
-(/fail on errors), so the last run's report is visible in Healthchecks.
+media-sort.env.example. Healthchecks: one ping per run of sort, junk and holding, with a summary as
+the ping body (/fail on errors), so the last run's report is visible in Healthchecks. Each job has its
+own check, media-sort-<job>-<host>, created by Healthchecks on the first ping (HC_URL + HC_PING_KEY).
 """
-import datetime, fcntl, json, os, re, signal, subprocess, sys, time, urllib.request
+import datetime, fcntl, json, os, re, signal, socket, subprocess, sys, time, urllib.request
 
 HOME0PS = "/var/mergerfs/merger-nvme/disk1/mos-docker/appdata/home0ps"   # Docker-side host files: disk path, outside mergerfs
 ENV_FILE = os.environ.get("MEDIA_SORT_ENV", HOME0PS + "/media-sort.env")
@@ -147,12 +148,17 @@ def exists(path):
     return rclone("lsjson", "--stat", path, check=False).returncode == 0
 
 
-def ping(ok, body):
-    url = E.get("PING_URL", "").rstrip("/")
+def ping(job, ok, body):
+    """PING_URL (one check's own URL) wins; else HC_URL + HC_PING_KEY ping the slug
+    media-sort-<job>-<host>, and Healthchecks creates that check on its first ping (?create=1)."""
+    url, q = E.get("PING_URL", "").rstrip("/"), ""
+    if not url and E.get("HC_URL") and E.get("HC_PING_KEY"):
+        host = socket.gethostname().split(".")[0]
+        url, q = f"{E['HC_URL'].rstrip('/')}/ping/{E['HC_PING_KEY']}/media-sort-{job}-{host}", "?create=1"
     if not url:
         return
     try:
-        urllib.request.urlopen(urllib.request.Request(url + ("" if ok else "/fail"), body.encode()[-90000:]),
+        urllib.request.urlopen(urllib.request.Request(url + ("" if ok else "/fail") + q, body.encode()[-90000:]),
                                timeout=10)
     except Exception as e:
         log(f"healthchecks ping failed: {e}")
@@ -520,7 +526,7 @@ def main():
             if os.path.exists(f):
                 os.remove(f)
         if job in ("sort", "junk", "holding"):
-            ping(False, msg)
+            ping(job, False, msg)
         sys.exit(130)
     except Exception as e:
         errors, report = 1, [f"ERROR {e}"]
@@ -528,7 +534,7 @@ def main():
     summary = f"{job} ({'run' if run else 'dry run'}): {len(report)} line(s), {errors} error(s)\n" + "\n".join(report)
     log(f"done {job}: {errors} error(s)")
     if job in ("sort", "junk", "holding"):
-        ping(errors == 0, summary)
+        ping(job, errors == 0, summary)
     sys.exit(1 if errors else 0)
 
 

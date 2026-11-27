@@ -303,3 +303,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** reasoned from the ACL levels alone without reading how the server handles retention.
 - **Fix applied:** `--server` sets retention per client (`mover@<host>`) and makes policies read-only for `mover@*`; `--test-append-only` also checks a policy change is refused.
 - **Rule going forward:** before describing how a tool enforces something (deletes, retention, ACLs), read the code path that does it, not just the permission names.
+
+### 2026-11-27 — mos (bytecode committed)
+
+- **Trigger:** wrong assumption
+- **What happened:** Claude syntax-checked `media-sort.py` with `python3 -m py_compile`, which wrote `config-files/mos/__pycache__/*.pyc`, then committed with `git add -A config-files/mos` and pushed the bytecode file to a PR branch.
+- **Root cause:** assumed the repo ignored `__pycache__/` and staged a whole folder without reading `git status` first.
+- **Fix applied:** removed the file in a follow-up commit; `.gitignore` now ignores `__pycache__/`.
+- **Rule going forward:** check Python syntax with `python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' FILE` (writes nothing), and read `git status -s` before every commit; stage files by name.

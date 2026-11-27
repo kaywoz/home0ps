@@ -31,7 +31,12 @@
 #   COOLDOWN_MIN=10          wait after a bounce that didn't help
 #   LOG_FILE=/var/log/nic-watchdog.log      RAM, capped at LOG_MAX_KB [256], visible in the MOS UI
 #   EVENT_FILE=/boot/config/home0ps/nic-watchdog.events   persistent, one line per bounce
-#   HC_URL=                  Healthchecks ping URL (a secret: env file only, 600)
+#   HC_URL=                  Healthchecks base URL, https://healthchecks.<tailnet>.ts.net
+#   HC_PING_KEY=             project ping key (a secret: env file only, 600); pings go to
+#                            HC_URL/ping/<key>/nic-watchdog-<host>?create=1, the check is created
+#                            on the first ping
+#   HC_PING_URL=             optional: a check's own ping URL instead (an old HC_URL holding a
+#                            full .../ping/<uuid> URL still works and is used the same way)
 set -euo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -39,7 +44,7 @@ ENV_FILE="${NIC_WATCHDOG_ENV:-/boot/config/home0ps/nic-watchdog.env}"
 MODE=apply
 case "${1:-}" in
   --check) MODE=check ;;
-  -h|--help) sed -n '2,36p' "$0"; exit 0 ;;
+  -h|--help) sed -n '2,39p' "$0"; exit 0 ;;
   "") ;;
   *) echo "unknown option: $1" >&2; exit 1 ;;
 esac
@@ -51,6 +56,8 @@ PROBE_SIZE="${PROBE_SIZE:-1000}"; PROBES="${PROBES:-3}"
 MAX_PER_HOUR="${MAX_PER_HOUR:-4}"; COOLDOWN_MIN="${COOLDOWN_MIN:-10}"
 LOG_FILE="${LOG_FILE:-/var/log/nic-watchdog.log}"; LOG_MAX_KB="${LOG_MAX_KB:-256}"
 EVENT_FILE="${EVENT_FILE:-/boot/config/home0ps/nic-watchdog.events}"; HC_URL="${HC_URL:-}"
+HC_PING_KEY="${HC_PING_KEY:-}"; HC_PING_URL="${HC_PING_URL:-}"
+case "$HC_URL" in */ping/*) HC_PING_URL="${HC_PING_URL:-$HC_URL}" ;; esac   # old setting: a check's own URL
 STATE_DIR=/run/nic-watchdog   # RAM: route, last state, bounce times; reset at boot on purpose
 
 log() {
@@ -70,9 +77,13 @@ event() {   # persistent record on the boot stick, only when something happened 
     tail -n 400 "$EVENT_FILE" > "$EVENT_FILE.tmp" && mv "$EVENT_FILE.tmp" "$EVENT_FILE"
   fi
 }
-hc() {   # hc ""|/fail "message"
-  [ -n "$HC_URL" ] || return 0
-  curl -fsS -m 10 --retry 2 --data-raw "$2" "${HC_URL%/}$1" >/dev/null 2>&1 || true
+hc() {   # hc ""|/fail "message": a check's own URL if set, else auto-provisioned by slug (?create=1)
+  local url
+  if [ -n "$HC_PING_URL" ]; then url="${HC_PING_URL%/}$1"
+  elif [ -n "$HC_URL" ] && [ -n "$HC_PING_KEY" ]; then
+    url="${HC_URL%/}/ping/$HC_PING_KEY/nic-watchdog-${HOSTNAME%%.*}$1?create=1"
+  else return 0; fi
+  curl -fsS -m 10 --retry 2 --data-raw "$2" "$url" >/dev/null 2>&1 || true
 }
 # log only when the state changes, so a healthy box writes nothing every minute
 state_change() { local old; old=$(cat "$STATE_DIR/state" 2>/dev/null || true); echo "$1" > "$STATE_DIR/state"; [ "$old" != "$1" ]; }
