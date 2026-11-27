@@ -20,7 +20,7 @@
 #
 # File names (CLAUDE.md §8): settings /etc/home0ps/kopia-backup.conf (root, 600; written by --setup, edit freely):
 #   KOPIA_URL=https://kopia.<tailnet>.ts.net:443   svc:kopia; Kopia's gRPC client needs the port (:443 added)
-#   SOURCES="/srv/docker"                          absolute paths, space-separated
+#   SOURCES="/srv/docker /etc/home0ps /home"       absolute paths, space-separated; default: those that exist
 #   STOP_COMPOSE=/srv/docker                       compose project stopped during the snapshot; empty = none
 #   HC_URL=https://healthchecks.<tailnet>.ts.net   Healthchecks; the check is auto-provisioned on the first ping:
 #   HC_PING_KEY=                                   project ping key (secret: from 1Password, else asked hidden);
@@ -140,7 +140,7 @@ write_conf() {
   dns=$(tailscale status --json 2>/dev/null | python3 -c 'import sys,json;print(json.load(sys.stdin).get("MagicDNSSuffix") or "")' 2>/dev/null || true)
   url="https://kopia.${dns:-TAILNET.ts.net}:443"
   hcurl="https://healthchecks.${dns:-TAILNET.ts.net}"
-  src=""; for d in /srv/docker /etc/home0ps; do [ -d "$d" ] && src="${src:+$src }$d"; done
+  src=""; for d in /srv/docker /etc/home0ps /home; do [ -d "$d" ] && src="${src:+$src }$d"; done
   hc=$(op_get "op://$OP_VAULT/healthchecks-ping-key/password")
   [ -n "$hc" ] && note "Healthchecks ping key: from 1Password (op://$OP_VAULT/healthchecks-ping-key)"
   stop=""; [ -f /srv/docker/compose.yaml ] && command -v docker >/dev/null 2>&1 && stop=/srv/docker
