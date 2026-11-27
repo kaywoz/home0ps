@@ -303,7 +303,9 @@ change explicitly if one no longer fits.
   `security/<role>.md` per host role. Update them in the same change as the
   system they describe.
 
-## 9. Reply style
+## 9. Writing style
+
+### Chat replies
 
 kaywoz, 2026-11-23. Applies to every reply, all projects:
 
@@ -317,6 +319,37 @@ kaywoz, 2026-11-23. Applies to every reply, all projects:
 - Every PR, issue or commit mentioned in a reply is a full clickable
   link (`https://github.com/kaywoz/<repo>/pull/N`), not a bare `#N`, so
   kaywoz can open it on mobile.
+
+Added kaywoz, 2026-11-27:
+
+- Order: status (1-2 lines, with links), then **Decide** (questions for
+  kaywoz), then **Do** (numbered steps for kaywoz), then notes (limits,
+  edge cases). Leave out a part with nothing in it.
+- Link the PR; don't restate its body. Chat says what changes for kaywoz,
+  not what the diff says.
+- Each step: host label on the line above the block, never a `#` line
+  inside it; then the command or exact click path; then **Expect:**.
+- Negative findings ("nothing else needed changing") get one line, not a
+  list.
+- Bold marks section labels only, not the start of every bullet.
+
+### GitHub text (PRs, issues, commits, comments)
+
+kaywoz, 2026-11-27. The reader is kaywoz on mobile, or months later.
+
+- First line: what changed and why, one sentence.
+- Each fact once. The why goes in the PR summary only; a commit body is
+  at most 5 lines and doesn't repeat the PR.
+- Don't restate the diff: name the file and the behaviour change, not
+  every flag or value.
+- Sources: name them (path, link, `kaywoz, DATE`); quote only a disputed
+  line.
+- Tests: one line each, `<what> → <result>`; say what wasn't tested.
+- Anything kaywoz must do goes first, under **Action required**.
+- A section with nothing in it is removed; short ones collapse into one
+  closing line (`Secrets: none · Assumptions: none`).
+- Budget: PR body at most 25 lines, issue at most 15, bullet at most 2
+  lines. Over budget: cut content, not words.
 
 ## 10. Work units (sessions)
 
