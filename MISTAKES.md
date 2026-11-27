@@ -311,3 +311,11 @@ These archived entries are fully covered by the section named; no extra rule:
 - **Root cause:** assumed the repo ignored `__pycache__/` and staged a whole folder without reading `git status` first.
 - **Fix applied:** removed the file in a follow-up commit; `.gitignore` now ignores `__pycache__/`.
 - **Rule going forward:** check Python syntax with `python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' FILE` (writes nothing), and read `git status -s` before every commit; stage files by name.
+
+### 2026-11-27 — chat (steps as instructions, not commands)
+
+- **Trigger:** misunderstood request
+- **What happened:** the sample rewrite for the new writing rules gave kaywoz steps as "put `HC_PING_KEY` in these files (600, root)" and "set each period in the UI", not commands to run.
+- **Root cause:** the rule draft covered order and length only; it said nothing about the form of a step, so file-and-instruction steps passed.
+- **Fix applied:** both steps rewritten as one-liners (key read with `read -s`, periods set through the Healthchecks API).
+- **Rule going forward:** CLAUDE.md §9 chat: every **Do** step that changes a host or service is a copy-paste one-liner; a click path only where no CLI or API exists.
